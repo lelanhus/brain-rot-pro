@@ -1,14 +1,38 @@
 import { expect, test } from '@playwright/test';
 
-// This exercises the real SSR-to-live feed and therefore needs a live Convex
-// deployment with seeded cards + PUBLIC_CONVEX_URL set. Enable with E2E_LIVE=1
-// once `npx convex dev` is running (acceptance-criteria.md Phase 0).
-test.skip(!process.env.E2E_LIVE, 'requires a live Convex deployment (set E2E_LIVE=1)');
+// SSR render test: needs a live Convex deployment with seeded cards +
+// PUBLIC_CONVEX_URL. Enable with E2E_LIVE=1 (acceptance-criteria Phase 0/1).
+// This passes anywhere SSR can reach Convex over HTTPS.
+test.describe('feed (SSR)', () => {
+	test.skip(!process.env.E2E_LIVE, 'requires a live Convex deployment (set E2E_LIVE=1)');
 
-test('feed renders source-backed cards', async ({ page }) => {
-	await page.goto('/');
-	await expect(page.getByTestId('feed')).toBeVisible();
-	await expect(page.getByRole('article').first()).toBeVisible();
-	await expect(page.getByRole('heading').first()).toBeVisible();
-	await page.screenshot({ path: 'feed-screenshot.png' });
+	test('renders source-backed cards', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByTestId('feed')).toBeVisible();
+		await expect(page.getByRole('article').first()).toBeVisible();
+		await expect(page.getByRole('heading').first()).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Save' }).first()).toBeVisible();
+		await page.screenshot({ path: 'feed-screenshot.png' });
+	});
+});
+
+// Interaction test: depends on the client-side Convex WebSocket (live updates +
+// mutations). Some sandboxed/CI browsers can't open it (TLS interception →
+// ERR_CERT_AUTHORITY_INVALID), so it's gated separately behind E2E_WS=1. The
+// save logic itself is covered by convex-test (saved.toggle/savedIds) and the
+// CardActions component test; this is the end-to-end confirmation.
+test.describe('feed (interaction, needs WebSocket)', () => {
+	test.skip(
+		!process.env.E2E_WS,
+		'needs a browser that can open the Convex WebSocket (set E2E_WS=1)'
+	);
+
+	test('save toggles saved state', async ({ page }) => {
+		await page.goto('/');
+		const save = page.getByRole('button', { name: 'Save' }).first();
+		await expect(save).toBeVisible();
+		await save.click();
+		await expect(page.getByRole('button', { name: /Saved/ }).first()).toBeVisible();
+		await page.screenshot({ path: 'feed-actions-screenshot.png' });
+	});
 });

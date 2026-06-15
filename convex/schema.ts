@@ -16,6 +16,21 @@ export const cardFormat = v.union(
 	v.literal('object_story')
 );
 
+/** Interaction event types (design doc §11.3). */
+export const eventType = v.union(
+	v.literal('session_start'),
+	v.literal('session_end'),
+	v.literal('card_impression'),
+	v.literal('card_complete'),
+	v.literal('card_skip'),
+	v.literal('card_expand'),
+	v.literal('related_tap'),
+	v.literal('save'),
+	v.literal('unsave'),
+	v.literal('source_open'),
+	v.literal('not_interested')
+);
+
 /** Card lifecycle (design doc §9.4). Only `published` is eligible for the feed. */
 export const cardStatus = v.union(
 	v.literal('draft'),
@@ -68,5 +83,30 @@ export default defineSchema({
 		// time, so the feed query stays deterministic (ADR-007 — no in-query RNG).
 		shuffleKey: v.number(),
 		createdAt: v.number()
-	}).index('by_status_shuffle', ['status', 'shuffleKey'])
+	}).index('by_status_shuffle', ['status', 'shuffleKey']),
+
+	/**
+	 * Raw interaction events (design doc §11.3). Write-heavy, append-only; the
+	 * feed query never reads these (ADR-007 — volatile signals stay out of the
+	 * reactive feed read). `deviceId` is the anonymous, pre-auth identity.
+	 */
+	events: defineTable({
+		deviceId: v.string(),
+		sessionId: v.string(),
+		type: eventType,
+		cardId: v.optional(v.id('knowledgeCards')),
+		visibleMs: v.optional(v.number()),
+		ts: v.number()
+	})
+		.index('by_device', ['deviceId'])
+		.index('by_device_session', ['deviceId', 'sessionId']),
+
+	/** Cards a device has saved. Bounded per device. */
+	savedCards: defineTable({
+		deviceId: v.string(),
+		cardId: v.id('knowledgeCards'),
+		savedAt: v.number()
+	})
+		.index('by_device', ['deviceId'])
+		.index('by_device_card', ['deviceId', 'cardId'])
 });
