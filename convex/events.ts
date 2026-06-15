@@ -32,16 +32,18 @@ export const log = mutation({
 			throw new Error(`log: batch too large (${args.events.length} > 200)`);
 		}
 
-		for (const e of args.events) {
-			await ctx.db.insert('events', {
-				deviceId: args.deviceId,
-				sessionId: args.sessionId,
-				type: e.type,
-				cardId: e.cardId,
-				visibleMs: e.visibleMs,
-				ts: e.ts
-			});
-		}
+		await Promise.all(
+			args.events.map((e) =>
+				ctx.db.insert('events', {
+					deviceId: args.deviceId,
+					sessionId: args.sessionId,
+					type: e.type,
+					cardId: e.cardId,
+					visibleMs: e.visibleMs,
+					ts: e.ts
+				})
+			)
+		);
 		return { logged: args.events.length };
 	}
 });

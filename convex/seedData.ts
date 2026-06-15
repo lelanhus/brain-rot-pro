@@ -13,27 +13,16 @@
  * follow-on (ideally the first output of the generation pipeline).
  */
 
+import type { Infer } from 'convex/values';
+import type { cardFormat, sourceValidator } from './schema';
+
 export type SeedCard = {
 	hook: string;
 	body: string;
 	whyItMatters?: string;
-	format:
-		| 'surprise_fact'
-		| 'myth_buster'
-		| 'hidden_connection'
-		| 'mini_biography'
-		| 'origin_story'
-		| 'timeline_shock'
-		| 'cause_effect'
-		| 'object_story';
+	format: Infer<typeof cardFormat>;
 	conceptTags: string[];
-	source: {
-		articleTitle: string;
-		articleUrl: string;
-		pageId?: number;
-		revisionId: number | null;
-		sourceSpan: string;
-	};
+	source: Infer<typeof sourceValidator>;
 };
 
 export const seedCards: SeedCard[] = [

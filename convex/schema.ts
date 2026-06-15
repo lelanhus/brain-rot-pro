@@ -47,7 +47,7 @@ export const cardStatus = v.union(
  * pipeline (Phase 2) must populate it. `sourceSpan` is the exact passage the
  * claim is grounded in, required for the source-support validator (review §3.2).
  */
-const source = v.object({
+export const sourceValidator = v.object({
 	articleTitle: v.string(),
 	articleUrl: v.string(),
 	pageId: v.optional(v.number()),
@@ -69,6 +69,16 @@ const image = v.object({
 	attribution: v.string()
 });
 
+/** Generation provenance (design doc §9.3): present on AI-generated cards. */
+export const generationValidator = v.object({
+	generationModel: v.string(),
+	validationModel: v.string(),
+	supportScore: v.number(),
+	promptVersion: v.string(),
+	sourceArticleId: v.id('sourceArticles'),
+	generatedAt: v.number()
+});
+
 export default defineSchema({
 	knowledgeCards: defineTable({
 		hook: v.string(),
@@ -76,20 +86,9 @@ export default defineSchema({
 		whyItMatters: v.optional(v.string()),
 		format: cardFormat,
 		conceptTags: v.array(v.string()),
-		source,
+		source: sourceValidator,
 		image: v.optional(image),
-		// Generation provenance (design doc §9.3): set for AI-generated cards,
-		// absent for hand-seeded ones. Enables regeneration, A/B testing, rollback.
-		generation: v.optional(
-			v.object({
-				generationModel: v.string(),
-				validationModel: v.string(),
-				supportScore: v.number(),
-				promptVersion: v.string(),
-				sourceArticleId: v.id('sourceArticles'),
-				generatedAt: v.number()
-			})
-		),
+		generation: v.optional(generationValidator),
 		status: cardStatus,
 		// Deterministic-but-varied feed order: a random key assigned once at write
 		// time, so the feed query stays deterministic (ADR-007 — no in-query RNG).

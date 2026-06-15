@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { getConvexClient } from 'convex-svelte';
 import { api } from '$convex/_generated/api';
-import type { Id } from '$convex/_generated/dataModel';
+import type { Doc, Id } from '$convex/_generated/dataModel';
 import { getDeviceId, getSessionId } from './identity';
 
 /**
@@ -11,18 +11,8 @@ import { getDeviceId, getSessionId } from './identity';
  * per the convex-svelte footgun rule (engineering-standards §2): never
  * `useQuery`/`useConvexClient` outside a component.
  */
-type EventType =
-	| 'session_start'
-	| 'session_end'
-	| 'card_impression'
-	| 'card_complete'
-	| 'card_skip'
-	| 'card_expand'
-	| 'related_tap'
-	| 'save'
-	| 'unsave'
-	| 'source_open'
-	| 'not_interested';
+// Single source of truth: the Convex `events` table's `type` union.
+type EventType = Doc<'events'>['type'];
 
 type QueuedEvent = {
 	type: EventType;

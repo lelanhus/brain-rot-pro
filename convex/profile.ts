@@ -21,14 +21,14 @@ export const recompute = mutation({
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
 			.collect();
 
-		// Concept tags for every card referenced by an event.
+		// Concept tags for every card referenced by an event (fetched in parallel).
 		const cardIds = [
-			...new Set(events.map((e) => e.cardId).filter(Boolean))
-		] as Id<'knowledgeCards'>[];
+			...new Set(events.map((e) => e.cardId).filter((id): id is Id<'knowledgeCards'> => !!id))
+		];
+		const cards = await Promise.all(cardIds.map((id) => ctx.db.get(id)));
 		const tagsByCard: Record<string, string[]> = {};
-		for (const id of cardIds) {
-			const card = await ctx.db.get(id);
-			if (card) tagsByCard[id] = card.conceptTags;
+		for (const card of cards) {
+			if (card) tagsByCard[card._id] = card.conceptTags;
 		}
 
 		const weights = accumulateWeights(events, tagsByCard);

@@ -39,6 +39,13 @@ function resolveKey(): { name: string; value: string } | null {
 	return null;
 }
 
+/** Surface an AI SDK failure loudly, including the raw model text when present. */
+function wrapAiError(stage: string, e: unknown): Error {
+	const err = e as { text?: string; cause?: { message?: string } };
+	const detail = err.text ? ` :: ${err.text.slice(0, 400)}` : '';
+	return new Error(`${stage} failed: ${err.cause?.message ?? String(e)}${detail}`, { cause: e });
+}
+
 /** Diagnostic: report what generation config is present (names/model ids only, no secrets). */
 export const config = action({
 	args: {},
@@ -101,12 +108,8 @@ export const generateFromArticle = action({
 				prompt: buildGenerationPrompt({ title: article.title, paragraphs: article.paragraphs })
 			});
 			card = generated.object;
-		} catch (e: unknown) {
-			const err = e as { text?: string; cause?: { message?: string } };
-			throw new Error(
-				`generation failed: ${err.cause?.message ?? String(e)}${err.text ? ` :: ${err.text.slice(0, 400)}` : ''}`,
-				{ cause: e }
-			);
+		} catch (e) {
+			throw wrapAiError('generation', e);
 		}
 
 		// Hard guard against invented spans before we even ask the validator.
@@ -120,12 +123,8 @@ export const generateFromArticle = action({
 				prompt: buildValidationPrompt(card)
 			});
 			validation = validated.object;
-		} catch (e: unknown) {
-			const err = e as { text?: string; cause?: { message?: string } };
-			throw new Error(
-				`validation failed: ${err.cause?.message ?? String(e)}${err.text ? ` :: ${err.text.slice(0, 400)}` : ''}`,
-				{ cause: e }
-			);
+		} catch (e) {
+			throw wrapAiError('validation', e);
 		}
 		// Clamp in case the model returns a 0–100 scale instead of 0–1.
 		const score = Math.max(

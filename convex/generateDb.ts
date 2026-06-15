@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from './_generated/server';
 import { v } from 'convex/values';
-import { cardFormat } from './schema';
+import { cardFormat, generationValidator, sourceValidator } from './schema';
 
 // DB access for the generation pipeline. Kept out of the "use node" action file
 // because Convex queries/mutations must run in the V8 runtime, not Node.
@@ -39,22 +39,9 @@ export const insertGeneratedCard = internalMutation({
 		whyItMatters: v.optional(v.string()),
 		format: cardFormat,
 		conceptTags: v.array(v.string()),
-		source: v.object({
-			articleTitle: v.string(),
-			articleUrl: v.string(),
-			pageId: v.optional(v.number()),
-			revisionId: v.union(v.number(), v.null()),
-			sourceSpan: v.string()
-		}),
+		source: sourceValidator,
 		status: v.union(v.literal('needs_review'), v.literal('validation_failed')),
-		generation: v.object({
-			generationModel: v.string(),
-			validationModel: v.string(),
-			supportScore: v.number(),
-			promptVersion: v.string(),
-			sourceArticleId: v.id('sourceArticles'),
-			generatedAt: v.number()
-		})
+		generation: generationValidator
 	},
 	returns: v.id('knowledgeCards'),
 	handler: async (ctx, args) => {

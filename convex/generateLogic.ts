@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { Infer } from 'convex/values';
+import type { cardFormat } from './schema';
 
 /**
  * Pure generation logic (prompt construction, output schemas, the
@@ -10,6 +12,8 @@ import { z } from 'zod';
 
 export const PROMPT_VERSION = 'gen-v1';
 
+// `satisfies` makes this fail to compile if a value drifts from the schema's
+// cardFormat union — one guarded source for the format list.
 export const CARD_FORMATS = [
 	'surprise_fact',
 	'myth_buster',
@@ -19,7 +23,7 @@ export const CARD_FORMATS = [
 	'timeline_shock',
 	'cause_effect',
 	'object_story'
-] as const;
+] as const satisfies readonly Infer<typeof cardFormat>[];
 
 /** Structured card the generator must return. `sourceSpan` MUST be copied verbatim from one input paragraph. */
 export const generatedCardSchema = z.object({

@@ -19,8 +19,7 @@
 	let activeCardId = $state<Id<'knowledgeCards'> | null>(null);
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
-
-	const NI_KEY = 'brp:notInterested';
+	let adaptTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Getter args (convex-svelte footgun rule) + 'skip' until the device id resolves.
 	const savedQuery = useQuery(api.saved.savedIds, () => (deviceId ? { deviceId } : 'skip'));
@@ -33,25 +32,29 @@
 	const personal = useQuery(api.feed.personal, () => (deviceId ? { deviceId } : 'skip'));
 	const recompute = useMutation(api.profile.recompute);
 
-	const baseCards = $derived(personal.data ?? feed.results);
-	const visibleResults = $derived(baseCards.filter((c) => !notInterested.has(c._id)));
+	// Personalized once it loads; the SSR global feed until then. `notInterested`
+	// is an in-memory optimistic hide for the gap before recompute() rewrites the
+	// profile (the server is the durable source — feed.personal excludes them).
+	const visibleResults = $derived(
+		(personal.data ?? feed.results).filter((c) => !notInterested.has(c._id))
+	);
 
-	function adaptProfile() {
+	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
+	function scheduleAdapt() {
 		if (!deviceId) return;
-		recompute({ deviceId }).catch((err) => console.error('[feed] recompute failed', err));
+		if (adaptTimer) clearTimeout(adaptTimer);
+		adaptTimer = setTimeout(async () => {
+			adaptTimer = null;
+			await flush(); // persist queued events before recompute reads them
+			recompute({ deviceId }).catch((err) => console.error('[feed] recompute failed', err));
+		}, 1500);
 	}
 
 	onMount(() => {
 		deviceId = getDeviceId();
-		try {
-			const stored = localStorage.getItem(NI_KEY);
-			if (stored) for (const id of JSON.parse(stored) as string[]) notInterested.add(id);
-		} catch {
-			/* corrupt storage — start fresh */
-		}
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
-		adaptProfile(); // fold in prior sessions' signals
+		scheduleAdapt(); // fold in prior sessions' signals
 		return () => {
 			track('session_end');
 			void flush();
@@ -64,28 +67,21 @@
 		try {
 			const res = await toggleSave({ deviceId, cardId: card._id });
 			track(res.saved ? 'save' : 'unsave', { cardId: card._id });
-			await flush(); // make the signal visible to recompute
-			adaptProfile();
+			scheduleAdapt();
 		} catch (err) {
 			console.error('[feed] save failed', err);
 		}
 	}
 
 	function handleNotInterested(card: Doc<'knowledgeCards'>) {
-		notInterested.add(card._id);
-		try {
-			localStorage.setItem(NI_KEY, JSON.stringify([...notInterested]));
-		} catch {
-			/* storage unavailable — keep the in-memory filter */
-		}
+		notInterested.add(card._id); // optimistic hide; recompute makes it durable
 		track('not_interested', { cardId: card._id });
-		void flush().then(adaptProfile);
+		scheduleAdapt();
 	}
 
 	function handleRelated(card: Doc<'knowledgeCards'>) {
-		// Boost this concept: log it, then re-rank toward related cards.
 		track('related_tap', { cardId: card._id });
-		void flush().then(adaptProfile);
+		scheduleAdapt();
 	}
 
 	function scrollByViewport(dir: 1 | -1) {
@@ -118,18 +114,6 @@
 				if (active) {
 					e.preventDefault();
 					handleNotInterested(active);
-				}
-				break;
-			case 'v':
-			case 'V':
-				if (activeCardId) {
-					const d = document.querySelector<HTMLDetailsElement>(
-						`[data-card-id="${activeCardId}"] details.source`
-					);
-					if (d) {
-						d.open = !d.open;
-						if (d.open) track('source_open', { cardId: activeCardId });
-					}
 				}
 				break;
 		}
@@ -171,13 +155,12 @@
 	{:else if visibleResults.length === 0}
 		<section class="state">
 			<h2>You've hidden everything here</h2>
-			<p>Reload to reset hidden cards.</p>
+			<p>More cards are on the way.</p>
 		</section>
 	{:else}
 		{#each visibleResults as card (card._id)}
 			<div
 				class="slot"
-				data-card-id={card._id}
 				use:dwell={{
 					cardId: card._id,
 					body: card.body,
