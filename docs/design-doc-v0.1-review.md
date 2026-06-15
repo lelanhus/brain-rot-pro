@@ -1,5 +1,7 @@
 # Review of Design Doc v0.1 — AI-Generated Knowledge Feed
 
+> **Status note (2026-06-15):** Several decisions in this review have since been **resolved and superseded** — most notably the frontend framework (now **SvelteKit + Svelte 5**, not TanStack/React) and the auth approach. The authoritative, current decisions live in **[`architecture-decisions.md`](./architecture-decisions.md)**. This document is retained as the original gap analysis; where it conflicts with the decisions doc, the decisions doc wins.
+
 **Reviewer pass:** technical verification + gap analysis before MVP
 **Date:** 2026-06-15
 **Verdict in one line:** The product thesis is sound and the stack is coherent and well-supported, but four things must be resolved *before* writing MVP code — (1) Wikipedia **text** licensing/ShareAlike, (2) the 2026 Wikimedia **rate-limit** regime, (3) a real **source-grounding / anti-hallucination** mechanism, and (4) a **cold-start** plan that doesn't depend on global stats that won't exist for a single user. Several stack claims are now outdated and a few open decisions can be closed today.
@@ -154,7 +156,7 @@ The doc's account model (§20) covers UX but not: a privacy policy, data-retenti
 
 | # | Decision | Recommendation | Basis |
 |---|----------|----------------|-------|
-| 1 | Router+Vite vs Start | **TanStack Start (pin exact version)** | Doc anticipates SSR share pages; Start is API-stable RC; Convex+Start+Vercel is officially supported. Retrofitting SSR later is costly. If risk-averse about RC, Router+Vite + a tiny serverless OG-render route is the fallback. |
+| 1 | Frontend framework | **SvelteKit + Svelte 5** (superseded the TanStack/React recommendation) | Owner pain points (React render thrash, cache-layer complexity) + a hard "incredibly fast" bar. Svelte's fine-grained reactivity removes render thrash; Convex's native subscriptions remove the cache layer; SvelteKit SSR is stable (vs TanStack Start RC). See [`architecture-decisions.md`](./architecture-decisions.md) ADR-001. |
 | 4 | Seed window | **Monthly top + a curated allowlist**, not daily | Monthly is calmer/less news-driven; daily top is full of current events the doc wants to suppress anyway. |
 | 5 | Exclusion categories | Start with the doc's §8.2 suppress-list **as a hard filter on ingestion**, plus living-person/BLP caution | Cheaper to exclude at ingest than to suppress at rank time. |
 | 6/7 | Generation + validation models | Two **different** models via Gateway (a strong generator; a separate validator/judge) | Using the same model to write and grade its own claims is weak; cross-model validation is more honest. Gateway makes swapping trivial. |
