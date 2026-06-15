@@ -14,6 +14,7 @@ type Params = {
 	cardId: Id<'knowledgeCards'>;
 	body: string;
 	onActive?: (cardId: Id<'knowledgeCards'>) => void;
+	onComplete?: (cardId: Id<'knowledgeCards'>) => void;
 };
 
 export function dwell(node: HTMLElement, params: Params) {
@@ -24,8 +25,10 @@ export function dwell(node: HTMLElement, params: Params) {
 		if (activeSince === null) return;
 		const visibleMs = Math.round(performance.now() - activeSince);
 		activeSince = null;
-		const type = visibleMs >= dwellThresholdMs(current.body) ? 'card_complete' : 'card_skip';
+		const completed = visibleMs >= dwellThresholdMs(current.body);
+		const type = completed ? 'card_complete' : 'card_skip';
 		track(type, { cardId: current.cardId, visibleMs });
+		if (completed) current.onComplete?.(current.cardId);
 	}
 
 	const observer = new IntersectionObserver(

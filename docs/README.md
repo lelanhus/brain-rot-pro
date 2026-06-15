@@ -22,6 +22,11 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 
 **The v1 core loop is complete:** open → scroll → react → the feed adapts; and content flows top-pageviews → filtered ingest → generate → cross-model validate → review → publish.
 
+### Engagement layer (retention hooks)
+
+- **Explore pathways** — done: tapping a card's concept chip focuses the feed on that concept (an additive re-rank via `feed.personal`'s `focusConcept`, never a filter, so the feed can't empty), jumps to the top, and shows a dismissible "Exploring" pill. Still a strong personalization signal.
+- **Momentum** — done: a per-device **daily streak** (`deviceStats` + `stats.ts`, idempotent within a UTC day; pure math in `streakLogic.ts`) plus a **live session counter** and milestone celebrations. The feed shows a 🔥 streak pill (reactive via `stats.get`) and a ✨ count that ticks as cards complete; streak extensions and session milestones (5/10/25/50/100) fire a transient toast. Stats live outside `userProfiles` so they never invalidate the feed query (ADR-007).
+
 ### Post-v1 backlog (enhancements / release gates, not core loop)
 
 - **Auth** (deferred by design, ADR-004): Better Auth anonymous + Google/Apple when save-across-devices matters.

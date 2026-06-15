@@ -18,6 +18,25 @@
 	const notInterested = new SvelteSet<string>();
 	let focusConcept = $state<string | null>(null);
 	let activeCardId = $state<Id<'knowledgeCards'> | null>(null);
+
+	// Momentum (engagement layer): a live count of cards completed this session and
+	// a transient celebration toast. Streak lives server-side; session count is
+	// client-only so it ticks instantly. Each card counts once per session.
+	const completedThisSession = new SvelteSet<string>();
+	let sessionCount = $state(0);
+	let lastMilestone = $state(0);
+	let toast = $state<string | null>(null);
+	let toastId = $state(0);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
+
+	function showToast(message: string) {
+		toast = message;
+		toastId += 1;
+		if (toastTimer) clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => (toast = null), 2600);
+	}
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
 	let adaptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -34,6 +53,11 @@
 		deviceId ? { deviceId, focusConcept: focusConcept ?? undefined } : 'skip'
 	);
 	const recompute = useMutation(api.profile.recompute);
+
+	// Engagement stats (streak): reactive HUD read + a once-per-session record.
+	const stats = useQuery(api.stats.get, () => (deviceId ? { deviceId } : 'skip'));
+	const recordActivity = useMutation(api.stats.recordActivity);
+	const streak = $derived(stats.data?.currentStreak ?? 0);
 
 	// Personalized once it loads; the SSR global feed until then. `notInterested`
 	// is an in-memory optimistic hide for the gap before recompute() rewrites the
@@ -58,12 +82,33 @@
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
+		// Register today's visit; celebrate a kept or new streak.
+		recordActivity({ deviceId })
+			.then((res) => {
+				if (res.event === 'extended') showToast(`🔥 ${res.currentStreak}-day streak!`);
+				else if (res.event === 'started') showToast('🔥 Streak started — see you tomorrow!');
+			})
+			.catch((err) => console.error('[stats] recordActivity failed', err));
 		return () => {
 			track('session_end');
 			void flush();
+			if (toastTimer) clearTimeout(toastTimer);
 			cleanupTelemetry();
 		};
 	});
+
+	// One card finished (dwell ≥ threshold): tick the live counter and celebrate
+	// milestones. Counted once per card per session.
+	function handleComplete(cardId: string) {
+		if (completedThisSession.has(cardId)) return;
+		completedThisSession.add(cardId);
+		sessionCount += 1;
+		const milestone = SESSION_MILESTONES.find((m) => m === sessionCount);
+		if (milestone && milestone > lastMilestone) {
+			lastMilestone = milestone;
+			showToast(`✨ ${milestone} learned this session!`);
+		}
+	}
 
 	async function handleSave(card: Doc<'knowledgeCards'>) {
 		if (!deviceId) return;
@@ -158,6 +203,32 @@
 
 <a class="feed-nav" href={resolve('/saved')}>Saved</a>
 
+<div class="hud" aria-live="polite">
+	{#if streak > 0}
+		<span
+			class="hud-pill streak"
+			title={`Longest streak: ${stats.data?.longestStreak ?? streak} days · ${stats.data?.daysLearned ?? 0} days learned`}
+		>
+			<span class="hud-icon" aria-hidden="true">🔥</span>
+			<span class="hud-value">{streak}</span>
+			<span class="sr-only">day streak</span>
+		</span>
+	{/if}
+	{#if sessionCount > 0}
+		<span class="hud-pill session" data-testid="session-count">
+			<span class="hud-icon" aria-hidden="true">✨</span>
+			{#key sessionCount}<span class="hud-value pop">{sessionCount}</span>{/key}
+			<span class="sr-only">learned this session</span>
+		</span>
+	{/if}
+</div>
+
+{#if toast}
+	{#key toastId}
+		<div class="toast" role="status" data-testid="toast">{toast}</div>
+	{/key}
+{/if}
+
 {#if focusConcept}
 	<button type="button" class="focus-pill" onclick={clearFocus} data-testid="focus-pill">
 		<span class="focus-label">Exploring</span>
@@ -192,7 +263,8 @@
 				use:dwell={{
 					cardId: card._id,
 					body: card.body,
-					onActive: (id) => (activeCardId = id)
+					onActive: (id) => (activeCardId = id),
+					onComplete: (id) => handleComplete(id)
 				}}
 			>
 				<Card

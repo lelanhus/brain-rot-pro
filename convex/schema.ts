@@ -155,5 +155,19 @@ export default defineSchema({
 		seen: v.array(v.id('knowledgeCards')),
 		notInterested: v.array(v.id('knowledgeCards')),
 		updatedAt: v.number()
+	}).index('by_device', ['deviceId']),
+
+	/**
+	 * Per-device engagement stats — the daily-return hook (streak) and lifetime
+	 * days-learned. Separate from `userProfiles` so the feed query never reads it;
+	 * updated once per session by `stats.recordActivity` (idempotent within a day).
+	 */
+	deviceStats: defineTable({
+		deviceId: v.string(),
+		currentStreak: v.number(),
+		longestStreak: v.number(),
+		lastActiveDay: v.string(), // UTC YYYY-MM-DD
+		daysLearned: v.number(),
+		updatedAt: v.number()
 	}).index('by_device', ['deviceId'])
 });
