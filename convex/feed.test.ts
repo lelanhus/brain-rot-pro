@@ -39,3 +39,25 @@ test('personal feed with no profile still returns published cards', async () => 
 	const personal = await t.query(api.feed.personal, { deviceId: 'nobody' });
 	expect(personal.length).toBeGreaterThan(0);
 });
+
+test('focusConcept floats matching cards to the top without dropping the rest', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(api.seed.seed, {});
+
+	const baseline = await t.query(api.feed.personal, { deviceId: 'focus-device' });
+	// Pick a concept that not every card shares, so focusing is observable.
+	const concept = baseline.find((c) => c.conceptTags.length > 0)?.conceptTags[0];
+	expect(concept).toBeTruthy();
+	const matching = baseline.filter((c) => c.conceptTags.includes(concept!));
+
+	const focused = await t.query(api.feed.personal, {
+		deviceId: 'focus-device',
+		focusConcept: concept
+	});
+
+	// Re-rank, not filter: the full library is still present.
+	expect(focused.length).toBe(baseline.length);
+	// Every card carrying the concept occupies the top slots.
+	const top = focused.slice(0, matching.length);
+	expect(top.every((c) => c.conceptTags.includes(concept!))).toBe(true);
+});
