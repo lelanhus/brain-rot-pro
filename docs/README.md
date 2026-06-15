@@ -8,6 +8,7 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 2. **[`architecture-decisions.md`](./architecture-decisions.md)** — **authoritative** locked decisions (ADRs), each confirmed with 2026 sources and caveats. The stack: SvelteKit + Svelte 5 + `convex-svelte`, Convex, Vercel AI SDK/Gateway, deferred Better Auth (anonymous + Google/Apple), Wikimedia free tier.
 3. **[`engineering-standards.md`](./engineering-standards.md)** — _fail fast, never fail silently._ Conventions, the `convex-svelte` silent-failure footguns, testing strategy, and **the `npm run verify` loop** to iterate against.
 4. **[`acceptance-criteria.md`](./acceptance-criteria.md)** — Definition of Done + per-phase 🤖 machine-checkable / 👤 human-judged gates. Phase 0 (card-quality spike) is the make-or-break.
+5. **[`ui-ux.md`](./ui-ux.md)** — mobile-first (desktop first-class) UX spec: design tokens, card/action spec, keyboard + gestures, motion, state catalog, accessibility, and UX acceptance gates. Foundational sections build now; "feel" sections refine after the Phase-0 content read.
 
 ## Current status
 
