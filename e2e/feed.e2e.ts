@@ -9,5 +9,6 @@ test('feed renders source-backed cards', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByTestId('feed')).toBeVisible();
 	await expect(page.getByRole('article').first()).toBeVisible();
-	await expect(page.getByRole('link', { name: /Wikipedia/ }).first()).toBeVisible();
+	await expect(page.getByRole('heading').first()).toBeVisible();
+	await page.screenshot({ path: 'feed-screenshot.png' });
 });

@@ -2,11 +2,22 @@
 /**
  * Generated `api` utility.
  *
- * THIS CODE IS GENERATED AUTOMATICALLY by `npx convex dev` / `npx convex codegen`.
- * It is committed so the project typechecks and tests run without a Convex login.
- * Regenerate it (do not edit by hand) once a deployment is configured.
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
  */
-import { anyApi } from 'convex/server';
 
+import { anyApi, componentsGeneric } from "convex/server";
+
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export const api = anyApi;
 export const internal = anyApi;
+export const components = componentsGeneric();
