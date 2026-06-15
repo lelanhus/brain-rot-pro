@@ -13,17 +13,22 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 ## Current status
 
 - Stack decisions: **locked** (architecture-decisions.md).
-- Code: **scaffolded** — SvelteKit + Svelte 5 + `convex-svelte`, Convex backend (`convex/`), and the Phase-0 card feed. The `verify` loop is wired and green.
-- Next step: connect a Convex deployment (`npx convex dev`), seed (`npm run convex:seed`), and run the app for the Phase-0 "is it fun?" judgement; then expand the card set toward ~150–200.
+- **Phase 0 (feed)** — done: SvelteKit + Svelte 5 + `convex-svelte` feed, SSR-to-live, 18 source-backed seed cards.
+- **Phase 1 (interaction + events)** — done: Save / Not-interested / source / related actions, keyboard parity, batched telemetry, dwell→complete/skip, saved state, CCR metric. All `verify`-green and validated via convex-test + component tests.
+- **Phase 2 (ingestion)** — done: Wikimedia Action API adapter + top-pageviews, storing `sourceArticles` with full provenance (revision id, grounding paragraphs, categories). Validated against live Wikipedia.
+- **Phase 2 (generation)** — _next, blocked on a credential._ Turning ingested articles into validated cards needs a **Vercel AI Gateway key** (`AI_GATEWAY_API_KEY`) for the generator + cross-model source-support validator, then a manual approve queue (review §3.2). Not yet built.
+- Known gap surfaced during ingestion: top-pageviews is full of current events / sports (e.g. World Cup). `looksLikeArticleTitle` filters namespaces only — a **topic/category allowlist** (design doc §8.2) is still needed before bulk seeding.
 
 ## Running it
 
 ```bash
 npm install
-npx convex dev            # one-time: configure a deployment + write PUBLIC_CONVEX_URL
-npm run convex:seed       # load the Phase-0 cards
-npm run dev               # the feed
-npm run verify            # the loop: typecheck + lint + unit + convex + component
+npx convex dev                                   # one-time: deployment + PUBLIC_CONVEX_URL
+npm run convex:seed                              # load the Phase-0 cards
+npx convex run ingest:topTitles '{"limit":20}'   # candidate articles from top pageviews
+npx convex run ingest:ingestTitles '{"titles":["Roman concrete","Octopus"]}'
+npm run dev                                      # the feed
+npm run verify                                   # the loop: typecheck + lint + unit + convex + component
 ```
 
-`npm run verify` is the iterate-until-green gate (offline). `npm run verify:full` adds Playwright e2e, which needs a live deployment (set `E2E_LIVE=1`).
+`npm run verify` is the iterate-until-green gate (offline). `npm run verify:full` adds the SSR Playwright e2e (`E2E_LIVE=1`, needs a live deployment); the interaction e2e additionally needs a WebSocket-capable browser (`E2E_WS=1`).

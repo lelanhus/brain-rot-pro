@@ -101,6 +101,25 @@ export default defineSchema({
 		.index('by_device', ['deviceId'])
 		.index('by_device_session', ['deviceId', 'sessionId']),
 
+	/**
+	 * Ingested Wikipedia source articles (design doc §8.3, ADR-005). Full
+	 * provenance is captured here so generated cards can ground claims in exact
+	 * paragraphs. Fetched via the MediaWiki Action API behind the adapter in
+	 * `ingest.ts` (the durable, non-deprecating surface).
+	 */
+	sourceArticles: defineTable({
+		pageId: v.number(),
+		title: v.string(),
+		url: v.string(),
+		revisionId: v.union(v.number(), v.null()),
+		extract: v.string(),
+		paragraphs: v.array(v.string()),
+		categories: v.array(v.string()),
+		pageviews: v.optional(v.number()),
+		fetchedAt: v.number(),
+		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
+	}).index('by_pageId', ['pageId']),
+
 	/** Cards a device has saved. Bounded per device. */
 	savedCards: defineTable({
 		deviceId: v.string(),

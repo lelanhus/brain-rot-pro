@@ -10,6 +10,8 @@
 
 import type * as cards from "../cards.js";
 import type * as events from "../events.js";
+import type * as ingest from "../ingest.js";
+import type * as ingestUtils from "../ingestUtils.js";
 import type * as metrics from "../metrics.js";
 import type * as saved from "../saved.js";
 import type * as seed from "../seed.js";
@@ -24,6 +26,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   cards: typeof cards;
   events: typeof events;
+  ingest: typeof ingest;
+  ingestUtils: typeof ingestUtils;
   metrics: typeof metrics;
   saved: typeof saved;
   seed: typeof seed;
