@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { capText, looksLikeArticleTitle, stripCategoryPrefix, toParagraphs } from './ingestUtils';
+import {
+	capText,
+	isEvergreenArticle,
+	looksLikeArticleTitle,
+	stripCategoryPrefix,
+	toParagraphs
+} from './ingestUtils';
+
+describe('isEvergreenArticle', () => {
+	it('accepts educational topics', () => {
+		expect(isEvergreenArticle(['Ancient Roman architecture', 'Concrete'])).toBe(true);
+		expect(isEvergreenArticle(['Cephalopods', 'Marine biology'])).toBe(true);
+	});
+	it('rejects sports / entertainment / current-events noise', () => {
+		expect(isEvergreenArticle(['English footballers', 'Premier League players'])).toBe(false);
+		expect(isEvergreenArticle(['2026 films', 'American comedy films'])).toBe(false);
+		expect(isEvergreenArticle(['2025 elections', 'Deaths in 2026'])).toBe(false);
+	});
+});
 
 describe('looksLikeArticleTitle', () => {
 	it('accepts real article titles', () => {

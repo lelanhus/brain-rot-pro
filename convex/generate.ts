@@ -1,7 +1,7 @@
 'use node';
 
 import { action } from './_generated/server';
-import { internal } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { generateObject } from 'ai';
@@ -168,5 +168,31 @@ export const generateFromArticle = action({
 			reason: validation.reason,
 			hook: card.hook
 		};
+	}
+});
+
+/**
+ * Generate cards for up to `limit` ingested articles that don't have one yet.
+ * Sequential to stay polite to the model + within action limits.
+ *   npx convex run generate:generateBatch '{"limit":3}'
+ */
+export const generateBatch = action({
+	args: { limit: v.optional(v.number()) },
+	handler: async (
+		ctx,
+		args
+	): Promise<{
+		attempted: number;
+		results: { needs_review: number; validation_failed: number };
+	}> => {
+		const ids = await ctx.runQuery(internal.generateDb.articlesNeedingCards, {
+			limit: args.limit ?? 3
+		});
+		const results = { needs_review: 0, validation_failed: 0 };
+		for (const articleId of ids) {
+			const r = await ctx.runAction(api.generate.generateFromArticle, { articleId });
+			results[r.status] += 1;
+		}
+		return { attempted: ids.length, results };
 	}
 });

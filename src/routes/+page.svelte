@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { useQuery, useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -134,6 +135,8 @@
 
 <svelte:window onkeydown={onKeydown} />
 <svelte:head><title>Brain Rot Pro</title></svelte:head>
+
+<a class="feed-nav" href={resolve('/saved')}>Saved</a>
 
 <main class="feed" data-testid="feed" bind:this={feedEl} aria-label="Knowledge feed">
 	{#if feed.error}

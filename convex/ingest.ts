@@ -1,7 +1,13 @@
 import { action, internalMutation, query } from './_generated/server';
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
-import { capText, looksLikeArticleTitle, stripCategoryPrefix, toParagraphs } from './ingestUtils';
+import {
+	capText,
+	isEvergreenArticle,
+	looksLikeArticleTitle,
+	stripCategoryPrefix,
+	toParagraphs
+} from './ingestUtils';
 
 // Required by Wikimedia policy: descriptive UA with contact info (ADR-005).
 const USER_AGENT =
@@ -31,7 +37,8 @@ export const upsertArticle = internalMutation({
 		extract: v.string(),
 		paragraphs: v.array(v.string()),
 		categories: v.array(v.string()),
-		pageviews: v.optional(v.number())
+		pageviews: v.optional(v.number()),
+		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
 	},
 	returns: v.id('sourceArticles'),
 	handler: async (ctx, args) => {
@@ -39,7 +46,7 @@ export const upsertArticle = internalMutation({
 			.query('sourceArticles')
 			.withIndex('by_pageId', (q) => q.eq('pageId', args.pageId))
 			.unique();
-		const doc = { ...args, fetchedAt: Date.now(), status: 'fetched' as const };
+		const doc = { ...args, fetchedAt: Date.now() };
 		if (existing) {
 			await ctx.db.patch(existing._id, doc);
 			return existing._id;
@@ -76,7 +83,8 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		exlimit: '1',
 		rvprop: 'ids',
 		rvlimit: '1',
-		cllimit: '20',
+		cllimit: '50',
+		clshow: '!hidden', // content categories only — skip maintenance cats (year noise)
 		redirects: '1',
 		titles: title
 	});
@@ -99,6 +107,7 @@ export const ingestTitles = action({
 	handler: async (ctx, args) => {
 		let ingested = 0;
 		const skipped: string[] = [];
+		const filtered: string[] = [];
 		const errors: { title: string; error: string }[] = [];
 
 		for (const title of args.titles) {
@@ -112,6 +121,8 @@ export const ingestTitles = action({
 					errors.push({ title, error: 'no extract / missing page' });
 					continue;
 				}
+				const categories = (page.categories ?? []).map((c) => stripCategoryPrefix(c.title));
+				const evergreen = isEvergreenArticle(categories);
 				await ctx.runMutation(internal.ingest.upsertArticle, {
 					pageId: page.pageid!,
 					title: page.title,
@@ -122,14 +133,16 @@ export const ingestTitles = action({
 					revisionId: page.revisions?.[0]?.revid ?? null,
 					extract: capText(page.extract),
 					paragraphs: toParagraphs(page.extract),
-					categories: (page.categories ?? []).map((c) => stripCategoryPrefix(c.title))
+					categories,
+					status: evergreen ? 'fetched' : 'filtered_out'
 				});
-				ingested++;
+				if (evergreen) ingested++;
+				else filtered.push(page.title);
 			} catch (err) {
 				errors.push({ title, error: err instanceof Error ? err.message : String(err) });
 			}
 		}
-		return { ingested, skipped, errors };
+		return { ingested, filtered, skipped, errors };
 	}
 });
 
