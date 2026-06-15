@@ -139,5 +139,19 @@ export default defineSchema({
 		savedAt: v.number()
 	})
 		.index('by_device', ['deviceId'])
-		.index('by_device_card', ['deviceId', 'cardId'])
+		.index('by_device_card', ['deviceId', 'cardId']),
+
+	/**
+	 * Precomputed personalization profile per device (ADR-007). The feed query
+	 * reads THIS (one cheap doc), not the raw events — so logging an event doesn't
+	 * invalidate the feed (avoids reactivity amplification). Rebuilt by
+	 * `profile.recompute` on session start and after strong signals.
+	 */
+	userProfiles: defineTable({
+		deviceId: v.string(),
+		conceptWeights: v.array(v.object({ concept: v.string(), weight: v.number() })),
+		seen: v.array(v.id('knowledgeCards')),
+		notInterested: v.array(v.id('knowledgeCards')),
+		updatedAt: v.number()
+	}).index('by_device', ['deviceId'])
 });

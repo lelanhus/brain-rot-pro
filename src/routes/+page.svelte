@@ -27,7 +27,19 @@
 	const savedSet = $derived(new Set<string>((savedQuery.data ?? []).map(String)));
 	const toggleSave = useMutation(api.saved.toggle);
 
-	const visibleResults = $derived(feed.results.filter((c) => !notInterested.has(c._id)));
+	// Personalized feed: takes over from the SSR global feed once the device id
+	// resolves and the profile loads (ADR-007). Reactive on the profile, so it
+	// re-ranks live when recompute() runs after a strong signal.
+	const personal = useQuery(api.feed.personal, () => (deviceId ? { deviceId } : 'skip'));
+	const recompute = useMutation(api.profile.recompute);
+
+	const baseCards = $derived(personal.data ?? feed.results);
+	const visibleResults = $derived(baseCards.filter((c) => !notInterested.has(c._id)));
+
+	function adaptProfile() {
+		if (!deviceId) return;
+		recompute({ deviceId }).catch((err) => console.error('[feed] recompute failed', err));
+	}
 
 	onMount(() => {
 		deviceId = getDeviceId();
@@ -39,6 +51,7 @@
 		}
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
+		adaptProfile(); // fold in prior sessions' signals
 		return () => {
 			track('session_end');
 			void flush();
@@ -51,6 +64,8 @@
 		try {
 			const res = await toggleSave({ deviceId, cardId: card._id });
 			track(res.saved ? 'save' : 'unsave', { cardId: card._id });
+			await flush(); // make the signal visible to recompute
+			adaptProfile();
 		} catch (err) {
 			console.error('[feed] save failed', err);
 		}
@@ -64,11 +79,13 @@
 			/* storage unavailable — keep the in-memory filter */
 		}
 		track('not_interested', { cardId: card._id });
+		void flush().then(adaptProfile);
 	}
 
 	function handleRelated(card: Doc<'knowledgeCards'>) {
-		// Phase 3 will pivot the feed toward this concept; for now we just log it.
+		// Boost this concept: log it, then re-rank toward related cards.
 		track('related_tap', { cardId: card._id });
+		void flush().then(adaptProfile);
 	}
 
 	function scrollByViewport(dir: 1 | -1) {
