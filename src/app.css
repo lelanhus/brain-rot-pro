@@ -1,0 +1,298 @@
+:root {
+	--bg: #0b0b0f;
+	--surface: #15151d;
+	--surface-2: #23232f;
+	--border: #25252f;
+	--text: #f3f3f7;
+	--text-2: #e3e3ec;
+	--muted: #9a9aa8;
+	--accent: #7c6cff;
+	--positive: #36c98e;
+	--negative: #ff6b6b;
+	--radius: 12px;
+	--dur-fast: 120ms;
+	--dur: 200ms;
+	--ease: cubic-bezier(0.2, 0, 0, 1);
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--bg);
+	color: var(--text);
+	font-family:
+		ui-sans-serif,
+		system-ui,
+		-apple-system,
+		'Segoe UI',
+		Roboto,
+		Helvetica,
+		Arial,
+		sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Visually hidden but accessible to screen readers. */
+.vh {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* One-card-at-a-time vertical feed with scroll snapping. */
+.feed {
+	height: 100dvh;
+	overflow-y: auto;
+	scroll-snap-type: y mandatory;
+	scroll-behavior: smooth;
+}
+
+/* Each slot is one snap stop and the positioning context for its action bar. */
+.slot {
+	position: relative;
+	min-height: 100dvh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	scroll-snap-align: start;
+	padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+}
+
+.card {
+	width: 100%;
+	max-width: 640px;
+}
+
+.card-body {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.tag {
+	align-self: flex-start;
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--accent);
+	background: var(--surface-2);
+	padding: 0.3rem 0.6rem;
+	border-radius: 999px;
+}
+
+.hook {
+	font-size: clamp(1.6rem, 4.5vw, 2.3rem);
+	line-height: 1.15;
+	font-weight: 750;
+	margin: 0;
+	letter-spacing: -0.01em;
+}
+
+.body {
+	font-size: 1.075rem;
+	line-height: 1.55;
+	color: var(--text-2);
+	margin: 0;
+}
+
+.why {
+	font-size: 0.95rem;
+	line-height: 1.5;
+	color: var(--muted);
+	margin: 0;
+	border-left: 2px solid var(--accent);
+	padding-left: 0.85rem;
+}
+
+.why-label {
+	display: block;
+	font-size: 0.7rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--accent);
+	margin-bottom: 0.2rem;
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.chip {
+	font: inherit;
+	font-size: 0.78rem;
+	color: var(--muted);
+	background: var(--surface-2);
+	border: 1px solid transparent;
+	padding: 0.3rem 0.6rem;
+	border-radius: 999px;
+	cursor: pointer;
+	transition:
+		color var(--dur-fast) var(--ease),
+		border-color var(--dur-fast) var(--ease);
+}
+
+.chip:hover {
+	color: var(--text);
+	border-color: var(--border);
+}
+
+.source {
+	font-size: 0.9rem;
+	color: var(--muted);
+	border-top: 1px solid var(--border);
+	padding-top: 0.85rem;
+}
+
+.source summary {
+	cursor: pointer;
+	color: var(--muted);
+	width: fit-content;
+}
+
+.source blockquote {
+	margin: 0.6rem 0;
+	padding-left: 0.85rem;
+	border-left: 2px solid #34343f;
+	font-style: italic;
+	color: #c8c8d2;
+}
+
+.source a {
+	color: var(--accent);
+}
+
+.license {
+	margin: 0.5rem 0 0;
+	font-size: 0.78rem;
+	color: #6c6c78;
+}
+
+/* Action bar — thumb zone bottom-right on phone (positioned within the slot). */
+.actions {
+	position: absolute;
+	right: 1rem;
+	bottom: calc(1.75rem + env(safe-area-inset-bottom));
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.action {
+	width: 48px;
+	height: 48px;
+	display: grid;
+	place-items: center;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 80%, transparent);
+	border: 1px solid var(--border);
+	color: var(--text);
+	cursor: pointer;
+	backdrop-filter: blur(6px);
+	transition:
+		transform var(--dur-fast) var(--ease),
+		color var(--dur-fast) var(--ease),
+		background var(--dur-fast) var(--ease);
+}
+
+.action:hover {
+	background: var(--surface-2);
+}
+
+.action:active {
+	transform: scale(0.92);
+}
+
+.action.active {
+	color: var(--positive);
+	border-color: var(--positive);
+}
+
+.state {
+	min-height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	text-align: center;
+	padding: 2rem;
+	color: var(--muted);
+}
+
+.state.subtle {
+	min-height: 6rem;
+}
+
+.state code {
+	background: var(--surface-2);
+	padding: 0.2rem 0.45rem;
+	border-radius: 6px;
+	color: var(--text);
+}
+
+.sentinel {
+	height: 1px;
+}
+
+/* Unobtrusive link to the saved view; fixed so it never shifts card layout. */
+.feed-nav {
+	position: fixed;
+	top: calc(env(safe-area-inset-top) + 0.75rem);
+	left: 0.9rem;
+	z-index: 10;
+	font-size: 0.8rem;
+	color: var(--muted);
+	text-decoration: none;
+	background: color-mix(in srgb, var(--surface) 75%, transparent);
+	border: 1px solid var(--border);
+	padding: 0.35rem 0.7rem;
+	border-radius: 999px;
+	backdrop-filter: blur(6px);
+}
+
+.feed-nav:hover {
+	color: var(--text);
+}
+
+/* Desktop: same single column, actions become a vertically-centered right rail. */
+@media (min-width: 1100px) {
+	.actions {
+		top: 50%;
+		bottom: auto;
+		right: max(1.5rem, calc((100% - 640px) / 2 - 4.5rem));
+		transform: translateY(-50%);
+	}
+}
+
+/* Honor reduced-motion: no smooth scroll, no transitions/transforms. */
+@media (prefers-reduced-motion: reduce) {
+	.feed {
+		scroll-behavior: auto;
+	}
+	* {
+		transition: none !important;
+	}
+	.action:active {
+		transform: none;
+	}
+}
