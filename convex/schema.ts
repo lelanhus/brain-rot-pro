@@ -78,6 +78,18 @@ export default defineSchema({
 		conceptTags: v.array(v.string()),
 		source,
 		image: v.optional(image),
+		// Generation provenance (design doc §9.3): set for AI-generated cards,
+		// absent for hand-seeded ones. Enables regeneration, A/B testing, rollback.
+		generation: v.optional(
+			v.object({
+				generationModel: v.string(),
+				validationModel: v.string(),
+				supportScore: v.number(),
+				promptVersion: v.string(),
+				sourceArticleId: v.id('sourceArticles'),
+				generatedAt: v.number()
+			})
+		),
 		status: cardStatus,
 		// Deterministic-but-varied feed order: a random key assigned once at write
 		// time, so the feed query stays deterministic (ADR-007 — no in-query RNG).

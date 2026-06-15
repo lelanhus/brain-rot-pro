@@ -54,6 +54,7 @@ export const recent = query({
 	handler: async (ctx) => {
 		const rows = await ctx.db.query('sourceArticles').order('desc').take(20);
 		return rows.map((r) => ({
+			_id: r._id,
 			title: r.title,
 			revisionId: r.revisionId,
 			paragraphs: r.paragraphs.length,

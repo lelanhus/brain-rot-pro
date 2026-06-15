@@ -47,7 +47,9 @@
 		"vitest-browser-svelte": "^2.1.1"
 	},
 	"dependencies": {
+		"ai": "^6.0.206",
 		"convex": "^1.41.0",
-		"convex-svelte": "^0.13.0"
+		"convex-svelte": "^0.13.0",
+		"zod": "^4.4.3"
 	}
 }
