@@ -18,7 +18,17 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 - **Phase 2 (ingestion)** — done: Wikimedia Action API adapter + top-pageviews, storing `sourceArticles` with full provenance (revision id, grounding paragraphs, categories). Validated against live Wikipedia.
 - **Phase 2 (generation)** — done & validated live: `generate.ts` turns an ingested article into a card via the Vercel AI Gateway (AI SDK v6), with a verbatim-span guard + a **different** validator model scoring support; drafts land as `needs_review` and reach the feed only via the `review.ts` approve queue. Confirmed end-to-end (a generated Roman-concrete card, support 0.92, approved, live). Models are env-overridable (`GENERATION_MODEL` / `VALIDATION_MODEL`).
 - **Phase 2 (hardening)** — done: a content-category **topic filter** (`isEvergreenArticle`) drops sports/entertainment/current-events noise; **`generate:generateBatch`** generates cards for ingested articles lacking one; an in-app **`/review`** admin queue (approve/reject) and a **`/saved`** view. Validated live (Volcano ingested / Ronaldo filtered; batch → 2 `needs_review` cards at support 0.95).
-- **Next:** Phase 3 personalization — concept extraction + embeddings (via the Gateway) → precomputed candidate pools and adjacency/wildcard buckets (ADR-007). Smaller follow-ups: a positive Wikidata topic allowlist, and images (Commons, fail-closed).
+- **Phase 3 (personalization)** — done & validated live: a precomputed per-device **profile** (concept weights / seen / not-interested) drives `feed.personal`, which the feed switches to after the device id resolves and re-ranks live after strong signals (`profile.recompute`). Reads the profile (one cheap doc), not raw events (ADR-007). Confirmed live: a save + not-interested re-ranked the liked card to #1 and excluded the disliked one.
+
+**The v1 core loop is complete:** open → scroll → react → the feed adapts; and content flows top-pageviews → filtered ingest → generate → cross-model validate → review → publish.
+
+### Post-v1 backlog (enhancements / release gates, not core loop)
+
+- **Auth** (deferred by design, ADR-004): Better Auth anonymous + Google/Apple when save-across-devices matters.
+- **Images**: Commons images with fail-closed licensing (schema field exists; pipeline TODO).
+- **Semantic adjacency**: card embeddings + vector search for "more like this" (concept-based pathways work today).
+- **Wikidata topic allowlist** (positive) to replace the exclusion heuristic.
+- **Before external users**: CC BY-SA card-licensing decision + counsel, privacy policy + data-delete cascade, authenticated/Enterprise Wikimedia access for bulk, analytics rollups (Aggregate component).
 
 ## Running it
 
