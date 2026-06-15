@@ -32,3 +32,26 @@ test('renders the hook and body, and reveals a source link', async () => {
 	await page.getByText('Source', { exact: true }).click();
 	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
 });
+
+test('omits the image figure when the card has none', async () => {
+	render(Card, { card: sample });
+	await expect.element(page.getByRole('img')).not.toBeInTheDocument();
+});
+
+test('renders a free-licensed image with attribution when present', async () => {
+	const withImage = {
+		...sample,
+		image: {
+			thumbnailUrl: 'https://upload.wikimedia.org/thumb.jpg',
+			commonsUrl: 'https://commons.wikimedia.org/wiki/File:Oxford.jpg',
+			author: 'Jane Doe',
+			licenseShortName: 'CC BY-SA 4.0',
+			licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+			attribution: 'Jane Doe, CC BY-SA 4.0, via Wikimedia Commons'
+		}
+	} as unknown as Doc<'knowledgeCards'>;
+	render(Card, { card: withImage });
+	await expect.element(page.getByRole('img', { name: sample.hook })).toBeInTheDocument();
+	await expect.element(page.getByRole('link', { name: 'Jane Doe' })).toBeVisible();
+	await expect.element(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toBeVisible();
+});

@@ -8,6 +8,8 @@ import {
 	stripCategoryPrefix,
 	toParagraphs
 } from './ingestUtils';
+import { selectFreeImage, type CardImage, type RawImageInfo } from './imageLicense';
+import { image as imageValidator } from './schema';
 
 // Required by Wikimedia policy: descriptive UA with contact info (ADR-005).
 const USER_AGENT =
@@ -25,7 +27,11 @@ type WikiPage = {
 	extract?: string;
 	categories?: { title: string }[];
 	revisions?: { revid: number }[];
+	pageimage?: string; // representative image file name (no namespace)
 };
+
+// Thumbnail width requested from Commons; matches the card's max-width.
+const IMAGE_THUMB_WIDTH = 640;
 
 /** Upsert an ingested article by stable pageId. Internal — called by the action. */
 export const upsertArticle = internalMutation({
@@ -37,6 +43,7 @@ export const upsertArticle = internalMutation({
 		extract: v.string(),
 		paragraphs: v.array(v.string()),
 		categories: v.array(v.string()),
+		image: v.optional(imageValidator),
 		pageviews: v.optional(v.number()),
 		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
 	},
@@ -67,6 +74,7 @@ export const recent = query({
 			paragraphs: r.paragraphs.length,
 			categories: r.categories.length,
 			url: r.url,
+			image: r.image ? `${r.image.licenseShortName} — ${r.image.author}` : null,
 			firstParagraph: r.paragraphs[0]?.slice(0, 120) ?? ''
 		}));
 	}
@@ -77,7 +85,7 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		action: 'query',
 		format: 'json',
 		formatversion: '2',
-		prop: 'extracts|info|categories|revisions',
+		prop: 'extracts|info|categories|revisions|pageimages',
 		inprop: 'url',
 		explaintext: '1',
 		exlimit: '1',
@@ -85,6 +93,7 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		rvlimit: '1',
 		cllimit: '50',
 		clshow: '!hidden', // content categories only — skip maintenance cats (year noise)
+		piprop: 'name', // representative image file name; license fetched separately
 		redirects: '1',
 		titles: title
 	});
@@ -94,6 +103,39 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 	const page = data.query?.pages?.[0];
 	if (!page || page.missing || !page.pageid) return null;
 	return page;
+}
+
+/**
+ * Fetch the article's lead image with its Commons license metadata and clear it
+ * through the fail-closed licensing check (ADR-005). Returns a ready-to-store
+ * `CardImage` only when the license is provably free; otherwise `null` (no image
+ * is preferable to an unlicensed one). Network/parse failures degrade to `null`
+ * so a missing image never aborts ingestion of otherwise-good text.
+ */
+async function fetchLeadImage(fileName: string | undefined): Promise<CardImage | null> {
+	if (!fileName) return null;
+	const params = new URLSearchParams({
+		action: 'query',
+		format: 'json',
+		formatversion: '2',
+		prop: 'imageinfo',
+		iiprop: 'url|extmetadata',
+		iiurlwidth: String(IMAGE_THUMB_WIDTH),
+		iiextmetadatafilter:
+			'License|LicenseShortName|LicenseUrl|Artist|Attribution|NonFree|Restrictions',
+		titles: `File:${fileName}`
+	});
+	try {
+		const res = await fetch(`${ACTION_API}?${params}`, { headers: { 'User-Agent': USER_AGENT } });
+		if (!res.ok) return null;
+		const data = (await res.json()) as {
+			query?: { pages?: { imageinfo?: RawImageInfo[] }[] };
+		};
+		const raw = data.query?.pages?.[0]?.imageinfo?.[0];
+		return selectFreeImage(raw);
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -123,6 +165,8 @@ export const ingestTitles = action({
 				}
 				const categories = (page.categories ?? []).map((c) => stripCategoryPrefix(c.title));
 				const evergreen = isEvergreenArticle(categories);
+				// Only spend the image request on articles we'd actually generate from.
+				const leadImage = evergreen ? await fetchLeadImage(page.pageimage) : null;
 				await ctx.runMutation(internal.ingest.upsertArticle, {
 					pageId: page.pageid!,
 					title: page.title,
@@ -134,6 +178,7 @@ export const ingestTitles = action({
 					extract: capText(page.extract),
 					paragraphs: toParagraphs(page.extract),
 					categories,
+					image: leadImage ?? undefined,
 					status: evergreen ? 'fetched' : 'filtered_out'
 				});
 				if (evergreen) ingested++;

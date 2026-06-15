@@ -25,7 +25,7 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 ### Post-v1 backlog (enhancements / release gates, not core loop)
 
 - **Auth** (deferred by design, ADR-004): Better Auth anonymous + Google/Apple when save-across-devices matters.
-- **Images**: Commons images with fail-closed licensing (schema field exists; pipeline TODO).
+- **Images** — done: ingest fetches each evergreen article's lead image and clears it through a **fail-closed** free-license check (`imageLicense.ts`: CC0 / public domain / CC BY / CC BY-SA only; NC/ND, restricted, non-free, or unknown → no image). Cleared images carry full attribution (author, license short name + deed URL, Commons page) onto the source article, then onto the generated card, and render with an inline credit line. Unit-tested against the license matrix; the feed never ships an unlicensed asset.
 - **Semantic adjacency**: card embeddings + vector search for "more like this" (concept-based pathways work today).
 - **Wikidata topic allowlist** (positive) to replace the exclusion heuristic.
 - **Before external users**: CC BY-SA card-licensing decision + counsel, privacy policy + data-delete cascade, authenticated/Enterprise Wikimedia access for bulk, analytics rollups (Aggregate component).

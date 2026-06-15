@@ -148,6 +148,8 @@ export const generateFromArticle = action({
 				revisionId: article.revisionId,
 				sourceSpan: card.sourceSpan
 			},
+			// Carry the article's pre-cleared free-licensed image (if any) onto the card.
+			image: article.image ?? undefined,
 			status,
 			generation: {
 				generationModel,

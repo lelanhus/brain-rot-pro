@@ -21,6 +21,23 @@
 </script>
 
 <article class="card">
+	{#if card.image}
+		<figure class="card-image">
+			<!-- Free-licensed Commons asset; attribution is shown below (ADR-005). -->
+			<img src={card.image.thumbnailUrl} alt={card.hook} loading="lazy" />
+			<figcaption>
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external Commons link -->
+				<a href={card.image.commonsUrl} target="_blank" rel="noreferrer noopener"
+					>{card.image.author}</a
+				>
+				·
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external license deed -->
+				<a href={card.image.licenseUrl} target="_blank" rel="noreferrer noopener"
+					>{card.image.licenseShortName}</a
+				>
+			</figcaption>
+		</figure>
+	{/if}
 	<div class="card-body">
 		<span class="tag">{formatName(card.format)}</span>
 

@@ -60,7 +60,7 @@ export const sourceValidator = v.object({
  * full attribution (ADR-005, fail-closed). Omitted entirely for hand-seeded
  * Phase-0 cards rather than shipping unverified license data.
  */
-const image = v.object({
+export const image = v.object({
 	thumbnailUrl: v.string(),
 	commonsUrl: v.string(),
 	author: v.string(),
@@ -126,6 +126,9 @@ export default defineSchema({
 		extract: v.string(),
 		paragraphs: v.array(v.string()),
 		categories: v.array(v.string()),
+		// Lead image, only when proven free-licensed (ADR-005, fail-closed). Carried
+		// onto generated cards; absent means no clearable image was found.
+		image: v.optional(image),
 		pageviews: v.optional(v.number()),
 		fetchedAt: v.number(),
 		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
