@@ -28,6 +28,12 @@ export function setDeviceId(id: string): void {
 	localStorage.setItem(DEVICE_KEY, id);
 }
 
+/** Forget this device's identity; the next `getDeviceId()` mints a fresh one. */
+export function clearDeviceId(): void {
+	if (!browser) return;
+	localStorage.removeItem(DEVICE_KEY);
+}
+
 let sessionId = '';
 export function getSessionId(): string {
 	if (!browser) return '';

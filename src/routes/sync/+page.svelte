@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
-	import { getDeviceId, setDeviceId } from '$lib/identity';
+	import { getDeviceId, setDeviceId, clearDeviceId } from '$lib/identity';
 	import { formatCodeForDisplay, normalizeCode } from '$convex/syncLogic';
 
 	let deviceId = $state('');
@@ -60,6 +60,25 @@
 
 	function minutesLeft(): number {
 		return Math.max(0, Math.round((expiresAt - Date.now()) / 60000));
+	}
+
+	// Delete-my-data state (two-step confirm).
+	let confirmingDelete = $state(false);
+	let deleting = $state(false);
+	let deleteError = $state<string | null>(null);
+
+	async function deleteData() {
+		if (deleting) return;
+		deleting = true;
+		deleteError = null;
+		try {
+			await getConvexClient().mutation(api.account.deleteData, { deviceId });
+			clearDeviceId(); // next visit starts fresh
+			location.assign(resolve('/'));
+		} catch (err) {
+			deleteError = err instanceof Error ? err.message : 'Could not delete your data.';
+			deleting = false;
+		}
 	}
 </script>
 
@@ -122,6 +141,26 @@
 			</p>
 		{/if}
 		{#if redeemError}<p class="err">{redeemError}</p>{/if}
+	</section>
+
+	<section class="panel danger">
+		<h2>Delete my data</h2>
+		<p>Permanently erase this account's saves, streak, and history. This can't be undone.</p>
+		{#if confirmingDelete}
+			<div class="confirm">
+				<button type="button" class="destructive" onclick={deleteData} disabled={deleting}>
+					{deleting ? 'Deleting…' : 'Yes, delete everything'}
+				</button>
+				<button type="button" class="ghost" onclick={() => (confirmingDelete = false)}
+					>Cancel</button
+				>
+			</div>
+		{:else}
+			<button type="button" class="ghost danger-trigger" onclick={() => (confirmingDelete = true)}>
+				Delete my data
+			</button>
+		{/if}
+		{#if deleteError}<p class="err">{deleteError}</p>{/if}
 	</section>
 </main>
 
@@ -227,6 +266,23 @@
 		color: var(--text);
 		background: transparent;
 		border: 1px solid var(--border);
+	}
+	.panel.danger {
+		border-color: color-mix(in srgb, var(--negative) 30%, var(--border));
+	}
+	.confirm {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.danger-trigger:hover {
+		color: var(--negative);
+		border-color: var(--negative);
+	}
+	.destructive {
+		color: #fff;
+		background: var(--negative);
+		border: 1px solid var(--negative);
 	}
 	.err {
 		color: var(--negative) !important;

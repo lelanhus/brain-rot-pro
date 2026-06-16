@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as account from "../account.js";
 import type * as aiKey from "../aiKey.js";
 import type * as cards from "../cards.js";
 import type * as embedLogic from "../embedLogic.js";
@@ -41,6 +42,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  account: typeof account;
   aiKey: typeof aiKey;
   cards: typeof cards;
   embedLogic: typeof embedLogic;
