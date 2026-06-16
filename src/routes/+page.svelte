@@ -36,12 +36,13 @@
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
+	const TOAST_MS = 2600;
 
 	function showToast(message: string) {
 		toast = message;
 		toastId += 1;
 		if (toastTimer) clearTimeout(toastTimer);
-		toastTimer = setTimeout(() => (toast = null), 2600);
+		toastTimer = setTimeout(() => (toast = null), TOAST_MS);
 	}
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);

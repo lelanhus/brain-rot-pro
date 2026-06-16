@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-import { advanceStreak, dayKey, type StreakState } from './streakLogic';
+import { advanceStreak, dayKey } from './streakLogic';
 
 /**
  * Engagement stats: the daily streak + lifetime days-learned (design: retention
@@ -62,16 +62,8 @@ export const recordActivity = mutation({
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
 			.unique();
 
-		const prev: StreakState | null = existing
-			? {
-					currentStreak: existing.currentStreak,
-					longestStreak: existing.longestStreak,
-					lastActiveDay: existing.lastActiveDay,
-					daysLearned: existing.daysLearned
-				}
-			: null;
-
-		const { state, event } = advanceStreak(prev, dayKey(Date.now()));
+		// A deviceStats doc is structurally a StreakState (plus system fields).
+		const { state, event } = advanceStreak(existing, dayKey(Date.now()));
 
 		if (event !== 'same_day') {
 			const doc = { deviceId: args.deviceId, ...state, updatedAt: Date.now() };

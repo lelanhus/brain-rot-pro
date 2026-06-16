@@ -79,6 +79,17 @@ export const recent = query({
 	}
 });
 
+/** GET JSON from a Wikimedia endpoint, degrading to null on any HTTP/parse error. */
+async function getJsonOrNull<T>(apiUrl: string, params: URLSearchParams): Promise<T | null> {
+	try {
+		const res = await fetch(`${apiUrl}?${params}`, { headers: { 'User-Agent': USER_AGENT } });
+		if (!res.ok) return null;
+		return (await res.json()) as T;
+	} catch {
+		return null;
+	}
+}
+
 async function fetchArticle(title: string): Promise<WikiPage | null> {
 	const params = new URLSearchParams({
 		action: 'query',
@@ -125,17 +136,11 @@ async function fetchLeadImage(fileName: string | undefined): Promise<CardImage |
 			'License|LicenseShortName|LicenseUrl|Artist|Attribution|NonFree|Restrictions',
 		titles: `File:${fileName}`
 	});
-	try {
-		const res = await fetch(`${ACTION_API}?${params}`, { headers: { 'User-Agent': USER_AGENT } });
-		if (!res.ok) return null;
-		const data = (await res.json()) as {
-			query?: { pages?: { imageinfo?: RawImageInfo[] }[] };
-		};
-		const raw = data.query?.pages?.[0]?.imageinfo?.[0];
-		return selectFreeImage(raw);
-	} catch {
-		return null;
-	}
+	const data = await getJsonOrNull<{ query?: { pages?: { imageinfo?: RawImageInfo[] }[] } }>(
+		ACTION_API,
+		params
+	);
+	return selectFreeImage(data?.query?.pages?.[0]?.imageinfo?.[0]);
 }
 
 /**
@@ -150,22 +155,16 @@ async function fetchWikidataClaims(qid: string): Promise<TopicClaims | null> {
 		ids: qid,
 		props: 'claims'
 	});
-	try {
-		const res = await fetch(`${WIKIDATA_API}?${params}`, { headers: { 'User-Agent': USER_AGENT } });
-		if (!res.ok) return null;
-		const data = (await res.json()) as {
-			entities?: Record<string, { claims?: Record<string, WikidataClaim[]> }>;
-		};
-		const claims = data.entities?.[qid]?.claims;
-		if (!claims) return null;
-		const ids = (prop: string): string[] =>
-			(claims[prop] ?? [])
-				.map((c) => c.mainsnak?.datavalue?.value?.id)
-				.filter((v): v is string => !!v);
-		return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106') };
-	} catch {
-		return null;
-	}
+	const data = await getJsonOrNull<{
+		entities?: Record<string, { claims?: Record<string, WikidataClaim[]> }>;
+	}>(WIKIDATA_API, params);
+	const claims = data?.entities?.[qid]?.claims;
+	if (!claims) return null;
+	const ids = (prop: string): string[] =>
+		(claims[prop] ?? [])
+			.map((c) => c.mainsnak?.datavalue?.value?.id)
+			.filter((v): v is string => !!v);
+	return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106') };
 }
 
 /**

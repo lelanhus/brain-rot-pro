@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from './_generated/server';
 import { v } from 'convex/values';
-import type { Doc, Id } from './_generated/dataModel';
+import type { Doc } from './_generated/dataModel';
 
 // V8-runtime DB access for the embedding pipeline (the action file is "use node"
 // and can't run Convex queries/mutations directly).
@@ -54,5 +54,3 @@ export const patchEmbedding = internalMutation({
 		return null;
 	}
 });
-
-export type { Id };

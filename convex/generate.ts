@@ -14,30 +14,13 @@ import {
 	spanIsFromSource,
 	validationSchema
 } from './generateLogic';
-
-// The AI SDK's default gateway provider reads AI_GATEWAY_API_KEY. We accept a
-// few common names and normalize, so it works whichever the user set.
-const KEY_CANDIDATES = [
-	'AI_GATEWAY_API_KEY',
-	'VERCEL_AI_GATEWAY_API_KEY',
-	'AI_GATEWAY_KEY',
-	'VERCEL_AI_GATEWAY_KEY',
-	'GATEWAY_API_KEY'
-];
+import { resolveGatewayKey, requireGatewayKey } from './aiKey';
 
 // Env-overridable model defaults (Vercel AI Gateway slugs). Set GENERATION_MODEL
 // / VALIDATION_MODEL in the Convex env to override. Generator ≠ validator so the
 // support check is an independent judgement (review §3.2).
 const DEFAULT_GENERATION_MODEL = 'anthropic/claude-sonnet-4.5';
 const DEFAULT_VALIDATION_MODEL = 'anthropic/claude-haiku-4.5';
-
-function resolveKey(): { name: string; value: string } | null {
-	for (const name of KEY_CANDIDATES) {
-		const value = process.env[name];
-		if (value) return { name, value };
-	}
-	return null;
-}
 
 /** Surface an AI SDK failure loudly, including the raw model text when present. */
 function wrapAiError(stage: string, e: unknown): Error {
@@ -50,7 +33,7 @@ function wrapAiError(stage: string, e: unknown): Error {
 export const config = action({
 	args: {},
 	handler: async () => {
-		const key = resolveKey();
+		const key = resolveGatewayKey();
 		return {
 			hasKey: !!key,
 			keyEnvVar: key?.name ?? null,
@@ -82,14 +65,7 @@ export const generateFromArticle = action({
 		reason: string;
 		hook: string;
 	}> => {
-		const key = resolveKey();
-		if (!key) {
-			throw new Error(
-				`No AI gateway key found. Set one of ${KEY_CANDIDATES.join(', ')} in the Convex deployment env.`
-			);
-		}
-		// Normalize so the AI SDK's default gateway provider picks it up.
-		process.env.AI_GATEWAY_API_KEY = key.value;
+		requireGatewayKey();
 
 		const generationModel = process.env.GENERATION_MODEL ?? DEFAULT_GENERATION_MODEL;
 		const validationModel = process.env.VALIDATION_MODEL ?? DEFAULT_VALIDATION_MODEL;
