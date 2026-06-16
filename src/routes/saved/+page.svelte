@@ -43,6 +43,7 @@
 		<h1>
 			Saved {#if items.length}<span class="count">{items.length}</span>{/if}
 		</h1>
+		<a class="sync-link" href={resolve('/sync')}>Sync to another device →</a>
 	</header>
 
 	{#if saved.error}
@@ -124,6 +125,15 @@
 		background: var(--surface-2);
 		padding: 0.1rem 0.55rem;
 		border-radius: 999px;
+	}
+	.sync-link {
+		color: var(--muted);
+		font-size: 0.82rem;
+		text-decoration: none;
+		margin-top: 0.2rem;
+	}
+	.sync-link:hover {
+		color: var(--accent);
 	}
 	.msg {
 		color: var(--muted);

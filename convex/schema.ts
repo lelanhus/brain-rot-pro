@@ -179,5 +179,18 @@ export default defineSchema({
 		lastActiveDay: v.string(), // UTC YYYY-MM-DD
 		daysLearned: v.number(),
 		updatedAt: v.number()
-	}).index('by_device', ['deviceId'])
+	}).index('by_device', ['deviceId']),
+
+	/**
+	 * Short-lived, single-use codes that let another device adopt this device's
+	 * anonymous account (ADR-004 — cross-device save without OAuth). The code maps
+	 * to the source `deviceId`; redeeming hands that id to the new device.
+	 */
+	syncCodes: defineTable({
+		code: v.string(), // normalized (uppercase, no separators)
+		deviceId: v.string(),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+		redeemedAt: v.optional(v.number())
+	}).index('by_code', ['code'])
 });

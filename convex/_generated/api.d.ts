@@ -30,6 +30,8 @@ import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
 import type * as stats from "../stats.js";
 import type * as streakLogic from "../streakLogic.js";
+import type * as sync from "../sync.js";
+import type * as syncLogic from "../syncLogic.js";
 import type * as wikidataLogic from "../wikidataLogic.js";
 
 import type {
@@ -61,6 +63,8 @@ declare const fullApi: ApiFromModules<{
   seedData: typeof seedData;
   stats: typeof stats;
   streakLogic: typeof streakLogic;
+  sync: typeof sync;
+  syncLogic: typeof syncLogic;
   wikidataLogic: typeof wikidataLogic;
 }>;
 
