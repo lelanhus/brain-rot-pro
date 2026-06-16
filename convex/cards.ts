@@ -2,10 +2,11 @@ import { paginationOptsValidator } from 'convex/server';
 import { query } from './_generated/server';
 
 /**
- * The feed (Phase 0/1). Reads a bounded, indexed candidate set — published cards
- * ordered by their stored `shuffleKey` — and paginates it. No full-table scan,
- * no in-query randomness (ADR-007). Ranking here is content-intrinsic; behavioral
- * ranking is deliberately dormant until there is a user base.
+ * The global feed: the anonymous SSR baseline. Reads a bounded, indexed candidate
+ * set — published cards ordered by their stored `shuffleKey` — and paginates it.
+ * No full-table scan, no in-query randomness (ADR-007). Ranking here is
+ * content-intrinsic by design; behavioral personalization is layered on by
+ * `feed.personal`, which the page switches to once a device id resolves.
  *
  * Consumed via `convexLoadPaginated(api.cards.feed, {}, { initialNumItems })`
  * for SSR-to-live (no loading flash), then live updates after hydration.
