@@ -61,8 +61,10 @@
 						<a href={card.sourceUrl} target="_blank" rel="noreferrer noopener">{card.sourceUrl}</a>
 					</details>
 					<div class="actions">
-						<button class="approve" onclick={() => onApprove(card._id)}>Approve</button>
-						<button class="reject" onclick={() => onReject(card._id)}>Reject</button>
+						<button type="button" class="approve" onclick={() => onApprove(card._id)}
+							>Approve</button
+						>
+						<button type="button" class="reject" onclick={() => onReject(card._id)}>Reject</button>
 					</div>
 				</li>
 			{/each}

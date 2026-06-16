@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { useQuery, useMutation, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -18,7 +19,9 @@
 
 	let deviceId = $state('');
 	const notInterested = new SvelteSet<string>();
-	let focusConcept = $state<string | null>(null);
+	// Seeded from a shared/deep-linked ?focus= (e.g. a concept chip tapped on
+	// /saved); read once from SvelteKit's reactive page state, not window.location.
+	let focusConcept = $state<string | null>(page.url.searchParams.get('focus'));
 	let activeCardId = $state<Id<'knowledgeCards'> | null>(null);
 
 	// Semantic "more like this": related cards woven into the feed right after the
@@ -78,9 +81,6 @@
 
 	onMount(() => {
 		deviceId = getDeviceId();
-		// Honor a shared/deep-linked focus (e.g. a concept chip tapped on /saved).
-		const linked = new URL(window.location.href).searchParams.get('focus');
-		if (linked) focusConcept = linked;
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
