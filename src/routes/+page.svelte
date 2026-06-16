@@ -11,6 +11,7 @@
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
+	import { createToast } from '$lib/toast.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -31,19 +32,10 @@
 	const completedThisSession = new SvelteSet<string>();
 	let sessionCount = $state(0);
 	let lastMilestone = $state(0);
-	let toast = $state<string | null>(null);
-	let toastId = $state(0);
-	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	const toast = createToast();
 
 	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
-	const TOAST_MS = 2600;
 
-	function showToast(message: string) {
-		toast = message;
-		toastId += 1;
-		if (toastTimer) clearTimeout(toastTimer);
-		toastTimer = setTimeout(() => (toast = null), TOAST_MS);
-	}
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
 	let adaptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -95,14 +87,14 @@
 		// Register today's visit; celebrate a kept or new streak.
 		recordActivity({ deviceId })
 			.then((res) => {
-				if (res.event === 'extended') showToast(`🔥 ${res.currentStreak}-day streak!`);
-				else if (res.event === 'started') showToast('🔥 Streak started — see you tomorrow!');
+				if (res.event === 'extended') toast.show(`🔥 ${res.currentStreak}-day streak!`);
+				else if (res.event === 'started') toast.show('🔥 Streak started — see you tomorrow!');
 			})
 			.catch((err) => console.error('[stats] recordActivity failed', err));
 		return () => {
 			track('session_end');
 			void flush();
-			if (toastTimer) clearTimeout(toastTimer);
+			toast.dismiss();
 			cleanupTelemetry();
 		};
 	});
@@ -116,7 +108,7 @@
 		const milestone = SESSION_MILESTONES.find((m) => m === sessionCount);
 		if (milestone && milestone > lastMilestone) {
 			lastMilestone = milestone;
-			showToast(`✨ ${milestone} learned this session!`);
+			toast.show(`✨ ${milestone} learned this session!`);
 		}
 	}
 
@@ -168,7 +160,7 @@
 			})) as Doc<'knowledgeCards'>[];
 			const fresh = related.filter((r) => !notInterested.has(r._id));
 			if (fresh.length === 0) {
-				showToast('No related cards yet — keep exploring');
+				toast.show('No related cards yet — keep exploring');
 			} else {
 				injectedAfter.set(card._id, fresh);
 				scheduleAdapt();
@@ -177,7 +169,7 @@
 			}
 		} catch (err) {
 			console.error('[feed] more-like-this failed', err);
-			showToast('Could not load related cards');
+			toast.show('Could not load related cards');
 		} finally {
 			divingId = null;
 		}
@@ -264,9 +256,9 @@
 	{/if}
 </div>
 
-{#if toast}
-	{#key toastId}
-		<div class="toast" role="status" data-testid="toast">{toast}</div>
+{#if toast.message}
+	{#key toast.id}
+		<div class="toast" role="status" data-testid="toast">{toast.message}</div>
 	{/key}
 {/if}
 

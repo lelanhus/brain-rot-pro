@@ -4,6 +4,7 @@
 	import { getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { getDeviceId, setDeviceId, clearDeviceId } from '$lib/identity';
+	import { errorMessage } from '$lib/errors';
 	import { formatCodeForDisplay, normalizeCode } from '$convex/syncLogic';
 
 	let deviceId = $state('');
@@ -35,7 +36,7 @@
 			code = res.code;
 			expiresAt = res.expiresAt;
 		} catch (err) {
-			mintError = err instanceof Error ? err.message : 'Could not create a code.';
+			mintError = errorMessage(err, 'Could not create a code.');
 		} finally {
 			minting = false;
 		}
@@ -52,7 +53,7 @@
 			// Reload so every live query re-subscribes under the adopted account.
 			setTimeout(() => location.assign(resolve('/')), 900);
 		} catch (err) {
-			redeemError = err instanceof Error ? err.message : 'Could not use that code.';
+			redeemError = errorMessage(err, 'Could not use that code.');
 		} finally {
 			redeeming = false;
 		}
@@ -76,7 +77,7 @@
 			clearDeviceId(); // next visit starts fresh
 			location.assign(resolve('/'));
 		} catch (err) {
-			deleteError = err instanceof Error ? err.message : 'Could not delete your data.';
+			deleteError = errorMessage(err, 'Could not delete your data.');
 			deleting = false;
 		}
 	}
