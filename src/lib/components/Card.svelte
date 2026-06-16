@@ -9,7 +9,9 @@
 		onSave,
 		onNotInterested,
 		onSource,
-		onRelated
+		onRelated,
+		onMore,
+		moreLoading = false
 	}: {
 		card: Doc<'knowledgeCards'>;
 		saved?: boolean;
@@ -17,6 +19,8 @@
 		onNotInterested?: () => void;
 		onSource?: () => void;
 		onRelated?: (tag: string) => void;
+		onMore?: () => void;
+		moreLoading?: boolean;
 	} = $props();
 </script>
 
@@ -53,6 +57,12 @@
 				<button type="button" class="chip" onclick={() => onRelated?.(tag)}>{tag}</button>
 			{/each}
 		</div>
+
+		{#if onMore}
+			<button type="button" class="more" onclick={onMore} disabled={moreLoading}>
+				{moreLoading ? 'Finding…' : 'More like this →'}
+			</button>
+		{/if}
 
 		<details class="source" ontoggle={(e) => e.currentTarget.open && onSource?.()}>
 			<summary>Source</summary>

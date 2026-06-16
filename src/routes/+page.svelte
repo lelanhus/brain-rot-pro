@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { SvelteSet } from 'svelte/reactivity';
-	import { useQuery, useMutation } from 'convex-svelte';
+	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
+	import { useQuery, useMutation, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
@@ -10,6 +10,7 @@
 	import { dwell } from '$lib/actions/dwell';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
+	import { weaveFeed } from '$lib/feed';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -18,6 +19,11 @@
 	const notInterested = new SvelteSet<string>();
 	let focusConcept = $state<string | null>(null);
 	let activeCardId = $state<Id<'knowledgeCards'> | null>(null);
+
+	// Semantic "more like this": related cards woven into the feed right after the
+	// card you dived from (the rabbit hole). `divingId` drives the button's spinner.
+	const injectedAfter = new SvelteMap<string, Doc<'knowledgeCards'>[]>();
+	let divingId = $state<string | null>(null);
 
 	// Momentum (engagement layer): a live count of cards completed this session and
 	// a transient celebration toast. Streak lives server-side; session count is
@@ -63,7 +69,7 @@
 	// is an in-memory optimistic hide for the gap before recompute() rewrites the
 	// profile (the server is the durable source — feed.personal excludes them).
 	const visibleResults = $derived(
-		(personal.data ?? feed.results).filter((c) => !notInterested.has(c._id))
+		weaveFeed(personal.data ?? feed.results, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
 
 	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
@@ -143,6 +149,37 @@
 	function clearFocus() {
 		focusConcept = null;
 		feedEl?.scrollTo({ top: 0, behavior: 'smooth' });
+	}
+
+	// Dive into a card: fetch semantically-related cards and weave them in right
+	// after it, then advance so the next card up is the first related one.
+	async function handleMore(card: Doc<'knowledgeCards'>) {
+		if (divingId || injectedAfter.has(card._id)) {
+			scrollByViewport(1);
+			return;
+		}
+		divingId = card._id;
+		track('related_tap', { cardId: card._id });
+		try {
+			const related = (await getConvexClient().action(api.embeddings.forCard, {
+				cardId: card._id,
+				limit: 3
+			})) as Doc<'knowledgeCards'>[];
+			const fresh = related.filter((r) => !notInterested.has(r._id));
+			if (fresh.length === 0) {
+				showToast('No related cards yet — keep exploring');
+			} else {
+				injectedAfter.set(card._id, fresh);
+				scheduleAdapt();
+				await tick();
+				scrollByViewport(1);
+			}
+		} catch (err) {
+			console.error('[feed] more-like-this failed', err);
+			showToast('Could not load related cards');
+		} finally {
+			divingId = null;
+		}
 	}
 
 	function scrollByViewport(dir: 1 | -1) {
@@ -277,6 +314,8 @@
 					onNotInterested={() => handleNotInterested(card)}
 					onSource={() => track('source_open', { cardId: card._id })}
 					onRelated={(tag) => handleRelated(card, tag)}
+					onMore={() => handleMore(card)}
+					moreLoading={divingId === card._id}
 				/>
 			</div>
 		{/each}

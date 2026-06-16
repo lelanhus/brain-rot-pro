@@ -8,7 +8,11 @@
  * @module
  */
 
+import type * as aiKey from "../aiKey.js";
 import type * as cards from "../cards.js";
+import type * as embedLogic from "../embedLogic.js";
+import type * as embeddings from "../embeddings.js";
+import type * as embeddingsDb from "../embeddingsDb.js";
 import type * as events from "../events.js";
 import type * as feed from "../feed.js";
 import type * as generate from "../generate.js";
@@ -34,7 +38,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiKey: typeof aiKey;
   cards: typeof cards;
+  embedLogic: typeof embedLogic;
+  embeddings: typeof embeddings;
+  embeddingsDb: typeof embeddingsDb;
   events: typeof events;
   feed: typeof feed;
   generate: typeof generate;

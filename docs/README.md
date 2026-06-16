@@ -28,6 +28,8 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 - **Momentum** — done: a per-device **daily streak** (`deviceStats` + `stats.ts`, idempotent within a UTC day; pure math in `streakLogic.ts`) plus a **live session counter** and milestone celebrations. The feed shows a 🔥 streak pill (reactive via `stats.get`) and a ✨ count that ticks as cards complete; streak extensions and session milestones (5/10/25/50/100) fire a transient toast. Stats live outside `userProfiles` so they never invalidate the feed query (ADR-007).
 - **Installable + collection** — done: a web manifest, theme-color, apple-touch + maskable icon and a custom app glyph make it an installable, standalone PWA (`viewport-fit=cover` so the safe-area CSS engages). The **Saved** view is a real collection manager — count, image thumbnails, inline remove (optimistic), relative save times, and concept chips that deep-link back into the feed's focus (`/?focus=<concept>`).
 
+- **Semantic "more like this"** — done: each card has a **"More like this"** dive that fetches semantically-related cards (`embeddings.forCard`) and weaves them into the feed right after it (`weaveFeed`, deduped — the rabbit hole). Cards are embedded on publish (`review.approve` schedules `embeddings.embedCard`) and backfilled for seeds (`embeddings.backfillEmbeddings`, also auto-scheduled by `seed`), stored on a Convex **vector index** (`by_embedding`, 1536-d, filtered to `published`). Degrades to concept-tag overlap when a card has no embedding yet, so it always returns something relevant. Embedding model is env-overridable (`EMBEDDING_MODEL`, default `openai/text-embedding-3-small`); the index dimension is locked. Pure ranking/cosine logic unit-tested; the fallback path convex-tested; the vector path validated live.
+
 ### Post-v1 backlog (enhancements / release gates, not core loop)
 
 - **Auth** (deferred by design, ADR-004): Better Auth anonymous + Google/Apple when save-across-devices matters.
@@ -46,7 +48,8 @@ npx convex run ingest:topTitles '{"limit":20}'   # candidate articles from top p
 npx convex run ingest:ingestTitles '{"titles":["Roman concrete","Octopus"]}'
 npx convex run generate:generateFromArticle '{"articleId":"<id from ingest:recent>"}'
 npx convex run review:queue                      # inspect generated drafts
-npx convex run review:approve '{"cardId":"<id>"}'  # publish a reviewed card
+npx convex run review:approve '{"cardId":"<id>"}'  # publish a reviewed card (also embeds it)
+npx convex run embeddings:backfillEmbeddings     # embed published cards (needs an AI gateway key)
 npm run dev                                      # the feed
 npm run verify                                   # the loop: typecheck + lint + unit + convex + component
 ```

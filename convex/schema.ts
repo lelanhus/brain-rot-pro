@@ -88,13 +88,23 @@ export default defineSchema({
 		conceptTags: v.array(v.string()),
 		source: sourceValidator,
 		image: v.optional(image),
+		// Semantic embedding of the card (hook+body+tags), for vector "more like
+		// this". Optional: backfilled for seeds, generated on publish. Dimension is
+		// locked to the index below — changing the embedding model means a reindex.
+		embedding: v.optional(v.array(v.float64())),
 		generation: v.optional(generationValidator),
 		status: cardStatus,
 		// Deterministic-but-varied feed order: a random key assigned once at write
 		// time, so the feed query stays deterministic (ADR-007 — no in-query RNG).
 		shuffleKey: v.number(),
 		createdAt: v.number()
-	}).index('by_status_shuffle', ['status', 'shuffleKey']),
+	})
+		.index('by_status_shuffle', ['status', 'shuffleKey'])
+		.vectorIndex('by_embedding', {
+			vectorField: 'embedding',
+			dimensions: 1536, // openai/text-embedding-3-small
+			filterFields: ['status']
+		}),
 
 	/**
 	 * Raw interaction events (design doc §11.3). Write-heavy, append-only; the

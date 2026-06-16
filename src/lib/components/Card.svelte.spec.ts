@@ -38,6 +38,20 @@ test('omits the image figure when the card has none', async () => {
 	await expect.element(page.getByRole('img')).not.toBeInTheDocument();
 });
 
+test('shows "More like this" only when a handler is wired, and fires it', async () => {
+	render(Card, { card: sample });
+	await expect
+		.element(page.getByRole('button', { name: /More like this/ }))
+		.not.toBeInTheDocument();
+
+	let dived = false;
+	render(Card, { card: sample, onMore: () => (dived = true) });
+	const button = page.getByRole('button', { name: /More like this/ });
+	await expect.element(button).toBeVisible();
+	await button.click();
+	expect(dived).toBe(true);
+});
+
 test('renders a free-licensed image with attribution when present', async () => {
 	const withImage = {
 		...sample,

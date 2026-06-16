@@ -186,6 +186,32 @@ body {
 	border-color: var(--border);
 }
 
+/* "More like this": dive into the semantic rabbit hole. */
+.more {
+	align-self: flex-start;
+	font: inherit;
+	font-size: 0.84rem;
+	font-weight: 600;
+	color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+	padding: 0.4rem 0.8rem;
+	border-radius: 999px;
+	cursor: pointer;
+	transition:
+		background var(--dur-fast) var(--ease),
+		opacity var(--dur-fast) var(--ease);
+}
+
+.more:hover {
+	background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.more:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
 .source {
 	font-size: 0.9rem;
 	color: var(--muted);
