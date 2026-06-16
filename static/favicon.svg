@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Brain Rot Pro">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7bff" />
+      <stop offset="1" stop-color="#5a48e0" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)" />
+  <path
+    fill="#ffffff"
+    d="M256 80c14 116 52 154 168 168-116 14-154 52-168 168-14-116-52-154-168-168 116-14 154-52 168-168Z"
+  />
+  <path fill="#ffffff" opacity="0.92" d="M392 132c5 38 17 50 55 55-38 5-50 17-55 55-5-38-17-50-55-55 38-5 50-17 55-55Z" />
+</svg>

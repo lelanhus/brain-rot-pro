@@ -79,6 +79,9 @@
 
 	onMount(() => {
 		deviceId = getDeviceId();
+		// Honor a shared/deep-linked focus (e.g. a concept chip tapped on /saved).
+		const linked = new URL(window.location.href).searchParams.get('focus');
+		if (linked) focusConcept = linked;
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals

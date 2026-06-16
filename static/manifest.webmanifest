@@ -1,0 +1,16 @@
+{
+	"name": "Brain Rot Pro",
+	"short_name": "Brain Rot",
+	"description": "A zero-friction feed of source-backed knowledge cards. One more idea, always.",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#0b0b0f",
+	"theme_color": "#0b0b0f",
+	"categories": ["education", "news", "lifestyle"],
+	"icons": [
+		{ "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+		{ "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+	]
+}

@@ -26,6 +26,7 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 
 - **Explore pathways** — done: tapping a card's concept chip focuses the feed on that concept (an additive re-rank via `feed.personal`'s `focusConcept`, never a filter, so the feed can't empty), jumps to the top, and shows a dismissible "Exploring" pill. Still a strong personalization signal.
 - **Momentum** — done: a per-device **daily streak** (`deviceStats` + `stats.ts`, idempotent within a UTC day; pure math in `streakLogic.ts`) plus a **live session counter** and milestone celebrations. The feed shows a 🔥 streak pill (reactive via `stats.get`) and a ✨ count that ticks as cards complete; streak extensions and session milestones (5/10/25/50/100) fire a transient toast. Stats live outside `userProfiles` so they never invalidate the feed query (ADR-007).
+- **Installable + collection** — done: a web manifest, theme-color, apple-touch + maskable icon and a custom app glyph make it an installable, standalone PWA (`viewport-fit=cover` so the safe-area CSS engages). The **Saved** view is a real collection manager — count, image thumbnails, inline remove (optimistic), relative save times, and concept chips that deep-link back into the feed's focus (`/?focus=<concept>`).
 
 ### Post-v1 backlog (enhancements / release gates, not core loop)
 
