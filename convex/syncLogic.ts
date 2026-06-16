@@ -1,9 +1,9 @@
 /**
  * Anonymous account sync (ADR-004 — the "anonymous" half, delivered without an
  * external OAuth provider). The per-device id IS the anonymous account key; a
- * short-lived, single-use code lets another device adopt the same account, so
- * saves / streak / personalization follow you across devices. Pure helpers here
- * (code shape, expiry); the network/DB lives in `sync.ts`.
+ * short-lived, single-use code lets another device join the same account
+ * (merging saves / streak / personalization). Pure helpers here (code shape,
+ * expiry); the network/DB — including the merge — lives in `sync.ts`.
  *
  * Better Auth + Google/Apple remains the future upgrade for frictionless,
  * codeless multi-device — this is the seam it would slot into.

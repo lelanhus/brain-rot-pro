@@ -43,8 +43,8 @@ export function stripCategoryPrefix(category: string): string {
 /**
  * Category-keyword signals that an article is time-bound or low educational
  * density (the design doc §8.2 noise: current events, sports, entertainment).
- * Heuristic, not exhaustive — a positive topic allowlist via Wikidata is the
- * Phase-3 upgrade.
+ * Heuristic, not exhaustive: the positive Wikidata allowlist (`wikidataLogic.ts`)
+ * now leads — this runs only as the fallback for topics it can't classify.
  */
 const EXCLUDE_CATEGORY_KEYWORDS = [
 	'footballers',
@@ -71,7 +71,10 @@ const EXCLUDE_CATEGORY_KEYWORDS = [
 
 const EXCLUDE_YEAR_CATEGORY = /\b20(1[5-9]|2[0-9])\b/; // recent-year categories ~ current events
 
-/** Heuristic: is this article evergreen/educational enough to generate cards from? */
+/**
+ * Heuristic: is this article evergreen/educational enough to generate cards from?
+ * The fallback behind the Wikidata allowlist — see `decideArticleStatus`.
+ */
 export function isEvergreenArticle(categories: string[]): boolean {
 	const lowered = categories.map((c) => c.toLowerCase());
 	if (lowered.some((c) => EXCLUDE_CATEGORY_KEYWORDS.some((k) => c.includes(k)))) return false;

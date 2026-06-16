@@ -5,9 +5,9 @@
  * These are hand-authored from well-established, verifiable facts so the spike
  * isn't blocked on the generation pipeline. Each carries real provenance
  * (source article + URL + the grounding span). `revisionId` is null because
- * these were not machine-fetched; the Phase-2 pipeline MUST populate it.
- * Images are intentionally omitted (no unverified license data) — the
- * fail-closed image path is built with ingestion in Phase 2.
+ * these were not machine-fetched; the generation pipeline MUST populate it.
+ * Images are intentionally omitted (no unverified license data); generated cards
+ * get fail-closed Commons images via ingestion (`imageLicense.ts`).
  *
  * Expanding toward the ~150–200 cards the real usability test wants is a
  * follow-on (ideally the first output of the generation pipeline).
