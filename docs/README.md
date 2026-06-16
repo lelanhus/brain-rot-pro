@@ -34,8 +34,7 @@ A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 
 - **Auth** (deferred by design, ADR-004): Better Auth anonymous + Google/Apple when save-across-devices matters.
 - **Images** — done: ingest fetches each evergreen article's lead image and clears it through a **fail-closed** free-license check (`imageLicense.ts`: CC0 / public domain / CC BY / CC BY-SA only; NC/ND, restricted, non-free, or unknown → no image). Cleared images carry full attribution (author, license short name + deed URL, Commons page) onto the source article, then onto the generated card, and render with an inline credit line. Unit-tested against the license matrix; the feed never ships an unlicensed asset.
-- **Semantic adjacency**: card embeddings + vector search for "more like this" (concept-based pathways work today).
-- **Wikidata topic allowlist** (positive) to replace the exclusion heuristic.
+- **Wikidata topic allowlist** — done: ingest now reads each article's linked Wikidata entity (`pageprops` → QID → `wbgetentities` P31/P279/P106) and classifies it by **type** rather than English category strings (`wikidataLogic.ts`, pure + tested). An authoritative _allow_ (species, element, language, war, academic discipline, …) or _block_ (film, album, song, video game, TV series; people whose occupation is footballer/actor/singer/…) decides; people are judged by occupation (scholars allowed), and **block wins over allow**. Anything Wikidata doesn't classify falls back to the old category heuristic (`decideArticleStatus`) — so the allowlist _leads_ and the heuristic only catches the long tail. `ingestTitles` returns a per-title `decisions` log (verdict + basis) for tuning.
 - **Before external users**: CC BY-SA card-licensing decision + counsel, privacy policy + data-delete cascade, authenticated/Enterprise Wikimedia access for bulk, analytics rollups (Aggregate component).
 
 ## Running it

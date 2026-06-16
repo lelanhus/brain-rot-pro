@@ -1,20 +1,16 @@
 import { action, internalMutation, query } from './_generated/server';
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
-import {
-	capText,
-	isEvergreenArticle,
-	looksLikeArticleTitle,
-	stripCategoryPrefix,
-	toParagraphs
-} from './ingestUtils';
+import { capText, looksLikeArticleTitle, stripCategoryPrefix, toParagraphs } from './ingestUtils';
 import { selectFreeImage, type CardImage, type RawImageInfo } from './imageLicense';
+import { classifyTopic, decideArticleStatus, type TopicClaims } from './wikidataLogic';
 import { image as imageValidator } from './schema';
 
 // Required by Wikimedia policy: descriptive UA with contact info (ADR-005).
 const USER_AGENT =
 	'BrainRotPro/0.1 (https://github.com/lelanhus/brain-rot-pro; leland.husband@gmail.com)';
 const ACTION_API = 'https://en.wikipedia.org/w/api.php';
+const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
 const PAGEVIEWS_API =
 	'https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia.org/all-access';
 
@@ -28,7 +24,10 @@ type WikiPage = {
 	categories?: { title: string }[];
 	revisions?: { revid: number }[];
 	pageimage?: string; // representative image file name (no namespace)
+	pageprops?: { wikibase_item?: string }; // linked Wikidata QID
 };
+
+type WikidataClaim = { mainsnak?: { datavalue?: { value?: { id?: string } } } };
 
 // Thumbnail width requested from Commons; matches the card's max-width.
 const IMAGE_THUMB_WIDTH = 640;
@@ -85,7 +84,7 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		action: 'query',
 		format: 'json',
 		formatversion: '2',
-		prop: 'extracts|info|categories|revisions|pageimages',
+		prop: 'extracts|info|categories|revisions|pageimages|pageprops',
 		inprop: 'url',
 		explaintext: '1',
 		exlimit: '1',
@@ -94,6 +93,7 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		cllimit: '50',
 		clshow: '!hidden', // content categories only — skip maintenance cats (year noise)
 		piprop: 'name', // representative image file name; license fetched separately
+		ppprop: 'wikibase_item', // the linked Wikidata QID, for the topic allowlist
 		redirects: '1',
 		titles: title
 	});
@@ -139,6 +139,36 @@ async function fetchLeadImage(fileName: string | undefined): Promise<CardImage |
 }
 
 /**
+ * Fetch the Wikidata `instance of` / `subclass of` / `occupation` claims for a
+ * QID, for the topic allowlist (`classifyTopic`). Returns null on any failure so
+ * ingestion degrades to the category heuristic rather than aborting.
+ */
+async function fetchWikidataClaims(qid: string): Promise<TopicClaims | null> {
+	const params = new URLSearchParams({
+		action: 'wbgetentities',
+		format: 'json',
+		ids: qid,
+		props: 'claims'
+	});
+	try {
+		const res = await fetch(`${WIKIDATA_API}?${params}`, { headers: { 'User-Agent': USER_AGENT } });
+		if (!res.ok) return null;
+		const data = (await res.json()) as {
+			entities?: Record<string, { claims?: Record<string, WikidataClaim[]> }>;
+		};
+		const claims = data.entities?.[qid]?.claims;
+		if (!claims) return null;
+		const ids = (prop: string): string[] =>
+			(claims[prop] ?? [])
+				.map((c) => c.mainsnak?.datavalue?.value?.id)
+				.filter((v): v is string => !!v);
+		return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106') };
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Ingest specific article titles. Public dev tooling (runnable via `convex run`).
  * Per-title failures are collected and returned, not thrown, so one bad title
  * doesn't abort the batch.
@@ -151,6 +181,9 @@ export const ingestTitles = action({
 		const skipped: string[] = [];
 		const filtered: string[] = [];
 		const errors: { title: string; error: string }[] = [];
+		// Why each title was accepted/filtered (wikidata verdict vs heuristic) — for
+		// tuning the allowlist from `convex run`.
+		const decisions: { title: string; status: string; basis: string }[] = [];
 
 		for (const title of args.titles) {
 			if (!looksLikeArticleTitle(title)) {
@@ -164,9 +197,16 @@ export const ingestTitles = action({
 					continue;
 				}
 				const categories = (page.categories ?? []).map((c) => stripCategoryPrefix(c.title));
-				const evergreen = isEvergreenArticle(categories);
+				// Positive Wikidata allowlist leads; the category heuristic is the
+				// fallback for topics Wikidata doesn't classify (decideArticleStatus).
+				const qid = page.pageprops?.wikibase_item;
+				const claims = qid ? await fetchWikidataClaims(qid) : null;
+				const verdict = claims ? classifyTopic(claims) : null;
+				const { status, basis } = decideArticleStatus({ verdict, categories });
+				decisions.push({ title: page.title, status, basis });
+				const accepted = status === 'fetched';
 				// Only spend the image request on articles we'd actually generate from.
-				const leadImage = evergreen ? await fetchLeadImage(page.pageimage) : null;
+				const leadImage = accepted ? await fetchLeadImage(page.pageimage) : null;
 				await ctx.runMutation(internal.ingest.upsertArticle, {
 					pageId: page.pageid!,
 					title: page.title,
@@ -179,15 +219,15 @@ export const ingestTitles = action({
 					paragraphs: toParagraphs(page.extract),
 					categories,
 					image: leadImage ?? undefined,
-					status: evergreen ? 'fetched' : 'filtered_out'
+					status
 				});
-				if (evergreen) ingested++;
+				if (accepted) ingested++;
 				else filtered.push(page.title);
 			} catch (err) {
 				errors.push({ title, error: err instanceof Error ? err.message : String(err) });
 			}
 		}
-		return { ingested, filtered, skipped, errors };
+		return { ingested, filtered, skipped, errors, decisions };
 	}
 });
 
