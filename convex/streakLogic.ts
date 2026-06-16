@@ -61,3 +61,23 @@ export function advanceStreak(
 		event: gap === 1 ? 'extended' : 'reset'
 	};
 }
+
+/**
+ * Merge two devices' streak states when accounts are joined (cross-device sync).
+ * The live current-streak follows the most recently active device; longest is the
+ * better of the two. `daysLearned` takes the max (a conservative lower bound — we
+ * can't know the day overlap, so we never inflate the achievement).
+ */
+export function mergeStreakStates(a: StreakState, b: StreakState): StreakState {
+	const recent = a.lastActiveDay >= b.lastActiveDay ? a : b;
+	const currentStreak =
+		a.lastActiveDay === b.lastActiveDay
+			? Math.max(a.currentStreak, b.currentStreak)
+			: recent.currentStreak;
+	return {
+		currentStreak,
+		longestStreak: Math.max(a.longestStreak, b.longestStreak),
+		lastActiveDay: recent.lastActiveDay,
+		daysLearned: Math.max(a.daysLearned, b.daysLearned)
+	};
+}

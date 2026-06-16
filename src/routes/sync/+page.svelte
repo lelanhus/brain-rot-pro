@@ -46,7 +46,7 @@
 		redeeming = true;
 		redeemError = null;
 		try {
-			const res = await getConvexClient().mutation(api.sync.redeem, { code: entry });
+			const res = await getConvexClient().mutation(api.sync.redeem, { code: entry, deviceId });
 			setDeviceId(res.deviceId);
 			redeemed = true;
 			// Reload so every live query re-subscribes under the adopted account.
@@ -92,8 +92,8 @@
 	</section>
 
 	<section class="panel">
-		<h2>Adopt an account on this device</h2>
-		<p>Enter a code from your other device. This device will switch to that account.</p>
+		<h2>Join an account on this device</h2>
+		<p>Enter a code from your other device. The two accounts merge into one.</p>
 
 		{#if redeemed}
 			<p class="ok">Synced. Taking you to the feed…</p>
@@ -118,7 +118,7 @@
 				</button>
 			</form>
 			<p class="hint">
-				Heads up: this device's current saves and streak will be replaced by the other account's.
+				Your saves and streak on this device will be combined with the other account's.
 			</p>
 		{/if}
 		{#if redeemError}<p class="err">{redeemError}</p>{/if}

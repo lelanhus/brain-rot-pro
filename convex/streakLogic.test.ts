@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceStreak, dayDiff, dayKey, type StreakState } from './streakLogic';
+import { advanceStreak, dayDiff, dayKey, mergeStreakStates, type StreakState } from './streakLogic';
 
 describe('dayKey / dayDiff', () => {
 	it('keys a timestamp to its UTC calendar day', () => {
@@ -59,5 +59,46 @@ describe('advanceStreak', () => {
 		expect(state.currentStreak).toBe(1);
 		expect(state.longestStreak).toBe(5);
 		expect(state.daysLearned).toBe(11);
+	});
+});
+
+describe('mergeStreakStates', () => {
+	it('takes the current streak from the more recently active device', () => {
+		const phone: StreakState = {
+			currentStreak: 2,
+			longestStreak: 4,
+			lastActiveDay: '2026-06-16',
+			daysLearned: 12
+		};
+		const tablet: StreakState = {
+			currentStreak: 7,
+			longestStreak: 9,
+			lastActiveDay: '2026-06-10',
+			daysLearned: 8
+		};
+		const merged = mergeStreakStates(phone, tablet);
+		expect(merged.currentStreak).toBe(2); // phone is more recent
+		expect(merged.longestStreak).toBe(9); // best of both
+		expect(merged.lastActiveDay).toBe('2026-06-16');
+		expect(merged.daysLearned).toBe(12); // max — never inflated
+	});
+
+	it('takes the larger current streak when both were active the same day', () => {
+		const a: StreakState = {
+			currentStreak: 3,
+			longestStreak: 3,
+			lastActiveDay: '2026-06-16',
+			daysLearned: 5
+		};
+		const b: StreakState = {
+			currentStreak: 5,
+			longestStreak: 6,
+			lastActiveDay: '2026-06-16',
+			daysLearned: 9
+		};
+		const merged = mergeStreakStates(a, b);
+		expect(merged.currentStreak).toBe(5);
+		expect(merged.longestStreak).toBe(6);
+		expect(merged.daysLearned).toBe(9);
 	});
 });
