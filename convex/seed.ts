@@ -1,4 +1,5 @@
 import { mutation } from './_generated/server';
+import { api } from './_generated/api';
 import { seedCards } from './seedData';
 
 /**
@@ -29,6 +30,11 @@ export const seed = mutation({
 				createdAt: now
 			});
 		}
+
+		// Backfill embeddings for the freshly-seeded library so "more like this"
+		// uses vectors, not just concept overlap. Best-effort: no gateway key just
+		// leaves them embedding-less (the fallback still works).
+		await ctx.scheduler.runAfter(0, api.embeddings.backfillEmbeddings, { limit: seedCards.length });
 
 		return { inserted: seedCards.length };
 	}

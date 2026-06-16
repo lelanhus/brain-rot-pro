@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { SvelteSet } from 'svelte/reactivity';
-	import { useQuery, useMutation } from 'convex-svelte';
+	import { page } from '$app/state';
+	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
+	import { useQuery, useMutation, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
@@ -10,13 +11,34 @@
 	import { dwell } from '$lib/actions/dwell';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
+	import { weaveFeed } from '$lib/feed';
+	import { createToast } from '$lib/toast.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
 
 	let deviceId = $state('');
 	const notInterested = new SvelteSet<string>();
+	// Seeded from a shared/deep-linked ?focus= (e.g. a concept chip tapped on
+	// /saved); read once from SvelteKit's reactive page state, not window.location.
+	let focusConcept = $state<string | null>(page.url.searchParams.get('focus'));
 	let activeCardId = $state<Id<'knowledgeCards'> | null>(null);
+
+	// Semantic "more like this": related cards woven into the feed right after the
+	// card you dived from (the rabbit hole). `divingId` drives the button's spinner.
+	const injectedAfter = new SvelteMap<string, Doc<'knowledgeCards'>[]>();
+	let divingId = $state<string | null>(null);
+
+	// Momentum (engagement layer): a live count of cards completed this session and
+	// a transient celebration toast. Streak lives server-side; session count is
+	// client-only so it ticks instantly. Each card counts once per session.
+	const completedThisSession = new SvelteSet<string>();
+	let sessionCount = $state(0);
+	let lastMilestone = $state(0);
+	const toast = createToast();
+
+	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
+
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
 	let adaptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -29,14 +51,21 @@
 	// Personalized feed: takes over from the SSR global feed once the device id
 	// resolves and the profile loads (ADR-007). Reactive on the profile, so it
 	// re-ranks live when recompute() runs after a strong signal.
-	const personal = useQuery(api.feed.personal, () => (deviceId ? { deviceId } : 'skip'));
+	const personal = useQuery(api.feed.personal, () =>
+		deviceId ? { deviceId, focusConcept: focusConcept ?? undefined } : 'skip'
+	);
 	const recompute = useMutation(api.profile.recompute);
+
+	// Engagement stats (streak): reactive HUD read + a once-per-session record.
+	const stats = useQuery(api.stats.get, () => (deviceId ? { deviceId } : 'skip'));
+	const recordActivity = useMutation(api.stats.recordActivity);
+	const streak = $derived(stats.data?.currentStreak ?? 0);
 
 	// Personalized once it loads; the SSR global feed until then. `notInterested`
 	// is an in-memory optimistic hide for the gap before recompute() rewrites the
 	// profile (the server is the durable source — feed.personal excludes them).
 	const visibleResults = $derived(
-		(personal.data ?? feed.results).filter((c) => !notInterested.has(c._id))
+		weaveFeed(personal.data ?? feed.results, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
 
 	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
@@ -55,12 +84,33 @@
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
+		// Register today's visit; celebrate a kept or new streak.
+		recordActivity({ deviceId })
+			.then((res) => {
+				if (res.event === 'extended') toast.show(`🔥 ${res.currentStreak}-day streak!`);
+				else if (res.event === 'started') toast.show('🔥 Streak started — see you tomorrow!');
+			})
+			.catch((err) => console.error('[stats] recordActivity failed', err));
 		return () => {
 			track('session_end');
 			void flush();
+			toast.dismiss();
 			cleanupTelemetry();
 		};
 	});
+
+	// One card finished (dwell ≥ threshold): tick the live counter and celebrate
+	// milestones. Counted once per card per session.
+	function handleComplete(cardId: string) {
+		if (completedThisSession.has(cardId)) return;
+		completedThisSession.add(cardId);
+		sessionCount += 1;
+		const milestone = SESSION_MILESTONES.find((m) => m === sessionCount);
+		if (milestone && milestone > lastMilestone) {
+			lastMilestone = milestone;
+			toast.show(`✨ ${milestone} learned this session!`);
+		}
+	}
 
 	async function handleSave(card: Doc<'knowledgeCards'>) {
 		if (!deviceId) return;
@@ -79,9 +129,50 @@
 		scheduleAdapt();
 	}
 
-	function handleRelated(card: Doc<'knowledgeCards'>) {
+	// Tapping a concept chip focuses the feed on that concept: matching cards float
+	// to the top (a re-rank, not a filter — the feed never empties) and we jump
+	// back to the first card. Still a strong personalization signal.
+	function handleRelated(card: Doc<'knowledgeCards'>, tag: string) {
 		track('related_tap', { cardId: card._id });
+		focusConcept = tag;
+		feedEl?.scrollTo({ top: 0, behavior: 'smooth' });
 		scheduleAdapt();
+	}
+
+	function clearFocus() {
+		focusConcept = null;
+		feedEl?.scrollTo({ top: 0, behavior: 'smooth' });
+	}
+
+	// Dive into a card: fetch semantically-related cards and weave them in right
+	// after it, then advance so the next card up is the first related one.
+	async function handleMore(card: Doc<'knowledgeCards'>) {
+		if (divingId || injectedAfter.has(card._id)) {
+			scrollByViewport(1);
+			return;
+		}
+		divingId = card._id;
+		track('related_tap', { cardId: card._id });
+		try {
+			const related = (await getConvexClient().action(api.embeddings.forCard, {
+				cardId: card._id,
+				limit: 3
+			})) as Doc<'knowledgeCards'>[];
+			const fresh = related.filter((r) => !notInterested.has(r._id));
+			if (fresh.length === 0) {
+				toast.show('No related cards yet — keep exploring');
+			} else {
+				injectedAfter.set(card._id, fresh);
+				scheduleAdapt();
+				await tick();
+				scrollByViewport(1);
+			}
+		} catch (err) {
+			console.error('[feed] more-like-this failed', err);
+			toast.show('Could not load related cards');
+		} finally {
+			divingId = null;
+		}
 	}
 
 	function scrollByViewport(dir: 1 | -1) {
@@ -116,6 +207,12 @@
 					handleNotInterested(active);
 				}
 				break;
+			case 'Escape':
+				if (focusConcept) {
+					e.preventDefault();
+					clearFocus();
+				}
+				break;
 		}
 	}
 
@@ -138,6 +235,41 @@
 <svelte:head><title>Brain Rot Pro</title></svelte:head>
 
 <a class="feed-nav" href={resolve('/saved')}>Saved</a>
+
+<div class="hud" aria-live="polite">
+	{#if streak > 0}
+		<span
+			class="hud-pill streak"
+			title={`Longest streak: ${stats.data?.longestStreak ?? streak} days · ${stats.data?.daysLearned ?? 0} days learned`}
+		>
+			<span class="hud-icon" aria-hidden="true">🔥</span>
+			<span class="hud-value">{streak}</span>
+			<span class="sr-only">day streak</span>
+		</span>
+	{/if}
+	{#if sessionCount > 0}
+		<span class="hud-pill session" data-testid="session-count">
+			<span class="hud-icon" aria-hidden="true">✨</span>
+			{#key sessionCount}<span class="hud-value pop">{sessionCount}</span>{/key}
+			<span class="sr-only">learned this session</span>
+		</span>
+	{/if}
+</div>
+
+{#if toast.message}
+	{#key toast.id}
+		<div class="toast" role="status" data-testid="toast">{toast.message}</div>
+	{/key}
+{/if}
+
+{#if focusConcept}
+	<button type="button" class="focus-pill" onclick={clearFocus} data-testid="focus-pill">
+		<span class="focus-label">Exploring</span>
+		<span class="focus-concept">{focusConcept}</span>
+		<span class="focus-x" aria-hidden="true">✕</span>
+		<span class="sr-only">Clear focus</span>
+	</button>
+{/if}
 
 <main class="feed" data-testid="feed" bind:this={feedEl} aria-label="Knowledge feed">
 	{#if feed.error}
@@ -164,7 +296,8 @@
 				use:dwell={{
 					cardId: card._id,
 					body: card.body,
-					onActive: (id) => (activeCardId = id)
+					onActive: (id) => (activeCardId = id),
+					onComplete: (id) => handleComplete(id)
 				}}
 			>
 				<Card
@@ -173,7 +306,9 @@
 					onSave={() => handleSave(card)}
 					onNotInterested={() => handleNotInterested(card)}
 					onSource={() => track('source_open', { cardId: card._id })}
-					onRelated={() => handleRelated(card)}
+					onRelated={(tag) => handleRelated(card, tag)}
+					onMore={() => handleMore(card)}
+					moreLoading={divingId === card._id}
 				/>
 			</div>
 		{/each}

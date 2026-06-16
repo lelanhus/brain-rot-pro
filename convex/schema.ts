@@ -60,7 +60,7 @@ export const sourceValidator = v.object({
  * full attribution (ADR-005, fail-closed). Omitted entirely for hand-seeded
  * Phase-0 cards rather than shipping unverified license data.
  */
-const image = v.object({
+export const image = v.object({
 	thumbnailUrl: v.string(),
 	commonsUrl: v.string(),
 	author: v.string(),
@@ -88,13 +88,23 @@ export default defineSchema({
 		conceptTags: v.array(v.string()),
 		source: sourceValidator,
 		image: v.optional(image),
+		// Semantic embedding of the card (hook+body+tags), for vector "more like
+		// this". Optional: backfilled for seeds, generated on publish. Dimension is
+		// locked to the index below — changing the embedding model means a reindex.
+		embedding: v.optional(v.array(v.float64())),
 		generation: v.optional(generationValidator),
 		status: cardStatus,
 		// Deterministic-but-varied feed order: a random key assigned once at write
 		// time, so the feed query stays deterministic (ADR-007 — no in-query RNG).
 		shuffleKey: v.number(),
 		createdAt: v.number()
-	}).index('by_status_shuffle', ['status', 'shuffleKey']),
+	})
+		.index('by_status_shuffle', ['status', 'shuffleKey'])
+		.vectorIndex('by_embedding', {
+			vectorField: 'embedding',
+			dimensions: 1536, // openai/text-embedding-3-small
+			filterFields: ['status']
+		}),
 
 	/**
 	 * Raw interaction events (design doc §11.3). Write-heavy, append-only; the
@@ -126,6 +136,9 @@ export default defineSchema({
 		extract: v.string(),
 		paragraphs: v.array(v.string()),
 		categories: v.array(v.string()),
+		// Lead image, only when proven free-licensed (ADR-005, fail-closed). Carried
+		// onto generated cards; absent means no clearable image was found.
+		image: v.optional(image),
 		pageviews: v.optional(v.number()),
 		fetchedAt: v.number(),
 		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
@@ -152,5 +165,32 @@ export default defineSchema({
 		seen: v.array(v.id('knowledgeCards')),
 		notInterested: v.array(v.id('knowledgeCards')),
 		updatedAt: v.number()
-	}).index('by_device', ['deviceId'])
+	}).index('by_device', ['deviceId']),
+
+	/**
+	 * Per-device engagement stats — the daily-return hook (streak) and lifetime
+	 * days-learned. Separate from `userProfiles` so the feed query never reads it;
+	 * updated once per session by `stats.recordActivity` (idempotent within a day).
+	 */
+	deviceStats: defineTable({
+		deviceId: v.string(),
+		currentStreak: v.number(),
+		longestStreak: v.number(),
+		lastActiveDay: v.string(), // UTC YYYY-MM-DD
+		daysLearned: v.number(),
+		updatedAt: v.number()
+	}).index('by_device', ['deviceId']),
+
+	/**
+	 * Short-lived, single-use codes that let another device adopt this device's
+	 * anonymous account (ADR-004 — cross-device save without OAuth). The code maps
+	 * to the source `deviceId`; redeeming hands that id to the new device.
+	 */
+	syncCodes: defineTable({
+		code: v.string(), // normalized (uppercase, no separators)
+		deviceId: v.string(),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+		redeemedAt: v.optional(v.number())
+	}).index('by_code', ['code'])
 });

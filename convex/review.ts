@@ -1,4 +1,5 @@
 import { mutation, query } from './_generated/server';
+import { internal } from './_generated/api';
 import { v } from 'convex/values';
 
 /**
@@ -36,6 +37,9 @@ export const approve = mutation({
 			throw new Error(`can only approve needs_review cards (was ${card.status})`);
 		}
 		await ctx.db.patch(args.cardId, { status: 'published' });
+		// Embed the freshly-published card so it joins "more like this" (async; a
+		// missing gateway key just leaves it without an embedding — fallback covers it).
+		await ctx.scheduler.runAfter(0, internal.embeddings.embedCard, { cardId: args.cardId });
 		return null;
 	}
 });

@@ -18,6 +18,22 @@ export function getDeviceId(): string {
 	return id;
 }
 
+/**
+ * Adopt a different anonymous account id (cross-device sync — ADR-004). Replaces
+ * the stored device id so all subsequent queries key on the adopted account. The
+ * caller should reload afterwards so live queries re-subscribe under the new id.
+ */
+export function setDeviceId(id: string): void {
+	if (!browser) return;
+	localStorage.setItem(DEVICE_KEY, id);
+}
+
+/** Forget this device's identity; the next `getDeviceId()` mints a fresh one. */
+export function clearDeviceId(): void {
+	if (!browser) return;
+	localStorage.removeItem(DEVICE_KEY);
+}
+
 let sessionId = '';
 export function getSessionId(): string {
 	if (!browser) return '';

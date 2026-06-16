@@ -12,7 +12,7 @@ import { scoreCard } from './profileLogic';
  * this becomes a precomputed candidate pool + paginated read.
  */
 export const personal = query({
-	args: { deviceId: v.string() },
+	args: { deviceId: v.string(), focusConcept: v.optional(v.string()) },
 	handler: async (ctx, args) => {
 		const cards = await ctx.db
 			.query('knowledgeCards')
@@ -38,7 +38,8 @@ export const personal = query({
 				card: c,
 				score: scoreCard(c.conceptTags, weights, {
 					seen: seen.has(c._id),
-					shuffleKey: c.shuffleKey
+					shuffleKey: c.shuffleKey,
+					focusConcept: args.focusConcept
 				})
 			}))
 			.sort((a, b) => b.score - a.score)

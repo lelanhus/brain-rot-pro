@@ -19,6 +19,12 @@ export const EVENT_DELTA: Record<string, number> = {
 export const WILDCARD_WEIGHT = 0.4;
 /** How hard to push already-seen cards down (kept, not removed, so the feed never empties). */
 export const SEEN_PENALTY = 5;
+/**
+ * Boost for a user-chosen focus concept ("explore this"). Large enough to float
+ * every matching card above the personalized ranking, but additive — so we
+ * reorder rather than filter, and the feed never empties when a concept runs dry.
+ */
+export const FOCUS_BOOST = 100;
 
 export type WeightedEvent = { type: string; cardId?: string | null };
 
@@ -43,11 +49,12 @@ export function accumulateWeights(
 export function scoreCard(
 	tags: string[],
 	weights: Record<string, number>,
-	opts: { seen: boolean; shuffleKey: number }
+	opts: { seen: boolean; shuffleKey: number; focusConcept?: string | null }
 ): number {
 	let score = 0;
 	for (const tag of tags) score += weights[tag] ?? 0;
 	score += WILDCARD_WEIGHT * opts.shuffleKey;
 	if (opts.seen) score -= SEEN_PENALTY;
+	if (opts.focusConcept && tags.includes(opts.focusConcept)) score += FOCUS_BOOST;
 	return score;
 }
