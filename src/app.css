@@ -29,8 +29,8 @@
 	--text-2: #3b3b48;
 	--muted: #61616f;
 	--accent: #5b4bdb;
-	--positive: #1f9d6b;
-	--negative: #d6453f;
+	--positive: #157a52;
+	--negative: #c0271f;
 }
 @media (prefers-color-scheme: light) {
 	:root:not([data-theme]) {
@@ -42,8 +42,8 @@
 		--text-2: #3b3b48;
 		--muted: #61616f;
 		--accent: #5b4bdb;
-		--positive: #1f9d6b;
-		--negative: #d6453f;
+		--positive: #157a52;
+		--negative: #c0271f;
 	}
 }
 
@@ -259,9 +259,9 @@ body {
 .source blockquote {
 	margin: 0.6rem 0;
 	padding-left: 0.85rem;
-	border-left: 2px solid #34343f;
+	border-left: 2px solid var(--border);
 	font-style: italic;
-	color: #c8c8d2;
+	color: var(--text-2);
 }
 
 .source a {
@@ -271,7 +271,7 @@ body {
 .license {
 	margin: 0.5rem 0 0;
 	font-size: 0.78rem;
-	color: #6c6c78;
+	color: var(--muted);
 }
 
 /* Action bar — thumb zone bottom-right on phone (positioned within the slot). */

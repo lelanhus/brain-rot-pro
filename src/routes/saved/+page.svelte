@@ -176,6 +176,17 @@
 		flex-direction: column;
 		gap: 1rem;
 	}
+	/* Desktop: use the extra width for a two-up grid instead of a long column. */
+	@media (min-width: 900px) {
+		.saved {
+			max-width: 960px;
+		}
+		ul {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			align-items: start;
+		}
+	}
 	li {
 		background: var(--surface);
 		border: 1px solid var(--border);
