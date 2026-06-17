@@ -1,4 +1,4 @@
-import { mutation, type MutationCtx } from './_generated/server';
+import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import {
 	CODE_TTL_MS,
@@ -7,73 +7,7 @@ import {
 	isValidCodeFormat,
 	normalizeCode
 } from './syncLogic';
-import { mergeStreakStates } from './streakLogic';
-
-// Cap on events re-pointed when merging accounts: keeps the transaction bounded
-// while preserving the recent signal that drives personalization (recompute reads
-// these). Older events on the joining device are left behind, not migrated.
-const EVENT_REPOINT_CAP = 1000;
-
-/**
- * Merge the `from` device's account into `to` (cross-device sync adopt). Saves
- * union (dedup), recent events re-point so the surviving account's recompute sees
- * the combined history, streak stats merge, and the joining device's now-stale
- * profile is dropped (the client rebuilds `to`'s profile on next load). Bounded:
- * saves are bounded per device and events are capped.
- */
-async function mergeAccounts(ctx: MutationCtx, from: string, to: string): Promise<void> {
-	// Saved cards: union, dropping duplicates already saved on the target.
-	const targetSaved = await ctx.db
-		.query('savedCards')
-		.withIndex('by_device', (q) => q.eq('deviceId', to))
-		.collect();
-	const targetCardIds = new Set(targetSaved.map((s) => String(s.cardId)));
-	const fromSaved = await ctx.db
-		.query('savedCards')
-		.withIndex('by_device', (q) => q.eq('deviceId', from))
-		.collect();
-	for (const s of fromSaved) {
-		if (targetCardIds.has(String(s.cardId))) await ctx.db.delete(s._id);
-		else await ctx.db.patch(s._id, { deviceId: to });
-	}
-
-	// Events: re-point the most recent (capped) so recompute reflects both devices.
-	const fromEvents = await ctx.db
-		.query('events')
-		.withIndex('by_device', (q) => q.eq('deviceId', from))
-		.order('desc')
-		.take(EVENT_REPOINT_CAP);
-	for (const e of fromEvents) await ctx.db.patch(e._id, { deviceId: to });
-
-	// Streak: merge into the target (or re-point if the target has none yet).
-	const toStats = await ctx.db
-		.query('deviceStats')
-		.withIndex('by_device', (q) => q.eq('deviceId', to))
-		.unique();
-	const fromStats = await ctx.db
-		.query('deviceStats')
-		.withIndex('by_device', (q) => q.eq('deviceId', from))
-		.unique();
-	if (fromStats) {
-		if (toStats) {
-			await ctx.db.patch(toStats._id, {
-				...mergeStreakStates(toStats, fromStats),
-				updatedAt: Date.now()
-			});
-			await ctx.db.delete(fromStats._id);
-		} else {
-			await ctx.db.patch(fromStats._id, { deviceId: to });
-		}
-	}
-
-	// Profile is derived; drop the joining device's and let the client's
-	// recompute-on-load rebuild the target's from the combined events.
-	const fromProfile = await ctx.db
-		.query('userProfiles')
-		.withIndex('by_device', (q) => q.eq('deviceId', from))
-		.unique();
-	if (fromProfile) await ctx.db.delete(fromProfile._id);
-}
+import { mergeAccounts } from './accountMerge';
 
 /**
  * Cross-device account sync (ADR-004). `createCode` mints a short-lived code for
