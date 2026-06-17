@@ -19,7 +19,11 @@
 
 {#if adminAuth.hasToken}
 	<div class="admin-bar">
-		<a href={resolve('/')}>← Feed</a>
+		<nav class="admin-nav">
+			<a href={resolve('/')}>← Feed</a>
+			<a href={resolve('/admin')}>Overview</a>
+			<a href={resolve('/admin/offers')}>Offers</a>
+		</nav>
 		<button type="button" class="signout" onclick={() => adminAuth.clear()}>Sign out</button>
 	</div>
 	{@render children()}
@@ -47,6 +51,11 @@
 		padding: 1rem 1.25rem 0;
 		display: flex;
 		justify-content: space-between;
+		align-items: center;
+	}
+	.admin-nav {
+		display: flex;
+		gap: 1rem;
 		align-items: center;
 	}
 	.admin-bar a {
