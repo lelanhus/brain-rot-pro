@@ -28,7 +28,11 @@ export const eventType = v.union(
 	v.literal('save'),
 	v.literal('unsave'),
 	v.literal('source_open'),
-	v.literal('not_interested')
+	v.literal('not_interested'),
+	// Monetization (ADR-008): a sponsored slot came into view / was clicked
+	// through. Carries `offerId` instead of `cardId`.
+	v.literal('sponsored_impression'),
+	v.literal('sponsored_click')
 );
 
 /** Card lifecycle (design doc §9.4). Only `published` is eligible for the feed. */
@@ -107,6 +111,33 @@ export default defineSchema({
 		}),
 
 	/**
+	 * Sponsored "Go deeper" offers (ADR-008 — monetization). Deliberately NOT a
+	 * `knowledgeCards` row: those MUST trace to a Wikipedia source span (ADR-005);
+	 * an offer has no such provenance and a different lifecycle. Offers are matched
+	 * contextually to a card's `conceptTags` and rendered in a clearly-labeled slot.
+	 * The same table later holds `network: 'direct'` rows for direct sponsors.
+	 */
+	affiliateOffers: defineTable({
+		headline: v.string(), // e.g. "Engineering an Empire"
+		blurb: v.string(), // one honest sentence, ~20–30 words
+		imageUrl: v.optional(v.string()),
+		cta: v.string(), // button label, e.g. "View on Bookshop"
+		url: v.string(), // affiliate deep link (tracking params baked in)
+		// Which program this came from — drives the required disclosure + reporting.
+		network: v.union(
+			v.literal('bookshop'),
+			v.literal('amazon'),
+			v.literal('course'),
+			v.literal('direct')
+		),
+		disclosure: v.string(), // program-required disclosure shown with the slot
+		conceptTags: v.array(v.string()), // contextual targeting; matched vs. card tags
+		weight: v.number(), // manual priority / deterministic tie-break
+		status: v.union(v.literal('active'), v.literal('paused')),
+		createdAt: v.number()
+	}).index('by_status', ['status']),
+
+	/**
 	 * Raw interaction events (design doc §11.3). Write-heavy, append-only; the
 	 * feed query never reads these (ADR-007 — volatile signals stay out of the
 	 * reactive feed read). `deviceId` is the anonymous, pre-auth identity.
@@ -116,6 +147,8 @@ export default defineSchema({
 		sessionId: v.string(),
 		type: eventType,
 		cardId: v.optional(v.id('knowledgeCards')),
+		// Set instead of `cardId` for sponsored_* events (ADR-008).
+		offerId: v.optional(v.id('affiliateOffers')),
 		visibleMs: v.optional(v.number()),
 		ts: v.number()
 	})

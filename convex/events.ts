@@ -16,6 +16,7 @@ export const log = mutation({
 			v.object({
 				type: eventType,
 				cardId: v.optional(v.id('knowledgeCards')),
+				offerId: v.optional(v.id('affiliateOffers')),
 				visibleMs: v.optional(v.number()),
 				ts: v.number()
 			})
@@ -39,6 +40,7 @@ export const log = mutation({
 					sessionId: args.sessionId,
 					type: e.type,
 					cardId: e.cardId,
+					offerId: e.offerId,
 					visibleMs: e.visibleMs,
 					ts: e.ts
 				})

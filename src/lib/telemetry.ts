@@ -17,6 +17,7 @@ type EventType = Doc<'events'>['type'];
 type QueuedEvent = {
 	type: EventType;
 	cardId?: Id<'knowledgeCards'>;
+	offerId?: Id<'affiliateOffers'>;
 	visibleMs?: number;
 	ts: number;
 };
@@ -29,10 +30,16 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 export function track(
 	type: EventType,
-	opts: { cardId?: Id<'knowledgeCards'>; visibleMs?: number } = {}
+	opts: { cardId?: Id<'knowledgeCards'>; offerId?: Id<'affiliateOffers'>; visibleMs?: number } = {}
 ): void {
 	if (!browser) return;
-	queue.push({ type, cardId: opts.cardId, visibleMs: opts.visibleMs, ts: Date.now() });
+	queue.push({
+		type,
+		cardId: opts.cardId,
+		offerId: opts.offerId,
+		visibleMs: opts.visibleMs,
+		ts: Date.now()
+	});
 	if (queue.length >= FLUSH_AT) {
 		void flush();
 	} else if (!timer) {
