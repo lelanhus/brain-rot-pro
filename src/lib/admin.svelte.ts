@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { ConvexError } from 'convex/values';
 
 /**
  * Client holder for the admin shared secret (ADR-008 phase B). This is only the
@@ -27,3 +28,8 @@ export const adminAuth = {
 		if (browser) localStorage.removeItem(KEY);
 	}
 };
+
+/** True when a query/mutation failed because the admin token was rejected. */
+export function isUnauthorized(error: unknown): boolean {
+	return error instanceof ConvexError && (error.data as { code?: string })?.code === 'unauthorized';
+}

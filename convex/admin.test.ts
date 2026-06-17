@@ -95,3 +95,24 @@ test('cards search + setCardStatus moderation (gated)', async () => {
 		t.mutation(api.admin.setCardStatus, { token: 'nope', cardId, status: 'published' })
 	).rejects.toThrow(/authorization/i);
 });
+
+test('setCardStatus refuses to publish a validation_failed card (§3.2)', async () => {
+	const t = convexTest(schema, modules);
+	const badId = await t.run(async (ctx) =>
+		ctx.db.insert('knowledgeCards', {
+			hook: 'Unsupported claim',
+			body: 'Not entailed by its source.',
+			format: 'surprise_fact',
+			conceptTags: ['x'],
+			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'validation_failed',
+			shuffleKey: 0.5,
+			createdAt: 0
+		})
+	);
+	await expect(
+		t.mutation(api.admin.setCardStatus, { token: TOKEN, cardId: badId, status: 'published' })
+	).rejects.toThrow(/cannot be published/i);
+	// Suppressing it is still allowed.
+	await t.mutation(api.admin.setCardStatus, { token: TOKEN, cardId: badId, status: 'suppressed' });
+});

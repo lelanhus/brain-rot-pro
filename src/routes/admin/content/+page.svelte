@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { useQuery, useMutation } from 'convex-svelte';
-	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { adminAuth } from '$lib/admin.svelte';
+	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	// Content management (ADR-009 phase 3): browse/search cards by status and
 	// moderate them. Defaults to the needs_review queue, so it also serves as the
@@ -32,10 +31,7 @@
 		status,
 		search: search.trim() || undefined
 	}));
-	const unauthorized = $derived(
-		cards.error instanceof ConvexError &&
-			(cards.error.data as { code?: string })?.code === 'unauthorized'
-	);
+	const unauthorized = $derived(isUnauthorized(cards.error));
 	const rows = $derived(cards.data ?? []);
 
 	const setStatus = useMutation(api.admin.setCardStatus);
@@ -96,7 +92,7 @@
 						<h2>{c.hook}</h2>
 						<p class="body">{c.body}</p>
 						<div class="actions">
-							{#if c.status !== 'published'}
+							{#if c.status !== 'published' && c.status !== 'validation_failed'}
 								<button type="button" class="publish" onclick={() => moderate(c._id, 'published')}>
 									Publish
 								</button>

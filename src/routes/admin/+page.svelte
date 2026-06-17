@@ -1,16 +1,12 @@
 <script lang="ts">
 	import { useQuery } from 'convex-svelte';
-	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
-	import { adminAuth } from '$lib/admin.svelte';
+	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	// Analytics overview (ADR-009) — one gated read folded into a dashboard.
 	const overview = useQuery(api.admin.overview, () => ({ token: adminAuth.token }));
 	const data = $derived(overview.data);
-	const unauthorized = $derived(
-		overview.error instanceof ConvexError &&
-			(overview.error.data as { code?: string })?.code === 'unauthorized'
-	);
+	const unauthorized = $derived(isUnauthorized(overview.error));
 
 	const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 	const num = (n: number) => n.toLocaleString();

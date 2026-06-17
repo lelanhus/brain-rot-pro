@@ -1,16 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { useQuery } from 'convex-svelte';
-	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
-	import { adminAuth } from '$lib/admin.svelte';
+	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	// Account management (ADR-009 phase 2) — one row per anonymous device account.
 	const accounts = useQuery(api.admin.accounts, () => ({ token: adminAuth.token }));
-	const unauthorized = $derived(
-		accounts.error instanceof ConvexError &&
-			(accounts.error.data as { code?: string })?.code === 'unauthorized'
-	);
+	const unauthorized = $derived(isUnauthorized(accounts.error));
 
 	let search = $state('');
 	const rows = $derived(

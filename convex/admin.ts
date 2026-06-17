@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { internal } from './_generated/api';
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { assertAdmin } from './adminAuth';
 import {
 	bucketByStatus,
@@ -161,11 +161,12 @@ export const account = query({
 			.order('desc')
 			.take(50);
 
-		const saved = [];
-		for (const row of savedRows) {
-			const card = await ctx.db.get(row.cardId);
-			saved.push({ cardId: row.cardId, hook: card?.hook ?? '(deleted card)' });
-		}
+		const saved = await Promise.all(
+			savedRows.map(async (row) => {
+				const card = await ctx.db.get(row.cardId);
+				return { cardId: row.cardId, hook: card?.hook ?? '(deleted card)' };
+			})
+		);
 
 		const topConcepts = [...(profile?.conceptWeights ?? [])]
 			.sort((a, b) => b.weight - a.weight)
@@ -252,6 +253,14 @@ export const setCardStatus = mutation({
 		assertAdmin(args.token);
 		const card = await ctx.db.get(args.cardId);
 		if (!card) throw new Error('setCardStatus: card not found');
+		// Acceptance criteria §3.2: a validation_failed card must never be published,
+		// even by an admin — its claim isn't entailed by its source. Suppress only.
+		if (args.status === 'published' && card.status === 'validation_failed') {
+			throw new ConvexError({
+				code: 'invalid_transition',
+				message: 'A validation_failed card cannot be published.'
+			});
+		}
 		await ctx.db.patch(args.cardId, { status: args.status });
 		if (args.status === 'published' && !card.embedding) {
 			await ctx.scheduler.runAfter(0, internal.embeddings.embedCard, { cardId: args.cardId });

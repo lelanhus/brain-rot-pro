@@ -3,17 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQuery, useMutation } from 'convex-svelte';
-	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
-	import { adminAuth } from '$lib/admin.svelte';
+	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	const deviceId = $derived(page.params.deviceId ?? '');
 	const detail = useQuery(api.admin.account, () => ({ token: adminAuth.token, deviceId }));
 	const data = $derived(detail.data);
-	const unauthorized = $derived(
-		detail.error instanceof ConvexError &&
-			(detail.error.data as { code?: string })?.code === 'unauthorized'
-	);
+	const unauthorized = $derived(isUnauthorized(detail.error));
 
 	const deleteData = useMutation(api.account.deleteData);
 	let confirming = $state(false);
