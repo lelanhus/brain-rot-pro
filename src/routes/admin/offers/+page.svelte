@@ -1,20 +1,15 @@
 <script lang="ts">
 	import { useQuery, useMutation } from 'convex-svelte';
-	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { adminAuth } from '$lib/admin.svelte';
+	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	// Admin: manage sponsored "Go deeper" offers and see CTR (ADR-008, phase B).
 	// No SSR — internal tool, gated by the /admin layout + server-side assertAdmin.
 	const report = useQuery(api.affiliate.report, () => ({ token: adminAuth.token }));
 	const rows = $derived(report.data?.offers ?? []);
 	const totals = $derived(report.data?.totals);
-	// A rejected token surfaces as a ConvexError; offer to re-enter it.
-	const unauthorized = $derived(
-		report.error instanceof ConvexError &&
-			(report.error.data as { code?: string })?.code === 'unauthorized'
-	);
+	const unauthorized = $derived(isUnauthorized(report.error));
 
 	const add = useMutation(api.affiliate.add);
 	const setStatus = useMutation(api.affiliate.setStatus);
