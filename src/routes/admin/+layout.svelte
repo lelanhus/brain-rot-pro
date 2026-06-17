@@ -22,6 +22,8 @@
 		<nav class="admin-nav">
 			<a href={resolve('/')}>← Feed</a>
 			<a href={resolve('/admin')}>Overview</a>
+			<a href={resolve('/admin/accounts')}>Accounts</a>
+			<a href={resolve('/admin/content')}>Content</a>
 			<a href={resolve('/admin/offers')}>Offers</a>
 		</nav>
 		<button type="button" class="signout" onclick={() => adminAuth.clear()}>Sign out</button>

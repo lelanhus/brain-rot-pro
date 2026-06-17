@@ -1,6 +1,6 @@
 # Admin interface (ADR-009)
 
-**Status:** in progress — phase 1 (analytics overview) shipped. Authored 2026-06-17.
+**Status:** phases 1–4 shipped (overview, accounts, content, activity trend). Authored 2026-06-17.
 **Depends on / respects:** the admin gate (`assertAdmin`, ADR-008 phase B), ADR-007 (admin reads are off the feed path), ADR-004 (auth deferred — this is the pre-auth operator surface), engineering-standards §1/§3.
 
 **Goal:** an internal operator console for running the product — content pipeline, audience, engagement, monetization, and (next) per-account management — all behind the `/admin` gate, structured so each section is a page that drops in under the shared layout.
@@ -24,11 +24,17 @@
 - **`/admin` dashboard** — headline stat cards + content-pipeline and events-by-type panels. Surfaces an unauthorized state with a re-enter-token path.
 - Pure folds (`bucketByType`, `bucketByStatus`, `summarizeEngagement`, `summarizeAudience`) are unit-tested; the gated query is convex-tested (including token rejection).
 
-## Roadmap (driving autonomously; a PR per phase)
+## Shipped phases
 
-- **Phase 2 — Account management.** List/search device accounts (`userProfiles` + `deviceStats`), view a single account (saves, streak, recent events, sync history), and run the GDPR **data-delete cascade** (`account.deleteData`, already exists) with a confirm step. Suppress/restore a device if needed.
-- **Phase 3 — Content management.** Promote the existing `/review` queue under `/admin` (and behind `assertAdmin`), plus card search, manual status changes (publish/suppress), and generation/ingestion health (support-score distribution, drafts awaiting review, articles lacking a card). Trigger `generate:generateBatch` / ingest from the UI.
-- **Phase 4 — Deeper analytics.** Time-series (DAU/retention curves), funnel (impression → complete → save), per-concept performance, and monetization trends — backed by the Aggregate component once volume warrants.
+- **Phase 1 — Analytics overview.** `admin.overview` + `/admin` dashboard (content pipeline, audience, engagement/CCR, monetization).
+- **Phase 2 — Account management.** `admin.accounts` (list, merged from `deviceStats` + `userProfiles` + saves) and `admin.account` (single: streak, top concepts, saves, recent events). `/admin/accounts` list + `/admin/accounts/[deviceId]` detail with the GDPR **data-delete cascade** (`account.deleteData`) behind a two-step confirm.
+- **Phase 3 — Content management.** `admin.cards` (status filter + hook search) and `admin.setCardStatus` (publish/suppress; publishing schedules the embedding like `review.approve`). `/admin/content` defaults to the `needs_review` queue, so it doubles as the gated review surface.
+- **Phase 4 — Activity trend.** `dailyActivity` folds the event stream into a 14-day impressions/continuations series, rendered as a bar panel on the overview. (Funnel + retention curves + per-concept performance remain for a later pass, behind the Aggregate component once volume warrants.)
+
+## Follow-ups
+
+- The legacy `/review` page + `review.ts` CLI remain (ungated) for now; `/admin/content` supersedes the page. Retire `/review` or fold its functions behind `assertAdmin` in the auth pass.
+- Move per-account analytics + activity off full scans onto the **Aggregate** component when the user base grows.
 
 ## Security note
 

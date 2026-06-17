@@ -49,4 +49,49 @@ test('overview folds content, audience, engagement and monetization', async () =
 	expect(o.engagement.continuations).toBe(1);
 	expect(o.engagement.ccr).toBeCloseTo(0.5);
 	expect(o.monetization).toMatchObject({ impressions: 1, clicks: 1, ctr: 1 });
+	expect(o.activity).toHaveLength(14);
+});
+
+test('accounts lists devices, and account returns detail; both gated', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(api.seed.seed, {});
+	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 2, cursor: null } });
+	const cardId = feed.page[0]._id;
+
+	await t.mutation(api.saved.toggle, { deviceId: 'dev-1', cardId });
+	await t.mutation(api.stats.recordActivity, { deviceId: 'dev-1' });
+	await t.mutation(api.events.log, {
+		deviceId: 'dev-1',
+		sessionId: 's1',
+		events: [{ type: 'card_complete', cardId, ts: 1 }]
+	});
+
+	await expect(t.query(api.admin.accounts, { token: 'x' })).rejects.toThrow(/authorization/i);
+
+	const list = await t.query(api.admin.accounts, { token: TOKEN });
+	const row = list.find((r) => r.deviceId === 'dev-1');
+	expect(row).toMatchObject({ saves: 1 });
+
+	const detail = await t.query(api.admin.account, { token: TOKEN, deviceId: 'dev-1' });
+	expect(detail.found).toBe(true);
+	expect(detail.saved).toHaveLength(1);
+	expect(detail.recentEvents.length).toBeGreaterThan(0);
+});
+
+test('cards search + setCardStatus moderation (gated)', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(api.seed.seed, {});
+	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 1, cursor: null } });
+	const cardId = feed.page[0]._id;
+
+	const published = await t.query(api.admin.cards, { token: TOKEN, status: 'published' });
+	expect(published.length).toBeGreaterThan(0);
+
+	await t.mutation(api.admin.setCardStatus, { token: TOKEN, cardId, status: 'suppressed' });
+	const stillPublished = await t.query(api.admin.cards, { token: TOKEN, status: 'published' });
+	expect(stillPublished.find((c) => c._id === cardId)).toBeUndefined();
+
+	await expect(
+		t.mutation(api.admin.setCardStatus, { token: 'nope', cardId, status: 'published' })
+	).rejects.toThrow(/authorization/i);
 });

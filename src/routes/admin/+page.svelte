@@ -14,6 +14,8 @@
 
 	const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 	const num = (n: number) => n.toLocaleString();
+	// Peak impressions across the activity window, for bar scaling (min 1).
+	const activityPeak = $derived(Math.max(1, ...(data?.activity ?? []).map((d) => d.impressions)));
 
 	// Card lifecycle statuses in pipeline order, for a stable display.
 	const STATUSES = [
@@ -88,6 +90,22 @@
 					</li>
 				{/each}
 			</ul>
+		</section>
+
+		<section class="panel">
+			<h2>Activity · last 14 days</h2>
+			<ul class="bars">
+				{#each data.activity as d (d.day)}
+					<li>
+						<span class="bar-day">{d.day.slice(5)}</span>
+						<span class="bar-track">
+							<span class="bar-fill" style="width: {(d.impressions / activityPeak) * 100}%"></span>
+						</span>
+						<span class="bar-val">{num(d.impressions)} · {num(d.continuations)}</span>
+					</li>
+				{/each}
+			</ul>
+			<p class="hint small">impressions · continuations</p>
 		</section>
 
 		<section class="panel">
@@ -192,5 +210,45 @@
 	.pl-count {
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
+	}
+	.small {
+		font-size: 0.75rem;
+		margin: 0.5rem 0 0;
+	}
+	.bars {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.bars li {
+		display: grid;
+		grid-template-columns: 3rem 1fr auto;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.8rem;
+	}
+	.bar-day {
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.bar-track {
+		background: var(--surface-2);
+		border-radius: 999px;
+		height: 0.5rem;
+		overflow: hidden;
+	}
+	.bar-fill {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+		border-radius: 999px;
+		min-width: 2px;
+	}
+	.bar-val {
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
 	}
 </style>

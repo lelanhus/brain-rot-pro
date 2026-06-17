@@ -73,3 +73,100 @@ export function summarizeAudience(
 		avgCurrentStreak: stats.length === 0 ? 0 : sumCurrent / stats.length
 	};
 }
+
+type ProfileLite = {
+	deviceId: string;
+	conceptWeights: ReadonlyArray<unknown>;
+	seen: ReadonlyArray<unknown>;
+	notInterested: ReadonlyArray<unknown>;
+};
+type StatRowLite = {
+	deviceId: string;
+	currentStreak: number;
+	longestStreak: number;
+	daysLearned: number;
+	lastActiveDay: string;
+};
+export type AccountSummary = {
+	deviceId: string;
+	currentStreak: number;
+	longestStreak: number;
+	daysLearned: number;
+	lastActiveDay: string;
+	saves: number;
+	concepts: number;
+	notInterested: number;
+};
+
+/**
+ * Merge the per-device tables into one account row each, keyed by the union of
+ * device ids seen across stats + profiles + saves (a device may have any subset).
+ * Sorted most-recently-active first. Pure → testable without a deployment.
+ */
+export function mergeAccountSummaries(
+	stats: ReadonlyArray<StatRowLite>,
+	profiles: ReadonlyArray<ProfileLite>,
+	savedCounts: ReadonlyMap<string, number>
+): AccountSummary[] {
+	const byDevice = new Map<string, AccountSummary>();
+	const ensure = (deviceId: string): AccountSummary => {
+		let row = byDevice.get(deviceId);
+		if (!row) {
+			row = {
+				deviceId,
+				currentStreak: 0,
+				longestStreak: 0,
+				daysLearned: 0,
+				lastActiveDay: '',
+				saves: savedCounts.get(deviceId) ?? 0,
+				concepts: 0,
+				notInterested: 0
+			};
+			byDevice.set(deviceId, row);
+		}
+		return row;
+	};
+
+	for (const s of stats) {
+		const row = ensure(s.deviceId);
+		row.currentStreak = s.currentStreak;
+		row.longestStreak = s.longestStreak;
+		row.daysLearned = s.daysLearned;
+		row.lastActiveDay = s.lastActiveDay;
+	}
+	for (const p of profiles) {
+		const row = ensure(p.deviceId);
+		row.concepts = p.conceptWeights.length;
+		row.notInterested = p.notInterested.length;
+	}
+	for (const deviceId of savedCounts.keys()) ensure(deviceId);
+
+	return [...byDevice.values()].sort((a, b) => b.lastActiveDay.localeCompare(a.lastActiveDay));
+}
+
+/**
+ * Daily impressions + continuations for the last `days` UTC days (oldest →
+ * newest, zero-filled), for a simple activity trend. Buckets by `dayKey` so it
+ * lines up with streak/active-today accounting.
+ */
+export function dailyActivity(
+	events: ReadonlyArray<{ type: string; ts: number }>,
+	now: number,
+	days: number
+): Array<{ day: string; impressions: number; continuations: number }> {
+	const continuation = new Set(CONTINUATION_TYPES);
+	const buckets = new Map<string, { impressions: number; continuations: number }>();
+	const order: string[] = [];
+	for (let i = days - 1; i >= 0; i--) {
+		const day = dayKey(now - i * 86_400_000);
+		buckets.set(day, { impressions: 0, continuations: 0 });
+		order.push(day);
+	}
+	for (const e of events) {
+		const b = buckets.get(dayKey(e.ts));
+		if (!b) continue; // outside the window
+		if (e.type === 'card_impression') b.impressions++;
+		else if (continuation.has(e.type)) b.continuations++;
+	}
+	return order.map((day) => ({ day, ...buckets.get(day)! }));
+}
