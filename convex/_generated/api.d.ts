@@ -9,6 +9,8 @@
  */
 
 import type * as account from "../account.js";
+import type * as affiliate from "../affiliate.js";
+import type * as affiliateLogic from "../affiliateLogic.js";
 import type * as aiKey from "../aiKey.js";
 import type * as cards from "../cards.js";
 import type * as embedLogic from "../embedLogic.js";
@@ -43,6 +45,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   account: typeof account;
+  affiliate: typeof affiliate;
+  affiliateLogic: typeof affiliateLogic;
   aiKey: typeof aiKey;
   cards: typeof cards;
   embedLogic: typeof embedLogic;

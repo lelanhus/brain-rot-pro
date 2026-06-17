@@ -8,10 +8,14 @@
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
 	import Card from '$lib/components/Card.svelte';
+	import SponsoredCard from '$lib/components/SponsoredCard.svelte';
+	import AdNetworkSlot from '$lib/components/AdNetworkSlot.svelte';
 	import { dwell } from '$lib/actions/dwell';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
+	import { injectSponsored, type SlotMode } from '$lib/sponsored';
+	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { createToast } from '$lib/toast.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -67,6 +71,36 @@
 	const visibleResults = $derived(
 		weaveFeed(personal.data ?? feed.results, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
+
+	// Monetization (ADR-008): sponsored "Go deeper" slots woven into the feed at a
+	// capped cadence. Provider precedence — an env-configured ad network fills the
+	// slot if present; otherwise contextual affiliate offers do; otherwise no slot.
+	const adConfig = getAdNetworkConfig();
+	const offers = useQuery(api.affiliate.active, () => ({}));
+	const dismissedOffers = new SvelteSet<string>();
+	const slotMode = $derived<SlotMode>(
+		adConfig ? 'network' : (offers.data ?? []).length > 0 ? 'offers' : 'off'
+	);
+	// Cards woven in by "more like this" — never place a slot just before one, so
+	// a rabbit-hole dive is never split.
+	const relatedIds = $derived(new Set([...injectedAfter.values()].flat().map((c) => c._id)));
+	const feedItems = $derived(
+		injectSponsored(visibleResults, {
+			mode: slotMode,
+			offers: (offers.data ?? []).filter((o) => !dismissedOffers.has(o._id)),
+			skipBefore: relatedIds
+		})
+	);
+
+	function handleSponsoredImpression(offerId: string) {
+		track('sponsored_impression', { offerId: offerId as Id<'affiliateOffers'> });
+	}
+	function handleSponsoredClick(offerId: string) {
+		track('sponsored_click', { offerId: offerId as Id<'affiliateOffers'> });
+	}
+	function handleSponsoredDismiss(offerId: string) {
+		dismissedOffers.add(offerId); // session-scoped suppression (no account yet)
+	}
 
 	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
 	function scheduleAdapt() {
@@ -290,27 +324,43 @@
 			<p>More cards are on the way.</p>
 		</section>
 	{:else}
-		{#each visibleResults as card (card._id)}
-			<div
-				class="slot"
-				use:dwell={{
-					cardId: card._id,
-					body: card.body,
-					onActive: (id) => (activeCardId = id),
-					onComplete: (id) => handleComplete(id)
-				}}
-			>
-				<Card
-					{card}
-					saved={savedSet.has(card._id)}
-					onSave={() => handleSave(card)}
-					onNotInterested={() => handleNotInterested(card)}
-					onSource={() => track('source_open', { cardId: card._id })}
-					onRelated={(tag) => handleRelated(card, tag)}
-					onMore={() => handleMore(card)}
-					moreLoading={divingId === card._id}
-				/>
-			</div>
+		{#each feedItems as item (item.kind === 'card' ? item.card._id : item.id)}
+			{#if item.kind === 'card'}
+				{@const card = item.card}
+				<div
+					class="slot"
+					use:dwell={{
+						cardId: card._id,
+						body: card.body,
+						onActive: (id) => (activeCardId = id),
+						onComplete: (id) => handleComplete(id)
+					}}
+				>
+					<Card
+						{card}
+						saved={savedSet.has(card._id)}
+						onSave={() => handleSave(card)}
+						onNotInterested={() => handleNotInterested(card)}
+						onSource={() => track('source_open', { cardId: card._id })}
+						onRelated={(tag) => handleRelated(card, tag)}
+						onMore={() => handleMore(card)}
+						moreLoading={divingId === card._id}
+					/>
+				</div>
+			{:else if item.offer}
+				<div class="slot">
+					<SponsoredCard
+						offer={item.offer}
+						onImpression={() => item.offer && handleSponsoredImpression(item.offer._id)}
+						onClick={() => item.offer && handleSponsoredClick(item.offer._id)}
+						onDismiss={() => item.offer && handleSponsoredDismiss(item.offer._id)}
+					/>
+				</div>
+			{:else if adConfig}
+				<div class="slot">
+					<AdNetworkSlot config={adConfig} />
+				</div>
+			{/if}
 		{/each}
 		<div bind:this={sentinel} class="sentinel" aria-hidden="true"></div>
 		{#if feed.status === 'LoadingMore'}

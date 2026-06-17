@@ -1,8 +1,8 @@
 # Monetization — Affiliate "Go deeper" slots (ADR-008 + implementation plan)
 
-**Status:** proposed (not yet built). Authored 2026-06-17.
+**Status:** implemented (phase A). Authored 2026-06-17.
 **Depends on / respects:** ADR-005 (provenance), ADR-007 (light feed query), engineering-standards §1 (fail-fast), ui-ux.md (card feel).
-**Goal:** a monetization path that works **before** we have an audience or a sales motion — i.e. requires no advertiser relationship and no scale to start.
+**Goal:** a monetization path that works **before** we have an audience or a sales motion — i.e. requires no advertiser relationship and no scale to start, with a one-step upgrade to an ad network once we qualify.
 
 ---
 
@@ -44,33 +44,33 @@ New table — **not** a field on `knowledgeCards`:
 
 ```ts
 affiliateOffers: defineTable({
-  // Rendered content (mirrors a card's shape so it can reuse Card styling).
-  headline: v.string(),          // e.g. "Engineering an Empire"
-  blurb: v.string(),             // 1 sentence, honest, ~20–30 words
-  imageUrl: v.optional(v.string()),
-  cta: v.string(),               // button label, e.g. "View on Bookshop"
-  url: v.string(),               // affiliate deep link (tag/params baked in)
-  network: v.union(              // for per-network disclosure + reporting
-    v.literal('amazon'),
-    v.literal('bookshop'),
-    v.literal('course'),
-    v.literal('direct')          // ← future direct sponsors use the same table
-  ),
-  disclosure: v.string(),        // network-required disclosure text shown with slot
-  // Contextual targeting: overlap against surrounding cards' conceptTags.
-  conceptTags: v.array(v.string()),
-  weight: v.number(),            // manual priority / tie-break
-  status: v.union(v.literal('active'), v.literal('paused')),
-  createdAt: v.number()
-}).index('by_status', ['status'])
+	// Rendered content (mirrors a card's shape so it can reuse Card styling).
+	headline: v.string(), // e.g. "Engineering an Empire"
+	blurb: v.string(), // 1 sentence, honest, ~20–30 words
+	imageUrl: v.optional(v.string()),
+	cta: v.string(), // button label, e.g. "View on Bookshop"
+	url: v.string(), // affiliate deep link (tag/params baked in)
+	network: v.union(
+		// for per-network disclosure + reporting
+		v.literal('amazon'),
+		v.literal('bookshop'),
+		v.literal('course'),
+		v.literal('direct') // ← future direct sponsors use the same table
+	),
+	disclosure: v.string(), // network-required disclosure text shown with slot
+	// Contextual targeting: overlap against surrounding cards' conceptTags.
+	conceptTags: v.array(v.string()),
+	weight: v.number(), // manual priority / tie-break
+	status: v.union(v.literal('active'), v.literal('paused')),
+	createdAt: v.number()
+}).index('by_status', ['status']);
 ```
 
 Extend `eventType` for measurement (reuses the existing `events` table):
 
 ```ts
 // add to the eventType union:
-v.literal('sponsored_impression'),
-v.literal('sponsored_click')
+(v.literal('sponsored_impression'), v.literal('sponsored_click'));
 ```
 
 `events.cardId` is typed `v.id('knowledgeCards')`, so add a sibling field rather than overloading it:
@@ -89,10 +89,12 @@ Following the `*Logic.ts` convention (pure, unit-tested without a deployment, pe
 // Score = tag overlap + weight; deterministic tie-break by _id. Returns null
 // if nothing overlaps (we DO NOT show an irrelevant offer — quality bar).
 export function pickOffer(
-  offers: AffiliateOffer[],
-  nearbyTags: string[],
-  opts: { minOverlap?: number }
-): AffiliateOffer | null { /* ... */ }
+	offers: AffiliateOffer[],
+	nearbyTags: string[],
+	opts: { minOverlap?: number }
+): AffiliateOffer | null {
+	/* ... */
+}
 ```
 
 Quality rule baked in: **no overlap → no slot.** Better an empty slot than an irrelevant ad.
@@ -123,10 +125,12 @@ New pure sibling to `weaveFeed`, applied to the **base** feed _before_ weaving (
 // best contextual offer from the surrounding window. Deterministic given the
 // same inputs (no in-render RNG — mirrors ADR-007's shuffleKey discipline).
 export function injectSponsored(
-  base: readonly Doc<'knowledgeCards'>[],
-  offers: readonly AffiliateOffer[],
-  opts: { cadence: number; seed: string }
-): FeedItem[] { /* ... */ }
+	base: readonly Doc<'knowledgeCards'>[],
+	offers: readonly AffiliateOffer[],
+	opts: { cadence: number; seed: string }
+): FeedItem[] {
+	/* ... */
+}
 ```
 
 `FeedItem` becomes a discriminated union: `{ kind: 'card'; card } | { kind: 'offer'; offer }`. Cadence default **1 per 10**, frequency-capped per session.
@@ -159,11 +163,11 @@ v1: offers are **seeded manually** (a `convex/seed`-style script or a tiny `/adm
 
 ## Phasing
 
-| Phase | Scope | Exit criteria |
-| --- | --- | --- |
-| **A — affiliate MVP** | schema + `affiliateLogic` + `injectSponsored` + `SponsoredCard` + manual offers + tracking | a labeled, contextual affiliate slot renders at 1/10 cadence; impression/click events recorded; `npm run verify` green |
-| **B — measure & tune** | CTR reporting query, per-session frequency cap, per-network disclosure correctness, "not interested" suppression | real CTR numbers; cadence tuned against retention; no measurable hit to session length |
-| **C — reuse slot for direct/programmatic** | `network: 'direct'` offers sold by hand using Phase-B numbers; evaluate a native in-feed network only if DAU justifies | first direct sponsor live through the existing slot with zero new UI |
+| Phase                                      | Scope                                                                                                                  | Exit criteria                                                                                                          |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **A — affiliate MVP**                      | schema + `affiliateLogic` + `injectSponsored` + `SponsoredCard` + manual offers + tracking                             | a labeled, contextual affiliate slot renders at 1/10 cadence; impression/click events recorded; `npm run verify` green |
+| **B — measure & tune**                     | CTR reporting query, per-session frequency cap, per-network disclosure correctness, "not interested" suppression       | real CTR numbers; cadence tuned against retention; no measurable hit to session length                                 |
+| **C — reuse slot for direct/programmatic** | `network: 'direct'` offers sold by hand using Phase-B numbers; evaluate a native in-feed network only if DAU justifies | first direct sponsor live through the existing slot with zero new UI                                                   |
 
 ## Testing (engineering-standards §3)
 
@@ -172,8 +176,41 @@ v1: offers are **seeded manually** (a `convex/seed`-style script or a tiny `/adm
 - `SponsoredCard.svelte` → component test (label present, `rel="sponsored"` set, click fires `sponsored_click`).
 - All offline; folds into the existing `npm run verify` gate.
 
-## Open questions for the owner
+## Resolved decisions (researched 2026-06-17)
 
-1. **Which networks first?** Recommend leading with **Bookshop.org + a course program** (no 180-day-sale termination clause); add Amazon once traffic converts.
-2. **Cadence comfort:** start at **1 per 10** organic cards, session-capped — agree before building?
-3. **Suppression scope:** should "not interested" on an offer hide the network for the session, permanently (needs the profile/account work), or just that offer?
+The original open questions, now answered and built:
+
+1. **Which provider first?** **Affiliate offers, led by Bookshop.org.** Research confirmed the pure "ad network" path isn't available yet: AdSense in 2026 wants ~15–25 long-form posts (800+ words), a ~6-month-old domain, and real traffic — a brand-new short-card feed won't be approved; Skimlinks/Sovrn auto-monetize _product_ outbound links, which we don't have (cards link to Wikipedia); and the only "no-minimum" networks (AdSterra, HilltopAds, BidVertiser) are popunder/push shops that would wreck the premium feel. Bookshop.org, by contrast, has a simple signup, **no sales-quota termination clause**, a 10% commission, and is on-brand for a learning product. Amazon is deferred (its 180-day "3 qualifying sales or you're cut" rule, plus stricter April-2026 commission terms). So the launch provider is affiliate offers; the ad-network slot is **wired and env-gated**, ready the day we qualify — no code change.
+2. **Cadence:** **1 slot per 10 organic cards**, first slot only after the 5th card, capped at **3 per render** (`SLOT_CADENCE` / `FIRST_SLOT_AFTER` / `MAX_SLOTS_PER_SESSION` in `src/lib/sponsored.ts`). Conservative; tune in phase B.
+3. **Suppression scope:** **session-scoped, client-side** for v1 (a `SvelteSet` of dismissed offer ids), matching the existing optimistic `notInterested` pattern. Permanent/per-network suppression is deferred until accounts exist (ADR-004).
+
+## What shipped (phase A)
+
+- **Schema** (`convex/schema.ts`): `affiliateOffers` table (`by_status` index); `events` gains `offerId` + two event types (`sponsored_impression`, `sponsored_click`).
+- **Backend** (`convex/affiliate.ts`): `active` (light query), `add` (the easy "paste a link" entry point — defaults the program disclosure/CTA), `setStatus` (pause without deleting). Pure constants in `convex/affiliateLogic.ts`.
+- **Feed logic** (`src/lib/sponsored.ts`): pure `pickOffer` (contextual tag match, no-overlap → no slot) + `injectSponsored` (deterministic cadence, session cap, never splits a "more like this" dive). Unit-tested.
+- **Rendering**: `SponsoredCard.svelte` (affiliate offer, labeled, `rel="sponsored"`, impression/click/dismiss) and `AdNetworkSlot.svelte` (env-configured AdSense-style in-feed unit). Wired into `src/routes/+page.svelte`; provider precedence is network → offers → off.
+- **Config**: optional `PUBLIC_AD_*` env vars in `.env.example` (`src/lib/adNetwork.ts`).
+- **Tracking**: `sponsored_impression` / `sponsored_click` flow through the existing telemetry batch with `offerId`.
+
+### How to add an affiliate offer (today, no approval)
+
+Sign up at Bookshop.org → get your affiliate link for a relevant book, then either from the Convex dashboard or a script:
+
+```ts
+await ctx.mutation(api.affiliate.add, {
+	headline: 'Engineering an Empire',
+	blurb: 'How Rome built infrastructure that still stands.',
+	url: 'https://bookshop.org/a/<your-id>/<book>',
+	conceptTags: ['rome', 'engineering'] // shown next to cards with these tags
+});
+```
+
+That's it — it appears in the feed, matched to cards sharing those tags. To switch to an ad network later, set `PUBLIC_AD_NETWORK` / `PUBLIC_AD_CLIENT` / `PUBLIC_AD_SLOT` and it takes over the slot automatically.
+
+### Not yet built (phases B–C)
+
+- CTR reporting query (aggregate `sponsored_*` events per offer/network).
+- A tiny `/admin/offers` route (today: dashboard/script via `api.affiliate.add`).
+- Impression gating via IntersectionObserver (today: fires on mount; fine at this density).
+- `network: 'direct'` offers sold by hand once phase-B numbers exist.
