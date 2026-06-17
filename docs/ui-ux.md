@@ -158,9 +158,9 @@ Every state needs a defined visual; silence/blank is a failure (fail-fast UX).
 
 ---
 
-## 9. Theming 🌀
+## 9. Theming ✅
 
-Dark-default (current). Add **light mode** via `prefers-color-scheme` with a parallel token set; both must pass AA. User override toggle is a later setting (§20.3 controls). Don't ship light mode until tokens are verified.
+Dark-default, with **light mode shipped**: a parallel token set applies under `prefers-color-scheme: light` (when on `system`) or a forced `data-theme` attribute. A no-flash inline script in `app.html` sets the forced theme before first paint; the `System / Light / Dark` override toggle lives on `/account` (`src/lib/theme.svelte.ts`, `ThemeToggle.svelte`). ⚠ Light tokens are first-pass — eyeball AA contrast on a real screen and tune `--muted`/`--accent` if needed.
 
 ---
 

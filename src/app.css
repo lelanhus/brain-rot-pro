@@ -16,6 +16,37 @@
 	color-scheme: dark;
 }
 
+/* Light theme (UI/UX §9). Tokens mirror the dark set; WCAG AA on the new
+   surfaces. Applied when the user picks Light, or under `system` when the OS
+   prefers light. `data-theme="dark"` always wins back to the default. */
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: #f6f6fb;
+	--surface: #ffffff;
+	--surface-2: #ececf3;
+	--border: #e0e0e9;
+	--text: #16161d;
+	--text-2: #3b3b48;
+	--muted: #61616f;
+	--accent: #5b4bdb;
+	--positive: #1f9d6b;
+	--negative: #d6453f;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		--bg: #f6f6fb;
+		--surface: #ffffff;
+		--surface-2: #ececf3;
+		--border: #e0e0e9;
+		--text: #16161d;
+		--text-2: #3b3b48;
+		--muted: #61616f;
+		--accent: #5b4bdb;
+		--positive: #1f9d6b;
+		--negative: #d6453f;
+	}
+}
+
 * {
 	box-sizing: border-box;
 }
@@ -316,6 +347,11 @@ body {
 	top: calc(env(safe-area-inset-top) + 0.75rem);
 	left: 0.9rem;
 	z-index: 10;
+	display: flex;
+	gap: 0.4rem;
+}
+
+.nav-pill {
 	font-size: 0.8rem;
 	color: var(--muted);
 	text-decoration: none;
@@ -326,7 +362,7 @@ body {
 	backdrop-filter: blur(6px);
 }
 
-.feed-nav:hover {
+.nav-pill:hover {
 	color: var(--text);
 }
 

@@ -268,7 +268,10 @@
 <svelte:window onkeydown={onKeydown} />
 <svelte:head><title>Brain Rot Pro</title></svelte:head>
 
-<a class="feed-nav" href={resolve('/saved')}>Saved</a>
+<nav class="feed-nav">
+	<a class="nav-pill" href={resolve('/saved')}>Saved</a>
+	<a class="nav-pill" href={resolve('/account')}>Account</a>
+</nav>
 
 <div class="hud" aria-live="polite">
 	{#if streak > 0}

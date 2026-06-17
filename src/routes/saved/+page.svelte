@@ -43,7 +43,7 @@
 		<h1>
 			Saved {#if items.length}<span class="count">{items.length}</span>{/if}
 		</h1>
-		<a class="sync-link" href={resolve('/sync')}>Sync to another device →</a>
+		<a class="sync-link" href={resolve('/account')}>Account →</a>
 	</header>
 
 	{#if saved.error}
