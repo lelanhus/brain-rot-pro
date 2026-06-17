@@ -366,6 +366,24 @@ body {
 	color: var(--text);
 }
 
+/* Offline status — fixed top-center so it's visible above the snapped feed. */
+.offline-banner {
+	position: fixed;
+	top: calc(env(safe-area-inset-top) + 0.75rem);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 11;
+	font-size: 0.78rem;
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 85%, transparent);
+	border: 1px solid var(--border);
+	padding: 0.35rem 0.8rem;
+	border-radius: 999px;
+	backdrop-filter: blur(6px);
+	max-width: 90vw;
+	text-align: center;
+}
+
 /* Focus indicator: tap to clear the active "explore this concept" filter. */
 .focus-pill {
 	position: fixed;

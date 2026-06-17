@@ -61,14 +61,25 @@ sw.addEventListener('fetch', (event) => {
 		return;
 	}
 
-	// Page navigations: network-first, fall back to cache, then an offline notice.
+	// Page navigations: network-first, caching each success so the app shell can
+	// boot offline (the client then reads cards from IndexedDB). Offline, serve the
+	// cached navigation, else any cached page, else a plain offline notice.
 	if (request.mode === 'navigate') {
 		event.respondWith(
-			fetch(request).catch(
-				async () =>
-					(await caches.match(request)) ??
-					new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
-			)
+			fetch(request)
+				.then((response) => {
+					const copy = response.clone();
+					void caches.open(CACHE).then((cache) => cache.put(request, copy));
+					return response;
+				})
+				.catch(
+					async () =>
+						(await caches.match(request)) ??
+						(await caches.match('/')) ??
+						new Response(OFFLINE_HTML, {
+							headers: { 'Content-Type': 'text/html; charset=utf-8' }
+						})
+				)
 		);
 	}
 });

@@ -16,6 +16,7 @@
 	import { weaveFeed } from '$lib/feed';
 	import { injectSponsored, type SlotMode } from '$lib/sponsored';
 	import { getAdNetworkConfig } from '$lib/adNetwork';
+	import { persistCards, readCards } from '$lib/offlineFeed';
 	import { createToast } from '$lib/toast.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -65,11 +66,24 @@
 	const recordActivity = useMutation(api.stats.recordActivity);
 	const streak = $derived(stats.data?.currentStreak ?? 0);
 
+	// Offline reading (PWA): mirror the live feed into IndexedDB, and fall back to
+	// that cache when offline with nothing live to show. Read-only — saving and
+	// personalization need the connection.
+	let online = $state(true);
+	let cachedOffline = $state<Doc<'knowledgeCards'>[]>([]);
+	const liveCards = $derived(personal.data ?? feed.results);
+	const sourceCards = $derived(!online && liveCards.length === 0 ? cachedOffline : liveCards);
+	const offlineFallback = $derived(!online && liveCards.length === 0 && cachedOffline.length > 0);
+
+	$effect(() => {
+		if (online && liveCards.length > 0) void persistCards(liveCards);
+	});
+
 	// Personalized once it loads; the SSR global feed until then. `notInterested`
 	// is an in-memory optimistic hide for the gap before recompute() rewrites the
 	// profile (the server is the durable source — feed.personal excludes them).
 	const visibleResults = $derived(
-		weaveFeed(personal.data ?? feed.results, injectedAfter).filter((c) => !notInterested.has(c._id))
+		weaveFeed(sourceCards, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
 
 	// Monetization (ADR-008): sponsored "Go deeper" slots woven into the feed at a
@@ -115,6 +129,15 @@
 
 	onMount(() => {
 		deviceId = getDeviceId();
+		online = navigator.onLine;
+		const goOnline = () => (online = true);
+		const goOffline = () => (online = false);
+		window.addEventListener('online', goOnline);
+		window.addEventListener('offline', goOffline);
+		// Prime the offline cache so it's ready if the connection drops mid-session.
+		readCards()
+			.then((c) => (cachedOffline = c))
+			.catch(() => {});
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
@@ -130,6 +153,8 @@
 			void flush();
 			toast.dismiss();
 			cleanupTelemetry();
+			window.removeEventListener('online', goOnline);
+			window.removeEventListener('offline', goOffline);
 		};
 	});
 
@@ -293,6 +318,12 @@
 	{/if}
 </div>
 
+{#if !online}
+	<div class="offline-banner" role="status">
+		Offline{offlineFallback ? ' — showing saved-for-offline cards' : ''}
+	</div>
+{/if}
+
 {#if toast.message}
 	{#key toast.id}
 		<div class="toast" role="status" data-testid="toast">{toast.message}</div>
@@ -342,11 +373,11 @@
 					<Card
 						{card}
 						saved={savedSet.has(card._id)}
-						onSave={() => handleSave(card)}
-						onNotInterested={() => handleNotInterested(card)}
+						onSave={online ? () => handleSave(card) : undefined}
+						onNotInterested={online ? () => handleNotInterested(card) : undefined}
 						onSource={() => track('source_open', { cardId: card._id })}
-						onRelated={(tag) => handleRelated(card, tag)}
-						onMore={() => handleMore(card)}
+						onRelated={online ? (tag) => handleRelated(card, tag) : undefined}
+						onMore={online ? () => handleMore(card) : undefined}
 						moreLoading={divingId === card._id}
 					/>
 				</div>
