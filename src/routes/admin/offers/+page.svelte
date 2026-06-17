@@ -1,15 +1,20 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { useQuery, useMutation } from 'convex-svelte';
+	import { ConvexError } from 'convex/values';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { adminAuth } from '$lib/admin.svelte';
 
 	// Admin: manage sponsored "Go deeper" offers and see CTR (ADR-008, phase B).
-	// No SSR — internal tool. NOTE: like /review, this and its mutations are not
-	// auth-gated yet (ADR-004 defers auth); gate before any public launch.
-	const report = useQuery(api.affiliate.report, () => ({}));
+	// No SSR — internal tool, gated by the /admin layout + server-side assertAdmin.
+	const report = useQuery(api.affiliate.report, () => ({ token: adminAuth.token }));
 	const rows = $derived(report.data?.offers ?? []);
 	const totals = $derived(report.data?.totals);
+	// A rejected token surfaces as a ConvexError; offer to re-enter it.
+	const unauthorized = $derived(
+		report.error instanceof ConvexError &&
+			(report.error.data as { code?: string })?.code === 'unauthorized'
+	);
 
 	const add = useMutation(api.affiliate.add);
 	const setStatus = useMutation(api.affiliate.setStatus);
@@ -41,6 +46,7 @@
 		message = null;
 		try {
 			await add({
+				token: adminAuth.token,
 				headline,
 				blurb,
 				url,
@@ -59,7 +65,11 @@
 
 	async function toggleStatus(offerId: Id<'affiliateOffers'>, current: 'active' | 'paused') {
 		try {
-			await setStatus({ offerId, status: current === 'active' ? 'paused' : 'active' });
+			await setStatus({
+				token: adminAuth.token,
+				offerId,
+				status: current === 'active' ? 'paused' : 'active'
+			});
 		} catch (err) {
 			console.error('[admin/offers] setStatus failed', err);
 		}
@@ -70,7 +80,6 @@
 
 <main class="admin">
 	<header>
-		<a href={resolve('/')}>← Feed</a>
 		<h1>Sponsored offers</h1>
 	</header>
 
@@ -127,7 +136,12 @@
 
 	<section class="report">
 		<h2>Performance</h2>
-		{#if report.error}
+		{#if unauthorized}
+			<p class="msg err">
+				Token rejected.
+				<button type="button" class="link" onclick={() => adminAuth.clear()}>Re-enter token</button>
+			</p>
+		{:else if report.error}
 			<p class="msg err">{report.error.message}</p>
 		{:else if report.isLoading}
 			<p class="hint">Loading…</p>
@@ -184,14 +198,7 @@
 		padding: 1.5rem 1.25rem 4rem;
 	}
 	header {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
 		margin-bottom: 1.5rem;
-	}
-	header a {
-		color: var(--muted);
-		font-size: 0.9rem;
 	}
 	h1 {
 		margin: 0;
@@ -271,6 +278,15 @@
 	}
 	.msg.err {
 		color: var(--negative);
+	}
+	.link {
+		font: inherit;
+		color: var(--accent);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
 	}
 	table {
 		width: 100%;

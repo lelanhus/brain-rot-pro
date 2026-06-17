@@ -1,6 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { DISCLOSURE, ctr, tallyOfferEvents, type OfferNetwork } from './affiliateLogic';
+import { assertAdmin } from './adminAuth';
 
 /**
  * Sponsored "Go deeper" offers (ADR-008). `active` is a light query — it reads
@@ -63,7 +64,7 @@ const networkValidator = v.union(
  * (ADR-007). Sponsored events are fetched via the `by_type` index, not a full scan.
  */
 export const report = query({
-	args: {},
+	args: { token: v.string() },
 	returns: v.object({
 		offers: v.array(
 			v.object({
@@ -78,7 +79,8 @@ export const report = query({
 		),
 		totals: v.object({ impressions: v.number(), clicks: v.number(), ctr: v.number() })
 	}),
-	handler: async (ctx) => {
+	handler: async (ctx, args) => {
+		assertAdmin(args.token);
 		const offers = await ctx.db.query('affiliateOffers').collect();
 		const impressions = await ctx.db
 			.query('events')
@@ -124,6 +126,7 @@ export const report = query({
  */
 export const add = mutation({
 	args: {
+		token: v.string(),
 		headline: v.string(),
 		blurb: v.string(),
 		url: v.string(),
@@ -136,6 +139,7 @@ export const add = mutation({
 	},
 	returns: v.id('affiliateOffers'),
 	handler: async (ctx, args) => {
+		assertAdmin(args.token);
 		if (args.headline.trim().length === 0 || args.url.trim().length === 0) {
 			throw new Error('add: headline and url are required');
 		}
@@ -162,11 +166,13 @@ export const add = mutation({
 /** Pause or re-activate an offer without deleting it (keeps reporting history). */
 export const setStatus = mutation({
 	args: {
+		token: v.string(),
 		offerId: v.id('affiliateOffers'),
 		status: v.union(v.literal('active'), v.literal('paused'))
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
+		assertAdmin(args.token);
 		await ctx.db.patch(args.offerId, { status: args.status });
 		return null;
 	}

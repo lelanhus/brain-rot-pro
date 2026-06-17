@@ -9,6 +9,7 @@
  */
 
 import type * as account from "../account.js";
+import type * as adminAuth from "../adminAuth.js";
 import type * as affiliate from "../affiliate.js";
 import type * as affiliateLogic from "../affiliateLogic.js";
 import type * as aiKey from "../aiKey.js";
@@ -45,6 +46,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   account: typeof account;
+  adminAuth: typeof adminAuth;
   affiliate: typeof affiliate;
   affiliateLogic: typeof affiliateLogic;
   aiKey: typeof aiKey;
