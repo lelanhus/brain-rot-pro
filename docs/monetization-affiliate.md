@@ -210,7 +210,14 @@ That's it — it appears in the feed, matched to cards sharing those tags. To sw
 
 ### Not yet built (phases B–C)
 
-- CTR reporting query (aggregate `sponsored_*` events per offer/network).
-- A tiny `/admin/offers` route (today: dashboard/script via `api.affiliate.add`).
+- ~~CTR reporting query~~ — **shipped** (`affiliate.report`; pure tally in `affiliateLogic.ts`, `events.by_type` index).
+- ~~A tiny `/admin/offers` route~~ — **shipped** (`src/routes/admin/offers/+page.svelte`: add-offer form, pause/activate, CTR table).
 - Impression gating via IntersectionObserver (today: fires on mount; fine at this density).
 - `network: 'direct'` offers sold by hand once phase-B numbers exist.
+
+### Phase B shipped (2026-06-17)
+
+- **`affiliate.report`** — joins every offer (active + paused) with tallied `sponsored_impression` / `sponsored_click` counts + CTR, plus totals. Sponsored events fetched via the new `events.by_type` index (no full scan). Counting is a pure, unit-tested fold (`tallyOfferEvents`, `ctr`).
+- **`/admin/offers`** — internal page to paste an affiliate link + concept tags, pause/activate offers, and watch CTR. Sits under a gated `/admin` layout.
+- **Admin gate** — a pre-auth **shared-secret** (`ADMIN_TOKEN`, a Convex deployment secret). `convex/adminAuth.ts` exposes a pure, constant-time `tokenMatches` + `assertAdmin`, applied to `affiliate.report` / `add` / `setStatus` (the public feed query `affiliate.active` stays open). The client side is an `/admin/+layout.svelte` that collects the token (localStorage) and a `src/lib/admin.svelte.ts` holder; the server is the real boundary. Designed to generalize: future `/admin/*` pages (account management, analytics) inherit the layout gate, and every admin function reuses `assertAdmin`.
+- ⚠ **Migrate to roles when auth lands.** This shared secret is a single-operator stopgap (ADR-004 defers real accounts). When Better Auth arrives, replace `assertAdmin(token)` with an `ctx.auth` role check — the call sites don't change. `/review` and its mutations are still ungated and should move under `/admin` + `assertAdmin` in that pass.
