@@ -153,7 +153,8 @@ export default defineSchema({
 		ts: v.number()
 	})
 		.index('by_device', ['deviceId'])
-		.index('by_device_session', ['deviceId', 'sessionId']),
+		.index('by_device_session', ['deviceId', 'sessionId'])
+		.index('by_type', ['type']),
 
 	/**
 	 * Ingested Wikipedia source articles (design doc §8.3, ADR-005). Full

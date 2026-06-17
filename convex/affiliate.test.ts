@@ -45,6 +45,32 @@ test('setStatus pause removes an offer from the active feed', async () => {
 	expect(await t.query(api.affiliate.active, {})).toHaveLength(0);
 });
 
+test('report joins offers with their tallied impressions/clicks and CTR', async () => {
+	const t = convexTest(schema, modules);
+	const offerId = await t.mutation(api.affiliate.add, {
+		headline: 'H',
+		blurb: 'B',
+		url: 'https://example.com',
+		conceptTags: ['rome']
+	});
+	await t.mutation(api.events.log, {
+		deviceId: 'd1',
+		sessionId: 's1',
+		events: [
+			{ type: 'sponsored_impression', offerId, ts: 1 },
+			{ type: 'sponsored_impression', offerId, ts: 2 },
+			{ type: 'sponsored_impression', offerId, ts: 3 },
+			{ type: 'sponsored_impression', offerId, ts: 4 },
+			{ type: 'sponsored_click', offerId, ts: 5 }
+		]
+	});
+
+	const report = await t.query(api.affiliate.report, {});
+	expect(report.offers).toHaveLength(1);
+	expect(report.offers[0]).toMatchObject({ offerId, impressions: 4, clicks: 1, ctr: 0.25 });
+	expect(report.totals).toEqual({ impressions: 4, clicks: 1, ctr: 0.25 });
+});
+
 test('events.log accepts sponsored events carrying an offerId', async () => {
 	const t = convexTest(schema, modules);
 	const offerId = await t.mutation(api.affiliate.add, {

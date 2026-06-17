@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-import { DISCLOSURE, type OfferNetwork } from './affiliateLogic';
+import { DISCLOSURE, ctr, tallyOfferEvents, type OfferNetwork } from './affiliateLogic';
 
 /**
  * Sponsored "Go deeper" offers (ADR-008). `active` is a light query — it reads
@@ -55,6 +55,65 @@ const networkValidator = v.union(
 	v.literal('course'),
 	v.literal('direct')
 );
+
+/**
+ * CTR report for the admin page (ADR-008, phase B). Joins every offer (active +
+ * paused) with its tallied sponsored events. Admin-only and non-reactive-critical,
+ * so reading the events table here is fine — it does NOT touch the feed read
+ * (ADR-007). Sponsored events are fetched via the `by_type` index, not a full scan.
+ */
+export const report = query({
+	args: {},
+	returns: v.object({
+		offers: v.array(
+			v.object({
+				offerId: v.id('affiliateOffers'),
+				headline: v.string(),
+				network: networkValidator,
+				status: v.union(v.literal('active'), v.literal('paused')),
+				impressions: v.number(),
+				clicks: v.number(),
+				ctr: v.number()
+			})
+		),
+		totals: v.object({ impressions: v.number(), clicks: v.number(), ctr: v.number() })
+	}),
+	handler: async (ctx) => {
+		const offers = await ctx.db.query('affiliateOffers').collect();
+		const impressions = await ctx.db
+			.query('events')
+			.withIndex('by_type', (q) => q.eq('type', 'sponsored_impression'))
+			.collect();
+		const clicks = await ctx.db
+			.query('events')
+			.withIndex('by_type', (q) => q.eq('type', 'sponsored_click'))
+			.collect();
+
+		const tally = tallyOfferEvents([...impressions, ...clicks]);
+
+		const rows = offers
+			.map((o) => {
+				const t = tally.get(o._id) ?? { impressions: 0, clicks: 0 };
+				return {
+					offerId: o._id,
+					headline: o.headline,
+					network: o.network,
+					status: o.status,
+					impressions: t.impressions,
+					clicks: t.clicks,
+					ctr: ctr(t.clicks, t.impressions)
+				};
+			})
+			.sort((a, b) => b.impressions - a.impressions || b.clicks - a.clicks);
+
+		const totImp = rows.reduce((s, r) => s + r.impressions, 0);
+		const totClk = rows.reduce((s, r) => s + r.clicks, 0);
+		return {
+			offers: rows,
+			totals: { impressions: totImp, clicks: totClk, ctr: ctr(totClk, totImp) }
+		};
+	}
+});
 
 /**
  * Add an offer — the "easy way to add an affiliate" entry point. Provide the
