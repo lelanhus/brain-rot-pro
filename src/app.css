@@ -16,6 +16,37 @@
 	color-scheme: dark;
 }
 
+/* Light theme (UI/UX §9). Tokens mirror the dark set; WCAG AA on the new
+   surfaces. Applied when the user picks Light, or under `system` when the OS
+   prefers light. `data-theme="dark"` always wins back to the default. */
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: #f6f6fb;
+	--surface: #ffffff;
+	--surface-2: #ececf3;
+	--border: #e0e0e9;
+	--text: #16161d;
+	--text-2: #3b3b48;
+	--muted: #61616f;
+	--accent: #5b4bdb;
+	--positive: #157a52;
+	--negative: #c0271f;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		--bg: #f6f6fb;
+		--surface: #ffffff;
+		--surface-2: #ececf3;
+		--border: #e0e0e9;
+		--text: #16161d;
+		--text-2: #3b3b48;
+		--muted: #61616f;
+		--accent: #5b4bdb;
+		--positive: #157a52;
+		--negative: #c0271f;
+	}
+}
+
 * {
 	box-sizing: border-box;
 }
@@ -228,9 +259,9 @@ body {
 .source blockquote {
 	margin: 0.6rem 0;
 	padding-left: 0.85rem;
-	border-left: 2px solid #34343f;
+	border-left: 2px solid var(--border);
 	font-style: italic;
-	color: #c8c8d2;
+	color: var(--text-2);
 }
 
 .source a {
@@ -240,7 +271,7 @@ body {
 .license {
 	margin: 0.5rem 0 0;
 	font-size: 0.78rem;
-	color: #6c6c78;
+	color: var(--muted);
 }
 
 /* Action bar — thumb zone bottom-right on phone (positioned within the slot). */
@@ -316,6 +347,11 @@ body {
 	top: calc(env(safe-area-inset-top) + 0.75rem);
 	left: 0.9rem;
 	z-index: 10;
+	display: flex;
+	gap: 0.4rem;
+}
+
+.nav-pill {
 	font-size: 0.8rem;
 	color: var(--muted);
 	text-decoration: none;
@@ -326,8 +362,26 @@ body {
 	backdrop-filter: blur(6px);
 }
 
-.feed-nav:hover {
+.nav-pill:hover {
 	color: var(--text);
+}
+
+/* Offline status — fixed top-center so it's visible above the snapped feed. */
+.offline-banner {
+	position: fixed;
+	top: calc(env(safe-area-inset-top) + 0.75rem);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 11;
+	font-size: 0.78rem;
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 85%, transparent);
+	border: 1px solid var(--border);
+	padding: 0.35rem 0.8rem;
+	border-radius: 999px;
+	backdrop-filter: blur(6px);
+	max-width: 90vw;
+	text-align: center;
 }
 
 /* Focus indicator: tap to clear the active "explore this concept" filter. */

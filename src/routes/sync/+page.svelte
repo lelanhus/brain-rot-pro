@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
-	import { getDeviceId, setDeviceId, clearDeviceId } from '$lib/identity';
+	import { getDeviceId, setDeviceId } from '$lib/identity';
 	import { errorMessage } from '$lib/errors';
 	import { formatCodeForDisplay, normalizeCode } from '$convex/syncLogic';
 
@@ -62,32 +62,13 @@
 	function minutesLeft(): number {
 		return Math.max(0, Math.round((expiresAt - Date.now()) / 60000));
 	}
-
-	// Delete-my-data state (two-step confirm).
-	let confirmingDelete = $state(false);
-	let deleting = $state(false);
-	let deleteError = $state<string | null>(null);
-
-	async function deleteData() {
-		if (deleting) return;
-		deleting = true;
-		deleteError = null;
-		try {
-			await getConvexClient().mutation(api.account.deleteData, { deviceId });
-			clearDeviceId(); // next visit starts fresh
-			location.assign(resolve('/'));
-		} catch (err) {
-			deleteError = errorMessage(err, 'Could not delete your data.');
-			deleting = false;
-		}
-	}
 </script>
 
 <svelte:head><title>Sync devices</title></svelte:head>
 
 <main class="sync">
 	<header>
-		<a class="back" href={resolve('/')}>← Feed</a>
+		<a class="back" href={resolve('/account')}>← Account</a>
 		<h1>Sync devices</h1>
 		<p class="lede">
 			Your saves, streak, and personalized feed live on this device, anonymously — no account
@@ -144,25 +125,9 @@
 		{#if redeemError}<p class="err">{redeemError}</p>{/if}
 	</section>
 
-	<section class="panel danger">
-		<h2>Delete my data</h2>
-		<p>Permanently erase this account's saves, streak, and history. This can't be undone.</p>
-		{#if confirmingDelete}
-			<div class="confirm">
-				<button type="button" class="destructive" onclick={deleteData} disabled={deleting}>
-					{deleting ? 'Deleting…' : 'Yes, delete everything'}
-				</button>
-				<button type="button" class="ghost" onclick={() => (confirmingDelete = false)}
-					>Cancel</button
-				>
-			</div>
-		{:else}
-			<button type="button" class="ghost danger-trigger" onclick={() => (confirmingDelete = true)}>
-				Delete my data
-			</button>
-		{/if}
-		{#if deleteError}<p class="err">{deleteError}</p>{/if}
-	</section>
+	<p class="account-link">
+		Manage your data and theme in <a href={resolve('/account')}>Account</a>.
+	</p>
 </main>
 
 <style>
@@ -268,22 +233,14 @@
 		background: transparent;
 		border: 1px solid var(--border);
 	}
-	.panel.danger {
-		border-color: color-mix(in srgb, var(--negative) 30%, var(--border));
+	.account-link {
+		margin: 1.5rem 0 0;
+		text-align: center;
+		color: var(--muted);
+		font-size: 0.9rem;
 	}
-	.confirm {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-	.danger-trigger:hover {
-		color: var(--negative);
-		border-color: var(--negative);
-	}
-	.destructive {
-		color: #fff;
-		background: var(--negative);
-		border: 1px solid var(--negative);
+	.account-link a {
+		color: var(--accent);
 	}
 	.err {
 		color: var(--negative) !important;
