@@ -1,17 +1,47 @@
 :root {
+	/* Palette (ui-ux.md §2 is the source of truth). Dark default.
+	   --text-2 restored to the doc value (#c8c8d2); the code had drifted to
+	   #e3e3ec, which flattened the hook↔body brightness hierarchy. */
 	--bg: #0b0b0f;
 	--surface: #15151d;
 	--surface-2: #23232f;
 	--border: #25252f;
-	--text: #f3f3f7;
-	--text-2: #e3e3ec;
-	--muted: #9a9aa8;
+	--text: #f3f3f7; /* hook — brightest tier */
+	--text-2: #c8c8d2; /* body — mid tier */
+	--muted: #9a9aa8; /* tag, chips, source — dim tier */
 	--accent: #7c6cff;
 	--positive: #36c98e;
 	--negative: #ff6b6b;
+
+	/* Type scale — Perfect Fourth (1.333). One idea per screen means no competing
+	   headings, so the hook is free to be a hero (web-design 01/06). System stack
+	   only — no web font, to protect the instant first paint (ui-ux.md §2). */
+	--fs-tag: 0.75rem; /* 12px */
+	--fs-meta: 0.8125rem; /* 13px — chips, source */
+	--fs-body: 1.0625rem; /* 17px — iOS-native */
+	--fs-hook: clamp(1.75rem, 1.5rem + 4vw, 2.25rem); /* 28→36px */
+	--tracking-tag: 0.08em; /* uppercase caps need opening up */
+	--measure: 60ch; /* body line length cap (calm on the wide desktop column) */
+
+	/* Spacing — 8pt grid (ui-ux.md §2; web-design 03). No values off this scale. */
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--space-7: 48px;
+	--space-8: 64px;
+
+	/* The thumb-zone strip reserved so content never runs under the action bar.
+	   Derived: two 52px buttons + 16px gap + bottom inset ≈ 136px → round up. */
+	--action-zone: 9.5rem;
+
 	--radius: 12px;
+	--radius-pill: 999px;
 	--dur-fast: 120ms;
 	--dur: 200ms;
+	--dur-slow: 320ms;
 	--ease: cubic-bezier(0.2, 0, 0, 1);
 	color-scheme: dark;
 }
@@ -36,6 +66,7 @@ body {
 		Arial,
 		sans-serif;
 	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 
 /* Visually hidden but accessible to screen readers. */
@@ -65,15 +96,57 @@ body {
 	scroll-behavior: smooth;
 }
 
-/* Each slot is one snap stop and the positioning context for its action bar. */
+/* Each slot is one snap stop and the positioning context for its action bar.
+   Content is TOP-anchored, not centred: every card's tag/hook lands at the same
+   Y regardless of body length, so swiping the feed never makes the hook jump —
+   calm and predictable ("snappy, not floaty", ui-ux.md §11). The generous top
+   space gives the hook a stage (active whitespace; web-design 03); bottom
+   padding reserves the thumb-zone strip. Top-anchoring also never clips a tall
+   card (the slot just grows past 100dvh and the feed scrolls). */
 .slot {
 	position: relative;
 	min-height: 100dvh;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	justify-content: center;
+	justify-content: flex-start;
 	scroll-snap-align: start;
-	padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+	/* Top space scales with viewport height so short phones don't overflow; bottom
+	   padding reserves the fixed action-bar strip so content never hides under it. */
+	padding: clamp(var(--space-5), 9vh, 6rem) var(--space-5)
+		calc(var(--action-zone) + env(safe-area-inset-bottom));
+	/* Browser owns vertical scroll; horizontal-dominant gestures go to swipeActions
+	   (so swipe-to-act never fights the feed's vertical scroll). */
+	touch-action: pan-y;
+}
+
+/* Directional swipe hint — a calm edge glow that grows with the gesture
+   (green = save on the right, red = dismiss on the left). */
+.slot::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity var(--dur-fast) var(--ease);
+}
+
+.slot[data-swipe='save']::after {
+	opacity: calc(var(--swipe-progress, 0) * 0.6);
+	background: radial-gradient(
+		120% 80% at 100% 50%,
+		color-mix(in srgb, var(--positive) 36%, transparent),
+		transparent 55%
+	);
+}
+
+.slot[data-swipe='dismiss']::after {
+	opacity: calc(var(--swipe-progress, 0) * 0.6);
+	background: radial-gradient(
+		120% 80% at 0% 50%,
+		color-mix(in srgb, var(--negative) 36%, transparent),
+		transparent 55%
+	);
 }
 
 .card {
@@ -81,100 +154,167 @@ body {
 	max-width: 640px;
 }
 
+/* Vertical rhythm via per-element margins (proximity: tight within a group,
+   loose between groups; web-design 03/06). No card border — the viewport edge
+   and the whitespace are the boundary (Gestalt closure). */
 .card-body {
 	display: flex;
 	flex-direction: column;
-	gap: 1rem;
 }
 
+.card-body > * {
+	margin: 0;
+}
+
+/* Format tag — an editorial kicker, not a competing pill. Accent-coloured per
+   ui-ux.md §2, but low-mass (12px) so the hook still wins the squint test: it's
+   the single sparing spark of brand colour at the top of each card. */
 .tag {
 	align-self: flex-start;
-	font-size: 0.72rem;
-	letter-spacing: 0.06em;
+	font-size: var(--fs-tag);
+	font-weight: 600;
+	line-height: 1.4;
+	letter-spacing: var(--tracking-tag);
 	text-transform: uppercase;
 	color: var(--accent);
-	background: var(--surface-2);
-	padding: 0.3rem 0.6rem;
-	border-radius: 999px;
 }
 
+/* The scroll-stopper. Brightest tier (inherits --text), top of the scale,
+   tight leading, balanced wrap so it never leaves an orphan word. */
 .hook {
-	font-size: clamp(1.6rem, 4.5vw, 2.3rem);
+	margin-top: var(--space-4);
+	font-size: var(--fs-hook);
 	line-height: 1.15;
-	font-weight: 750;
-	margin: 0;
+	font-weight: 700;
 	letter-spacing: -0.01em;
+	text-wrap: balance;
 }
 
+/* Body — mid brightness tier, capped measure, looser leading (light-on-dark
+   reads heavier, so +0.05 over the usual 1.55; web-design 01). */
 .body {
-	font-size: 1.075rem;
-	line-height: 1.55;
+	margin-top: var(--space-5);
+	max-width: var(--measure);
+	font-size: var(--fs-body);
+	line-height: 1.6;
 	color: var(--text-2);
-	margin: 0;
+	text-wrap: pretty;
+}
+
+/* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding
+   even though the text is small (web-design 05). */
+.why-toggle {
+	align-self: flex-start;
+	margin-top: var(--space-4);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-height: 44px;
+	font: inherit;
+	font-size: var(--fs-meta);
+	letter-spacing: 0.01em;
+	color: var(--muted);
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	transition: color var(--dur-fast) var(--ease);
+}
+
+.why-toggle:hover,
+.why-toggle.open {
+	color: var(--text-2);
+}
+
+/* Caret rotates from ▸ to ▾ when open. */
+.why-caret {
+	width: 0;
+	height: 0;
+	border-left: 4px solid currentColor;
+	border-top: 3.5px solid transparent;
+	border-bottom: 3.5px solid transparent;
+	transition: transform var(--dur-fast) var(--ease);
+}
+
+.why-toggle.open .why-caret {
+	transform: rotate(90deg);
 }
 
 .why {
-	font-size: 0.95rem;
-	line-height: 1.5;
+	max-width: var(--measure);
+	font-size: var(--fs-meta);
+	line-height: 1.6;
 	color: var(--muted);
-	margin: 0;
-	border-left: 2px solid var(--accent);
-	padding-left: 0.85rem;
-}
-
-.why-label {
-	display: block;
-	font-size: 0.7rem;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--accent);
-	margin-bottom: 0.2rem;
+	border-left: 2px solid var(--border);
+	padding-left: var(--space-4);
 }
 
 .chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.4rem;
+	gap: var(--space-2);
+	margin-top: var(--space-5);
 }
 
+/* Filled pill, no border (closure: the fill implies the shape). 44px min tap
+   target (a11y gate, ui-ux.md §8); the fill stays visually compact. */
 .chip {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
 	font: inherit;
-	font-size: 0.78rem;
+	font-size: var(--fs-meta);
 	color: var(--muted);
 	background: var(--surface-2);
-	border: 1px solid transparent;
-	padding: 0.3rem 0.6rem;
-	border-radius: 999px;
+	border: 0;
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--radius-pill);
 	cursor: pointer;
 	transition:
 		color var(--dur-fast) var(--ease),
-		border-color var(--dur-fast) var(--ease);
+		background var(--dur-fast) var(--ease),
+		transform var(--dur-fast) var(--ease);
 }
 
 .chip:hover {
 	color: var(--text);
-	border-color: var(--border);
+	background: var(--border);
+}
+
+/* Tactile press feedback (the only "hover" a touch screen gets; web-design 05). */
+.chip:active {
+	transform: scale(0.96);
+	color: var(--text);
+}
+
+.why-toggle:active {
+	transform: scale(0.98);
 }
 
 .source {
-	font-size: 0.9rem;
+	margin-top: var(--space-5);
+	font-size: var(--fs-meta);
 	color: var(--muted);
 	border-top: 1px solid var(--border);
-	padding-top: 0.85rem;
+	padding-top: var(--space-4);
 }
 
 .source summary {
+	display: flex;
+	align-items: center;
+	min-height: 44px;
 	cursor: pointer;
 	color: var(--muted);
 	width: fit-content;
 }
 
 .source blockquote {
-	margin: 0.6rem 0;
-	padding-left: 0.85rem;
-	border-left: 2px solid #34343f;
+	max-width: var(--measure);
+	margin: var(--space-3) 0;
+	padding-left: var(--space-4);
+	border-left: 2px solid var(--border);
 	font-style: italic;
-	color: #c8c8d2;
+	color: var(--text-2);
 }
 
 .source a {
@@ -182,36 +322,51 @@ body {
 }
 
 .license {
-	margin: 0.5rem 0 0;
-	font-size: 0.78rem;
-	color: #6c6c78;
+	margin: var(--space-2) 0 0;
+	font-size: var(--fs-tag);
+	color: var(--muted);
 }
 
-/* Action bar — thumb zone bottom-right on phone (positioned within the slot). */
+/* Action bar — a single viewport-FIXED thumb-zone stack, bottom-right. Fixed (not
+   per-card absolute) so the controls sit in the identical spot on every screen
+   size and stay reachable even while a tall card scrolls — consistent across all
+   mobile screens. `column-reverse` puts Save (first in the DOM) at the very
+   bottom — easiest thumb reach for the rewarding action — and the semi-destructive
+   Dismiss above it, 16px apart so an overshoot can't hit the wrong target (Fitts). */
 .actions {
-	position: absolute;
-	right: 1rem;
-	bottom: calc(1.75rem + env(safe-area-inset-bottom));
+	position: fixed;
+	right: var(--space-4);
+	bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+	z-index: 20;
 	display: flex;
-	flex-direction: column;
-	gap: 0.75rem;
+	flex-direction: column-reverse;
+	gap: var(--space-4);
 }
 
+/* Floating controls are the one raised element — a surface lift + soft shadow so
+   they read as above the card in dark mode (figure-ground; web-design 06). */
 .action {
-	width: 48px;
-	height: 48px;
+	width: 52px;
+	height: 52px;
 	display: grid;
 	place-items: center;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--surface) 80%, transparent);
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--surface) 82%, transparent);
 	border: 1px solid var(--border);
 	color: var(--text);
 	cursor: pointer;
-	backdrop-filter: blur(6px);
+	backdrop-filter: blur(8px);
+	box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
 	transition:
 		transform var(--dur-fast) var(--ease),
 		color var(--dur-fast) var(--ease),
-		background var(--dur-fast) var(--ease);
+		background var(--dur-fast) var(--ease),
+		border-color var(--dur-fast) var(--ease);
+}
+
+/* Dismiss is recessive (dim icon); Save carries full weight (Von Restorff). */
+.action.dismiss {
+	color: var(--muted);
 }
 
 .action:hover {
@@ -219,12 +374,25 @@ body {
 }
 
 .action:active {
-	transform: scale(0.92);
+	transform: scale(0.94);
 }
 
 .action.active {
 	color: var(--positive);
-	border-color: var(--positive);
+	border-color: color-mix(in srgb, var(--positive) 55%, var(--border));
+	background: color-mix(in srgb, var(--positive) 12%, var(--surface));
+}
+
+/* A calm confirmation pulse on save — a gentle settle, not a slot-machine pop
+   (ui-ux.md §4: calm dopamine). */
+.action.active svg {
+	animation: save-pulse var(--dur) var(--ease);
+}
+
+@keyframes save-pulse {
+	50% {
+		transform: scale(1.1);
+	}
 }
 
 .state {
@@ -233,9 +401,9 @@ body {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 0.5rem;
+	gap: var(--space-2);
 	text-align: center;
-	padding: 2rem;
+	padding: var(--space-6);
 	color: var(--muted);
 }
 
@@ -243,9 +411,47 @@ body {
 	min-height: 6rem;
 }
 
+/* End of feed — a graceful "you're caught up" snap stop, never a dead end. */
+.state.end {
+	scroll-snap-align: start;
+	gap: var(--space-4);
+}
+
+.state.end h2 {
+	margin: 0;
+	font-size: var(--fs-hook);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--text);
+}
+
+.state.end p {
+	margin: 0;
+	max-width: var(--measure);
+	color: var(--muted);
+}
+
+.restart {
+	margin-top: var(--space-2);
+	min-height: 44px;
+	padding: 0 var(--space-5);
+	font: inherit;
+	font-weight: 600;
+	color: var(--bg);
+	background: var(--accent);
+	border: 0;
+	border-radius: var(--radius-pill);
+	cursor: pointer;
+	transition: transform var(--dur-fast) var(--ease);
+}
+
+.restart:active {
+	transform: scale(0.96);
+}
+
 .state code {
 	background: var(--surface-2);
-	padding: 0.2rem 0.45rem;
+	padding: var(--space-1) var(--space-2);
 	border-radius: 6px;
 	color: var(--text);
 }
@@ -257,16 +463,19 @@ body {
 /* Unobtrusive link to the saved view; fixed so it never shifts card layout. */
 .feed-nav {
 	position: fixed;
-	top: calc(env(safe-area-inset-top) + 0.75rem);
-	left: 0.9rem;
+	top: calc(env(safe-area-inset-top) + var(--space-3));
+	left: var(--space-4);
 	z-index: 10;
-	font-size: 0.8rem;
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	font-size: var(--fs-meta);
 	color: var(--muted);
 	text-decoration: none;
 	background: color-mix(in srgb, var(--surface) 75%, transparent);
 	border: 1px solid var(--border);
-	padding: 0.35rem 0.7rem;
-	border-radius: 999px;
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--radius-pill);
 	backdrop-filter: blur(6px);
 }
 
@@ -279,20 +488,24 @@ body {
 	.actions {
 		top: 50%;
 		bottom: auto;
-		right: max(1.5rem, calc((100% - 640px) / 2 - 4.5rem));
+		right: max(var(--space-5), calc((100% - 640px) / 2 - 4.5rem));
 		transform: translateY(-50%);
 	}
 }
 
-/* Honor reduced-motion: no smooth scroll, no transitions/transforms. */
+/* Honor reduced-motion: no smooth scroll, no transitions/transforms/animations. */
 @media (prefers-reduced-motion: reduce) {
 	.feed {
 		scroll-behavior: auto;
 	}
-	* {
+	*,
+	*::before,
+	*::after {
 		transition: none !important;
+		animation: none !important;
 	}
-	.action:active {
+	.action:active,
+	.chip:active {
 		transform: none;
 	}
 }

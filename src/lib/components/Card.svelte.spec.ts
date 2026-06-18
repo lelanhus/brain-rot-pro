@@ -4,12 +4,15 @@ import { page } from 'vitest/browser';
 import Card from './Card.svelte';
 import type { Doc } from '$convex/_generated/dataModel';
 
+// Hoisted so assertions get a non-optional `string` (whyItMatters is optional on Doc).
+const WHY = 'It scrambles the mental timeline.';
+
 const sample = {
 	_id: 'card_1',
 	_creationTime: 0,
 	hook: 'Oxford is older than the Aztec Empire.',
 	body: 'Teaching at Oxford dates to 1096, before the Aztec capital was founded in 1325.',
-	whyItMatters: 'It scrambles the mental timeline.',
+	whyItMatters: WHY,
 	format: 'timeline_shock',
 	conceptTags: ['Oxford', 'history'],
 	source: {
@@ -31,4 +34,22 @@ test('renders the hook and body, and reveals a source link', async () => {
 	// The source link lives behind a disclosure; opening it should reveal it.
 	await page.getByText('Source', { exact: true }).click();
 	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
+});
+
+test('keeps "why it matters" collapsed until the toggle reveals it, firing card_expand once', async () => {
+	let expands = 0;
+	render(Card, { card: sample, onExpand: () => (expands += 1) });
+
+	// Hidden by default so it doesn't compete with the hook (ui-ux.md §3).
+	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
+
+	const toggle = page.getByRole('button', { name: /why it matters/i });
+	await toggle.click();
+	await expect.element(page.getByText(WHY)).toBeVisible();
+	expect(expands).toBe(1);
+
+	// Collapsing again hides it without re-firing the deepening signal.
+	await toggle.click();
+	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
+	expect(expands).toBe(1);
 });

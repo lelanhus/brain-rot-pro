@@ -1,23 +1,31 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
+	import { slide } from 'svelte/transition';
 	import { formatName } from '$lib/cards';
-	import CardActions from './CardActions.svelte';
 
+	// Card is pure content. Save/dismiss live in a single viewport-fixed action
+	// bar (rendered by the feed page, wired to the active card) so the controls
+	// sit in the same thumb-zone spot on every screen size — see +page.svelte.
 	let {
 		card,
-		saved = false,
-		onSave,
-		onNotInterested,
 		onSource,
-		onRelated
+		onRelated,
+		onExpand
 	}: {
 		card: Doc<'knowledgeCards'>;
-		saved?: boolean;
-		onSave?: () => void;
-		onNotInterested?: () => void;
 		onSource?: () => void;
 		onRelated?: (tag: string) => void;
+		onExpand?: () => void;
 	} = $props();
+
+	// "Why it matters" is significance, not the payload — it competes with the
+	// hook (ui-ux.md §3), so the glanceable card hides it behind this toggle and
+	// reveals it on demand (the long-defined `card_expand` signal).
+	let expanded = $state(false);
+	function toggleWhy() {
+		if (!expanded) onExpand?.(); // count the first reveal as a deepening signal
+		expanded = !expanded;
+	}
 </script>
 
 <article class="card">
@@ -28,7 +36,19 @@
 		<p class="body">{card.body}</p>
 
 		{#if card.whyItMatters}
-			<p class="why"><span class="why-label">Why it matters</span>{card.whyItMatters}</p>
+			<button
+				type="button"
+				class="why-toggle"
+				class:open={expanded}
+				aria-expanded={expanded}
+				onclick={toggleWhy}
+			>
+				Why it matters
+				<span class="why-caret" aria-hidden="true"></span>
+			</button>
+			{#if expanded}
+				<p class="why" transition:slide={{ duration: 180 }}>{card.whyItMatters}</p>
+			{/if}
 		{/if}
 
 		<div class="chips">
@@ -47,8 +67,4 @@
 			<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
 		</details>
 	</div>
-
-	{#if onSave && onNotInterested}
-		<CardActions {saved} {onSave} {onNotInterested} />
-	{/if}
 </article>

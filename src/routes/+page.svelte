@@ -7,9 +7,13 @@
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
 	import Card from '$lib/components/Card.svelte';
+	import CardActions from '$lib/components/CardActions.svelte';
 	import { dwell } from '$lib/actions/dwell';
+	import { swipeActions } from '$lib/actions/swipeActions';
+	import { formatName } from '$lib/cards';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
+	import { cooldownGate } from '$lib/cooldownGate';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -37,6 +41,13 @@
 	// profile (the server is the durable source — feed.personal excludes them).
 	const visibleResults = $derived(
 		(personal.data ?? feed.results).filter((c) => !notInterested.has(c._id))
+	);
+
+	// The single fixed action bar targets whichever card is currently in view
+	// (set by the dwell action). Fall back to the first card before the observer
+	// fires so the controls are present from the first paint.
+	const activeCard = $derived(
+		visibleResults.find((c) => c._id === activeCardId) ?? visibleResults[0]
 	);
 
 	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
@@ -73,7 +84,13 @@
 		}
 	}
 
+	// The dismiss button is stationary and the next card snaps into its slot
+	// instantly, so a double-click (or rapid second click) would otherwise dismiss
+	// two cards in one gesture. Swallow a repeat within the cooldown window.
+	const allowDismiss = cooldownGate(350);
+
 	function handleNotInterested(card: Doc<'knowledgeCards'>) {
+		if (!allowDismiss()) return;
 		notInterested.add(card._id); // optimistic hide; recompute makes it durable
 		track('not_interested', { cardId: card._id });
 		scheduleAdapt();
@@ -81,6 +98,11 @@
 
 	function handleRelated(card: Doc<'knowledgeCards'>) {
 		track('related_tap', { cardId: card._id });
+		scheduleAdapt();
+	}
+
+	function handleExpand(card: Doc<'knowledgeCards'>) {
+		track('card_expand', { cardId: card._id }); // going deeper is a positive signal
 		scheduleAdapt();
 	}
 
@@ -139,6 +161,12 @@
 
 <a class="feed-nav" href={resolve('/saved')}>Saved</a>
 
+<!-- Announce the active card to screen readers as it changes (ui-ux.md §8;
+     polite so it never interrupts). -->
+<div class="vh" aria-live="polite" aria-atomic="true">
+	{#if activeCard}{formatName(activeCard.format)}. {activeCard.hook}{/if}
+</div>
+
 <main class="feed" data-testid="feed" bind:this={feedEl} aria-label="Knowledge feed">
 	{#if feed.error}
 		<section class="state error">
@@ -166,20 +194,44 @@
 					body: card.body,
 					onActive: (id) => (activeCardId = id)
 				}}
+				use:swipeActions={{
+					onSave: () => handleSave(card),
+					onDismiss: () => handleNotInterested(card)
+				}}
 			>
 				<Card
 					{card}
-					saved={savedSet.has(card._id)}
-					onSave={() => handleSave(card)}
-					onNotInterested={() => handleNotInterested(card)}
 					onSource={() => track('source_open', { cardId: card._id })}
 					onRelated={() => handleRelated(card)}
+					onExpand={() => handleExpand(card)}
 				/>
 			</div>
 		{/each}
 		<div bind:this={sentinel} class="sentinel" aria-hidden="true"></div>
 		{#if feed.status === 'LoadingMore'}
 			<section class="state subtle">Loading more…</section>
+		{:else if feed.status === 'Exhausted'}
+			<section class="state end">
+				<h2>You're caught up</h2>
+				<p>That's every idea for now — more are on the way.</p>
+				<button
+					type="button"
+					class="restart"
+					onclick={() => feedEl?.scrollTo({ top: 0, behavior: 'smooth' })}
+				>
+					Back to the top
+				</button>
+			</section>
 		{/if}
 	{/if}
 </main>
+
+<!-- One viewport-fixed action bar for the active card: identical thumb-zone
+     placement on every screen size, regardless of card content height. -->
+{#if activeCard && visibleResults.length > 0}
+	<CardActions
+		saved={savedSet.has(activeCard._id)}
+		onSave={() => handleSave(activeCard)}
+		onNotInterested={() => handleNotInterested(activeCard)}
+	/>
+{/if}

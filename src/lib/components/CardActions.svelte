@@ -37,7 +37,7 @@
 
 	<button
 		type="button"
-		class="action"
+		class="action dismiss"
 		aria-label="Not interested"
 		title="Not interested"
 		onclick={onNotInterested}
