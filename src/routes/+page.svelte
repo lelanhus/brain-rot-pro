@@ -10,7 +10,10 @@
 	import Card from '$lib/components/Card.svelte';
 	import SponsoredCard from '$lib/components/SponsoredCard.svelte';
 	import AdNetworkSlot from '$lib/components/AdNetworkSlot.svelte';
+	import CardActions from '$lib/components/CardActions.svelte';
 	import { dwell } from '$lib/actions/dwell';
+	import { swipeActions } from '$lib/actions/swipeActions';
+	import { formatName } from '$lib/cards';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
@@ -18,6 +21,7 @@
 	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { persistCards, readCards } from '$lib/offlineFeed';
 	import { createToast } from '$lib/toast.svelte';
+	import { cooldownGate } from '$lib/cooldownGate';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -116,6 +120,13 @@
 		dismissedOffers.add(offerId); // session-scoped suppression (no account yet)
 	}
 
+	// The single fixed action bar targets whichever card is currently in view
+	// (set by the dwell action). Fall back to the first card before the observer
+	// fires so the controls are present from the first paint.
+	const activeCard = $derived(
+		visibleResults.find((c) => c._id === activeCardId) ?? visibleResults[0]
+	);
+
 	// Debounced: coalesce bursts of signals into one flush + profile rebuild.
 	function scheduleAdapt() {
 		if (!deviceId) return;
@@ -182,7 +193,13 @@
 		}
 	}
 
+	// The dismiss button is stationary and the next card snaps into its slot
+	// instantly, so a double-click (or rapid second click) would otherwise dismiss
+	// two cards in one gesture. Swallow a repeat within the cooldown window.
+	const allowDismiss = cooldownGate(350);
+
 	function handleNotInterested(card: Doc<'knowledgeCards'>) {
+		if (!allowDismiss()) return;
 		notInterested.add(card._id); // optimistic hide; recompute makes it durable
 		track('not_interested', { cardId: card._id });
 		scheduleAdapt();
@@ -232,6 +249,11 @@
 		} finally {
 			divingId = null;
 		}
+	}
+
+	function handleExpand(card: Doc<'knowledgeCards'>) {
+		track('card_expand', { cardId: card._id }); // going deeper is a positive signal
+		scheduleAdapt();
 	}
 
 	function scrollByViewport(dir: 1 | -1) {
@@ -339,6 +361,12 @@
 	</button>
 {/if}
 
+<!-- Announce the active card to screen readers as it changes (ui-ux.md §8;
+     polite so it never interrupts). -->
+<div class="vh" aria-live="polite" aria-atomic="true">
+	{#if activeCard}{formatName(activeCard.format)}. {activeCard.hook}{/if}
+</div>
+
 <main class="feed" data-testid="feed" bind:this={feedEl} aria-label="Knowledge feed">
 	{#if feed.error}
 		<section class="state error">
@@ -369,16 +397,22 @@
 						onActive: (id) => (activeCardId = id),
 						onComplete: (id) => handleComplete(id)
 					}}
+					use:swipeActions={{
+						onSave: () => {
+							if (online) void handleSave(card);
+						},
+						onDismiss: () => {
+							if (online) handleNotInterested(card);
+						}
+					}}
 				>
 					<Card
 						{card}
-						saved={savedSet.has(card._id)}
-						onSave={online ? () => handleSave(card) : undefined}
-						onNotInterested={online ? () => handleNotInterested(card) : undefined}
 						onSource={() => track('source_open', { cardId: card._id })}
 						onRelated={online ? (tag) => handleRelated(card, tag) : undefined}
 						onMore={online ? () => handleMore(card) : undefined}
 						moreLoading={divingId === card._id}
+						onExpand={() => handleExpand(card)}
 					/>
 				</div>
 			{:else if item.offer}
@@ -399,6 +433,28 @@
 		<div bind:this={sentinel} class="sentinel" aria-hidden="true"></div>
 		{#if feed.status === 'LoadingMore'}
 			<section class="state subtle">Loading more…</section>
+		{:else if feed.status === 'Exhausted'}
+			<section class="state end">
+				<h2>You're caught up</h2>
+				<p>That's every idea for now — more are on the way.</p>
+				<button
+					type="button"
+					class="restart"
+					onclick={() => feedEl?.scrollTo({ top: 0, behavior: 'smooth' })}
+				>
+					Back to the top
+				</button>
+			</section>
 		{/if}
 	{/if}
 </main>
+
+<!-- One viewport-fixed action bar for the active card: identical thumb-zone
+     placement on every screen size, regardless of card content height. -->
+{#if activeCard && visibleResults.length > 0 && online}
+	<CardActions
+		saved={savedSet.has(activeCard._id)}
+		onSave={() => handleSave(activeCard)}
+		onNotInterested={() => handleNotInterested(activeCard)}
+	/>
+{/if}

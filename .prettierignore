@@ -11,3 +11,7 @@ bun.lockb
 build/
 .vercel/
 convex/_generated/
+
+# Local, git-ignored deployment & editor state (not source)
+.convex/
+.claude/settings.local.json
