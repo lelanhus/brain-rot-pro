@@ -123,8 +123,8 @@
 		font-weight: 650;
 		color: var(--accent);
 		background: var(--surface-2);
-		padding: 0.1rem 0.55rem;
-		border-radius: 999px;
+		padding: 0.1rem 0.5rem;
+		border-radius: var(--radius-xs);
 	}
 	.sync-link {
 		color: var(--muted);
@@ -163,7 +163,7 @@
 		background: var(--surface-2);
 		border: 1px solid var(--border);
 		padding: 0.5rem 1rem;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 	}
 	.cta:hover {
 		border-color: var(--accent);
@@ -239,11 +239,16 @@
 		background: var(--surface-2);
 		border: 1px solid transparent;
 		padding: 0.25rem 0.6rem;
-		border-radius: 999px;
+		border-radius: var(--radius-xs);
+	}
+	/* These are filled tag-chips, not the feed's dot-tags — suppress the global
+	   .chip::before dot so they don't read as box-plus-bullet. */
+	.chip::before {
+		display: none;
 	}
 	.chip:hover {
 		color: var(--text);
-		border-color: var(--border);
+		border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 	}
 	.row {
 		display: flex;
@@ -264,7 +269,7 @@
 		background: none;
 		border: 1px solid var(--border);
 		padding: 0.3rem 0.7rem;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition:
 			color var(--dur-fast) var(--ease),

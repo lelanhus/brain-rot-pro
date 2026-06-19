@@ -85,7 +85,10 @@
 		{/if}
 
 		<details class="source" ontoggle={(e) => e.currentTarget.open && onSource?.()}>
-			<summary>Source</summary>
+			<summary>
+				Source
+				<span class="why-caret" aria-hidden="true"></span>
+			</summary>
 			<blockquote>{card.source.sourceSpan}</blockquote>
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external source link, not an internal route -->
 			<a href={card.source.articleUrl} target="_blank" rel="noreferrer noopener">

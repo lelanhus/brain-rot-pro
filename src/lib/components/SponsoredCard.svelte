@@ -92,7 +92,7 @@
 		background: color-mix(in srgb, var(--accent) 14%, transparent);
 		border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
 		padding: 0.5rem 0.95rem;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		text-decoration: none;
 		transition: background var(--dur-fast) var(--ease);
 	}
@@ -118,7 +118,7 @@
 		color: var(--muted);
 		background: transparent;
 		border: none;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 	}
 

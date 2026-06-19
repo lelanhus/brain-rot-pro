@@ -9,19 +9,25 @@
 	--text: #f3f3f7; /* hook — brightest tier */
 	--text-2: #c8c8d2; /* body — mid tier */
 	--muted: #9a9aa8; /* tag, chips, source — dim tier */
-	--accent: #7c6cff;
+	/* Accent — a warm ember, not the stock indigo every generated app ships. It's
+	   the one chosen "spark of an idea": editorial, distinct from the green/red
+	   signals, AA-clear on the near-black (7.3:1). Light mode is a deeper burnt
+	   sienna for AA on the off-white (4.8:1). Used sparingly — one moment per card. */
+	--accent: #e2884a;
 	--positive: #36c98e;
 	--negative: #ff6b6b;
 
-	/* Type scale — Perfect Fourth (1.333). One idea per screen means no competing
-	   headings, so the hook is free to be a hero (web-design 01/06). System stack
+	/* Type scale — Perfect Fourth (1.333) anchored off the 17px body so the ratio
+	   stays constant across the mobile→desktop clamp (≈30→40px hook). One idea per
+	   screen means the hook is free to be a poster, not a paragraph. System stack
 	   only — no web font, to protect the instant first paint (ui-ux.md §2). */
 	--fs-tag: 0.75rem; /* 12px */
 	--fs-meta: 0.8125rem; /* 13px — chips, source */
+	--fs-why: 0.9375rem; /* 15px — why-it-matters is prose to read, not metadata */
 	--fs-body: 1.0625rem; /* 17px — iOS-native */
-	--fs-hook: clamp(1.75rem, 1.5rem + 4vw, 2.25rem); /* 28→36px */
-	--tracking-tag: 0.08em; /* uppercase caps need opening up */
-	--measure: 60ch; /* body line length cap (calm on the wide desktop column) */
+	--fs-hook: clamp(1.9rem, 1.2rem + 3vw, 3rem); /* 30px mobile → 48px desktop poster */
+	--tracking-tag: 0.12em; /* small bold caps need wide tracking to breathe */
+	--measure: 60ch; /* line length cap for why/source on the wide desktop column */
 
 	/* Spacing — 8pt grid (ui-ux.md §2; web-design 03). No values off this scale. */
 	--space-1: 4px;
@@ -37,12 +43,21 @@
 	   Derived: two 52px buttons + 16px gap + bottom inset ≈ 136px → round up. */
 	--action-zone: 9.5rem;
 
-	--radius: 12px;
-	--radius-pill: 999px;
+	/* Radius scale — crisp and editorial. The old design rounded *everything* to a
+	   999px pill, so confident content sat inside timid bubbles. Geometry is now a
+	   choice: near-square tags, gently-softened controls, no pill-soup. */
+	--radius-xs: 4px; /* tags, chips, count badges — editorial, near-square */
+	--radius-sm: 8px; /* buttons, nav, hud, banners, toast */
+	--radius-md: 14px; /* action tiles, images, saved cards — softened, not round */
+	--radius: var(--radius-md); /* back-compat alias (card images, saved cards) */
+	--radius-pill: 999px; /* reserved for genuinely circular marks only */
 	--dur-fast: 120ms;
 	--dur: 200ms;
 	--dur-slow: 320ms;
 	--ease: cubic-bezier(0.2, 0, 0, 1);
+	/* A little overshoot for taps and the save pulse — the difference between a UI
+	   that merely acknowledges you and one that delights (joy via motion, not chrome). */
+	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 	color-scheme: dark;
 }
 
@@ -57,8 +72,8 @@
 	--border: #e0e0e9;
 	--text: #16161d;
 	--text-2: #3b3b48;
-	--muted: #61616f;
-	--accent: #5b4bdb;
+	--muted: #585866;
+	--accent: #b1521f;
 	--positive: #157a52;
 	--negative: #c0271f;
 }
@@ -70,8 +85,8 @@
 		--border: #e0e0e9;
 		--text: #16161d;
 		--text-2: #3b3b48;
-		--muted: #61616f;
-		--accent: #5b4bdb;
+		--muted: #585866;
+		--accent: #b1521f;
 		--positive: #157a52;
 		--negative: #c0271f;
 	}
@@ -119,12 +134,20 @@ body {
 	border-radius: 4px;
 }
 
-/* One-card-at-a-time vertical feed with scroll snapping. */
+/* One-card-at-a-time vertical feed with scroll snapping. A barely-there ember warmth
+   at the top edge (~4% accent) keeps the near-black field from reading as a cold
+   terminal — ambient "room light" behind where the hook lands, not a decorative
+   gradient. The container's own background stays put while cards scroll past it. */
 .feed {
 	height: 100dvh;
 	overflow-y: auto;
 	scroll-snap-type: y mandatory;
 	scroll-behavior: smooth;
+	background: radial-gradient(
+		115% 45% at 50% 0%,
+		color-mix(in srgb, var(--accent) 4%, var(--bg)),
+		var(--bg) 60%
+	);
 }
 
 /* Each slot is one snap stop and the positioning context for its action bar.
@@ -163,19 +186,19 @@ body {
 }
 
 .slot[data-swipe='save']::after {
-	opacity: calc(var(--swipe-progress, 0) * 0.6);
+	opacity: calc(var(--swipe-progress, 0) * 0.4);
 	background: radial-gradient(
 		120% 80% at 100% 50%,
-		color-mix(in srgb, var(--positive) 36%, transparent),
+		color-mix(in srgb, var(--positive) 28%, transparent),
 		transparent 55%
 	);
 }
 
 .slot[data-swipe='dismiss']::after {
-	opacity: calc(var(--swipe-progress, 0) * 0.6);
+	opacity: calc(var(--swipe-progress, 0) * 0.4);
 	background: radial-gradient(
 		120% 80% at 0% 50%,
-		color-mix(in srgb, var(--negative) 36%, transparent),
+		color-mix(in srgb, var(--negative) 28%, transparent),
 		transparent 55%
 	);
 }
@@ -232,6 +255,9 @@ body {
    the single sparing spark of brand colour at the top of each card. */
 .tag {
 	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
 	font-size: var(--fs-tag);
 	font-weight: 600;
 	line-height: 1.4;
@@ -240,33 +266,51 @@ body {
 	color: var(--accent);
 }
 
-/* The scroll-stopper. Brightest tier (inherits --text), top of the scale,
-   tight leading, balanced wrap so it never leaves an orphan word. */
+/* The editorial mark: a short accent bar anchoring each kicker. Gives every card a
+   confident "start here" with structure, not a pill — the design's one bit of joy
+   that's there before you even interact. */
+.tag::before {
+	content: '';
+	width: 3px;
+	height: 0.95em;
+	border-radius: 1px;
+	background: var(--accent);
+}
+
+/* The scroll-stopper — set like a poster, not a big paragraph: the heaviest grade
+   the system stack ships (800, not faux-bold), display leading (1.05), optical
+   tightening that scales with size, and a short ~22ch measure so it lands in 2–3
+   punchy lines. Balanced wrap kills orphans. This is the hero; everything else
+   recedes from it. */
 .hook {
-	margin-top: var(--space-4);
+	margin-top: var(--space-3);
+	max-width: 22ch;
 	font-size: var(--fs-hook);
-	line-height: 1.15;
-	font-weight: 700;
-	letter-spacing: -0.01em;
+	line-height: 1.05;
+	font-weight: 800;
+	letter-spacing: -0.022em;
 	text-wrap: balance;
 }
 
-/* Body — mid brightness tier, capped measure, looser leading (light-on-dark
-   reads heavier, so +0.05 over the usual 1.55; web-design 01). */
+/* Body — mid brightness tier, ~58ch measure (the readability sweet spot), 1.55
+   leading (light-on-dark reads a touch heavy; this respects that without drifting
+   into a loose wall of text). The generous sink below the hook is set here. */
 .body {
-	margin-top: var(--space-5);
-	max-width: var(--measure);
+	margin-top: var(--space-6);
+	max-width: 58ch;
 	font-size: var(--fs-body);
-	line-height: 1.6;
+	line-height: 1.55;
 	color: var(--text-2);
 	text-wrap: pretty;
 }
 
 /* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding
    even though the text is small (web-design 05). */
+/* Bound tight to the body it expands (proximity), and lifted to the body tier at
+   rest so it reads as an invitation to go deeper — not fine print. */
 .why-toggle {
 	align-self: flex-start;
-	margin-top: var(--space-4);
+	margin-top: var(--space-2);
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
@@ -274,7 +318,7 @@ body {
 	font: inherit;
 	font-size: var(--fs-meta);
 	letter-spacing: 0.01em;
-	color: var(--muted);
+	color: var(--text-2);
 	background: none;
 	border: 0;
 	padding: 0;
@@ -284,7 +328,7 @@ body {
 
 .why-toggle:hover,
 .why-toggle.open {
-	color: var(--text-2);
+	color: var(--text);
 }
 
 /* Caret rotates from ▸ to ▾ when open. */
@@ -301,48 +345,69 @@ body {
 	transform: rotate(90deg);
 }
 
+/* "Why it matters" — prose to read, not metadata, so it earns 15px and a readable
+   leading. No border rule: the dimmer tier + the slide-in already mark it as an
+   aside (whitespace and colour do the separating, not ink). */
 .why {
 	max-width: var(--measure);
-	font-size: var(--fs-meta);
-	line-height: 1.6;
+	font-size: var(--fs-why);
+	line-height: 1.55;
 	color: var(--muted);
-	border-left: 2px solid var(--border);
-	padding-left: var(--space-4);
 }
 
+/* Explore cluster (chips + "more") detaches from the reading column with a true
+   section gap so proximity — not a divider — tells the eye it's a new zone. */
 .chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-2);
-	margin-top: var(--space-5);
+	gap: var(--space-3) var(--space-4);
+	margin-top: var(--space-7);
 }
 
-/* Filled pill, no border (closure: the fill implies the shape). 44px min tap
-   target (a11y gate, ui-ux.md §8); the fill stays visually compact. */
+/* Concept tags as words, not boxes — a tiny warm dot marks each as a tappable
+   "pivot the feed here" without the mass of a filled chip or the empty-input look
+   of an outline. The lowest-ink way to keep discovery present but quiet (Ma). 44px
+   tap target preserved via vertical padding. */
 .chip {
 	display: inline-flex;
 	align-items: center;
+	gap: var(--space-2);
 	min-height: 44px;
 	font: inherit;
 	font-size: var(--fs-meta);
 	color: var(--muted);
-	background: var(--surface-2);
+	background: none;
 	border: 0;
-	padding: var(--space-2) var(--space-4);
-	border-radius: var(--radius-pill);
+	padding: 0;
 	cursor: pointer;
 	transition:
 		color var(--dur-fast) var(--ease),
+		transform var(--dur-fast) var(--ease-spring);
+}
+
+/* Dot is neutral at rest so the warm accent stays "one spark per card" (the kicker);
+   it warms to ember only when the concept is touched — turning the tag-line into a
+   live, tappable thing on interaction rather than four competing accents at rest. */
+.chip::before {
+	content: '';
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--muted);
+	transition:
 		background var(--dur-fast) var(--ease),
-		transform var(--dur-fast) var(--ease);
+		opacity var(--dur-fast) var(--ease);
 }
 
 .chip:hover {
 	color: var(--text);
-	background: var(--border);
 }
 
-/* Tactile press feedback (the only "hover" a touch screen gets; web-design 05). */
+.chip:hover::before {
+	background: var(--accent);
+}
+
+/* Tactile, springy press feedback (the only "hover" a touch screen gets; web-design 05). */
 .chip:active {
 	transform: scale(0.96);
 	color: var(--text);
@@ -352,25 +417,36 @@ body {
 	transform: scale(0.98);
 }
 
-/* "More like this": dive into the semantic rabbit hole. */
+/* "More like this": dive into the semantic rabbit hole. A quiet text affordance
+   (accent text + arrow, no fill, no border) sitting tight under the chips as part
+   of the same explore group — so the format-tag stays the card's single accent
+   *fill* and nothing out-shouts the hook. */
 .more {
 	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	min-height: 44px;
+	margin-top: var(--space-4);
 	font: inherit;
-	font-size: 0.84rem;
+	font-size: var(--fs-meta);
 	font-weight: 600;
 	color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 14%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-	padding: 0.4rem 0.8rem;
-	border-radius: 999px;
+	background: none;
+	border: 0;
+	padding: 0;
 	cursor: pointer;
 	transition:
-		background var(--dur-fast) var(--ease),
-		opacity var(--dur-fast) var(--ease);
+		opacity var(--dur-fast) var(--ease),
+		transform var(--dur-fast) var(--ease-spring);
 }
 
 .more:hover {
-	background: color-mix(in srgb, var(--accent) 24%, transparent);
+	opacity: 0.78;
+}
+
+.more:active {
+	transform: scale(0.96);
 }
 
 .more:disabled {
@@ -378,28 +454,45 @@ body {
 	cursor: default;
 }
 
+/* Source — the trust affordance floats off as its own quiet zone on a full section
+   of whitespace (no hairline rule: the 48px gap is the divider), with a closing
+   breath beneath so the card doesn't trail straight into the action strip. */
 .source {
-	margin-top: var(--space-5);
+	margin-top: var(--space-7);
+	margin-bottom: var(--space-6);
 	font-size: var(--fs-meta);
 	color: var(--muted);
-	border-top: 1px solid var(--border);
-	padding-top: var(--space-4);
 }
 
 .source summary {
 	display: flex;
 	align-items: center;
+	gap: var(--space-2);
 	min-height: 44px;
 	cursor: pointer;
 	color: var(--muted);
 	width: fit-content;
+	list-style: none;
+	transition: color var(--dur-fast) var(--ease);
+}
+
+/* Drop the native disclosure triangle (we supply our own caret to match the
+   "why it matters" affordance, so "Source" reads as a control, not an orphan label). */
+.source summary::-webkit-details-marker {
+	display: none;
+}
+
+.source summary:hover {
+	color: var(--text-2);
+}
+
+.source[open] summary .why-caret {
+	transform: rotate(90deg);
 }
 
 .source blockquote {
 	max-width: var(--measure);
 	margin: var(--space-3) 0;
-	padding-left: var(--space-4);
-	border-left: 2px solid var(--border);
 	font-style: italic;
 	color: var(--text-2);
 }
@@ -408,9 +501,11 @@ body {
 	color: var(--accent);
 }
 
+/* License — genuine fine print; demoted to 11px so it reads as legal metadata, not
+   content (rebuilds hierarchy below the body without adding chrome). */
 .license {
 	margin: var(--space-2) 0 0;
-	font-size: var(--fs-tag);
+	font-size: 0.6875rem;
 	color: var(--muted);
 }
 
@@ -430,22 +525,23 @@ body {
 	gap: var(--space-4);
 }
 
-/* Floating controls are the one raised element — a surface lift + soft shadow so
-   they read as above the card in dark mode (figure-ground; web-design 06). */
+/* Floating controls are the one raised element — a SOLID surface lift + a crisp,
+   tight shadow so they read as above the card via clean figure-ground, not a hazy
+   blurred glass pane (blur-on-everything is an AI-design tell; there's nothing to
+   blur over a near-black feed anyway). */
 .action {
-	width: 52px;
-	height: 52px;
+	width: 56px;
+	height: 56px;
 	display: grid;
 	place-items: center;
-	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, var(--surface) 82%, transparent);
+	border-radius: var(--radius-md);
+	background: var(--surface);
 	border: 1px solid var(--border);
 	color: var(--text);
 	cursor: pointer;
-	backdrop-filter: blur(8px);
-	box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+	box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
 	transition:
-		transform var(--dur-fast) var(--ease),
+		transform var(--dur-fast) var(--ease-spring),
 		color var(--dur-fast) var(--ease),
 		background var(--dur-fast) var(--ease),
 		border-color var(--dur-fast) var(--ease);
@@ -461,7 +557,7 @@ body {
 }
 
 .action:active {
-	transform: scale(0.94);
+	transform: scale(0.9);
 }
 
 .action.active {
@@ -470,15 +566,16 @@ body {
 	background: color-mix(in srgb, var(--positive) 12%, var(--surface));
 }
 
-/* A calm confirmation pulse on save — a gentle settle, not a slot-machine pop
-   (ui-ux.md §4: calm dopamine). */
+/* A calm confirmation settle on save — NOT a slot-machine overshoot (ui-ux.md §4;
+   a 1.28 spring pop was explicitly rejected before). The real reward is the
+   bookmark *filling in* (see Card markup) — a legible state change, not a flash. */
 .action.active svg {
 	animation: save-pulse var(--dur) var(--ease);
 }
 
 @keyframes save-pulse {
 	50% {
-		transform: scale(1.1);
+		transform: scale(1.12);
 	}
 }
 
@@ -498,38 +595,60 @@ body {
 	min-height: 6rem;
 }
 
-/* End of feed — a graceful "you're caught up" snap stop, never a dead end. */
+/* End of feed — not a dead end but the session's warm payoff, echoing the card
+   grammar: an accent kicker, the count you read set as the poster hero, and a quiet
+   accent-text invitation back (a loud filled button would shout at the calmest
+   moment in the whole app). */
 .state.end {
 	scroll-snap-align: start;
-	gap: var(--space-4);
+	gap: var(--space-3);
+}
+
+.end-kicker {
+	font-size: var(--fs-tag);
+	font-weight: 600;
+	letter-spacing: var(--tracking-tag);
+	text-transform: uppercase;
+	color: var(--accent);
 }
 
 .state.end h2 {
 	margin: 0;
+	max-width: 16ch;
 	font-size: var(--fs-hook);
-	font-weight: 700;
-	letter-spacing: -0.01em;
+	font-weight: 800;
+	line-height: 1.05;
+	letter-spacing: -0.022em;
+	text-wrap: balance;
 	color: var(--text);
 }
 
 .state.end p {
 	margin: 0;
-	max-width: var(--measure);
+	max-width: 34ch;
 	color: var(--muted);
 }
 
 .restart {
-	margin-top: var(--space-2);
+	margin-top: var(--space-3);
 	min-height: 44px;
-	padding: 0 var(--space-5);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: 0 var(--space-2);
 	font: inherit;
 	font-weight: 600;
-	color: var(--bg);
-	background: var(--accent);
+	color: var(--accent);
+	background: none;
 	border: 0;
-	border-radius: var(--radius-pill);
 	cursor: pointer;
-	transition: transform var(--dur-fast) var(--ease);
+	transition:
+		opacity var(--dur-fast) var(--ease),
+		transform var(--dur-fast) var(--ease-spring);
+}
+
+.restart:hover {
+	opacity: 0.78;
 }
 
 .restart:active {
@@ -539,7 +658,7 @@ body {
 .state code {
 	background: var(--surface-2);
 	padding: var(--space-1) var(--space-2);
-	border-radius: 6px;
+	border-radius: var(--radius-xs);
 	color: var(--text);
 }
 
@@ -564,31 +683,33 @@ body {
 	font-size: var(--fs-meta);
 	color: var(--muted);
 	text-decoration: none;
-	background: color-mix(in srgb, var(--surface) 75%, transparent);
+	background: var(--surface);
 	border: 1px solid var(--border);
 	padding: var(--space-2) var(--space-4);
-	border-radius: var(--radius-pill);
-	backdrop-filter: blur(6px);
+	border-radius: var(--radius-sm);
+	transition:
+		color var(--dur-fast) var(--ease),
+		border-color var(--dur-fast) var(--ease);
 }
 
 .nav-pill:hover {
 	color: var(--text);
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 
 /* Offline status — fixed top-center so it's visible above the snapped feed. */
 .offline-banner {
 	position: fixed;
-	top: calc(env(safe-area-inset-top) + 0.75rem);
+	top: calc(env(safe-area-inset-top) + var(--space-3));
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 11;
-	font-size: 0.78rem;
+	font-size: var(--fs-tag);
 	color: var(--text);
-	background: color-mix(in srgb, var(--surface) 85%, transparent);
+	background: var(--surface);
 	border: 1px solid var(--border);
-	padding: 0.35rem 0.8rem;
-	border-radius: 999px;
-	backdrop-filter: blur(6px);
+	padding: var(--space-1) var(--space-3);
+	border-radius: var(--radius-sm);
 	max-width: 90vw;
 	text-align: center;
 }
@@ -596,23 +717,22 @@ body {
 /* Focus indicator: tap to clear the active "explore this concept" filter. */
 .focus-pill {
 	position: fixed;
-	top: calc(env(safe-area-inset-top) + 0.75rem);
+	top: calc(env(safe-area-inset-top) + var(--space-3));
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 10;
 	display: inline-flex;
 	align-items: center;
-	gap: 0.45rem;
+	gap: var(--space-2);
 	max-width: min(80vw, 22rem);
 	font: inherit;
-	font-size: 0.8rem;
+	font-size: var(--fs-meta);
 	color: var(--text);
 	cursor: pointer;
-	background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-	border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-	padding: 0.35rem 0.75rem;
-	border-radius: 999px;
-	backdrop-filter: blur(6px);
+	background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+	border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+	padding: var(--space-1) var(--space-3);
+	border-radius: var(--radius-sm);
 	transition: background var(--dur-fast) var(--ease);
 }
 
@@ -654,39 +774,44 @@ body {
 /* Momentum HUD: streak + live session count, fixed top-right out of the thumb zone. */
 .hud {
 	position: fixed;
-	top: calc(env(safe-area-inset-top) + 0.75rem);
-	right: 0.9rem;
+	top: calc(env(safe-area-inset-top) + var(--space-3));
+	right: var(--space-4);
 	z-index: 10;
 	display: flex;
-	gap: 0.4rem;
+	gap: var(--space-2);
 }
 
 .hud-pill {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.3rem;
-	font-size: 0.82rem;
+	gap: var(--space-1);
+	font-size: var(--fs-meta);
 	font-weight: 650;
 	font-variant-numeric: tabular-nums;
 	color: var(--text);
-	background: color-mix(in srgb, var(--surface) 78%, transparent);
+	background: var(--surface);
 	border: 1px solid var(--border);
-	padding: 0.32rem 0.62rem;
-	border-radius: 999px;
-	backdrop-filter: blur(6px);
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm);
 }
 
-.hud-pill.streak {
-	border-color: color-mix(in srgb, #ff9d3c 45%, var(--border));
+/* A quiet accent tick anchors each HUD count — the same editorial-bar motif as the
+   card kicker — instead of an emoji (emoji-as-icon and a streak flame are both
+   AI-slop/gamification tells). Calm momentum, not a casino counter. */
+.hud-tick {
+	width: 3px;
+	height: 0.85em;
+	border-radius: 1px;
+	background: var(--accent);
+	opacity: 0.85;
 }
 
-.hud-pill.session {
-	border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-}
-
-.hud-icon {
-	font-size: 0.95em;
-	line-height: 1;
+.hud-label {
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 0.62rem;
+	font-weight: 600;
 }
 
 .hud-value.pop {
@@ -694,17 +819,21 @@ body {
 	animation: hud-pop var(--dur) var(--ease);
 }
 
+/* A quiet acknowledgement when the count ticks — a small settle, no colour flash
+   (the scale(1.6) accent-flash was a number-go-up slot-machine flourish). */
 @keyframes hud-pop {
 	0% {
-		transform: scale(1.6);
-		color: var(--accent);
+		transform: scale(1.15);
 	}
 	100% {
 		transform: scale(1);
 	}
 }
 
-/* Celebration toast: transient, above the thumb-zone action bar. */
+/* Milestone toast: transient confirmation, not confetti. Neutral surface + hairline
+   border + a real (non-coloured) shadow, with the accent appearing only as a thin
+   left rule — a calm "noted", not a glowing "you won a prize". Reserved for genuine
+   moments (streak start, session milestones), never routine saves. */
 .toast {
 	position: fixed;
 	left: 50%;
@@ -712,16 +841,16 @@ body {
 	transform: translateX(-50%);
 	z-index: 20;
 	max-width: min(86vw, 22rem);
-	text-align: center;
-	font-size: 0.92rem;
-	font-weight: 650;
+	text-align: left;
+	font-size: var(--fs-meta);
+	font-weight: 600;
 	color: var(--text);
-	background: color-mix(in srgb, var(--accent) 28%, var(--surface));
-	border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
-	padding: 0.6rem 1rem;
-	border-radius: 999px;
-	box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 25%, transparent);
-	backdrop-filter: blur(8px);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-left: 2px solid var(--accent);
+	padding: var(--space-3) var(--space-4);
+	border-radius: var(--radius-sm);
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
 	animation: toast-in var(--dur) var(--ease);
 }
 
@@ -736,13 +865,55 @@ body {
 	}
 }
 
-/* Desktop: same single column, actions become a vertically-centered right rail. */
+/* Continuation cue — the quiet "there's more this way" anchored to the first card's
+   slot, centered in the bottom whitespace, with a gentle 2.4s drift (NOT a bounce —
+   it invites, it doesn't demand). Scroll-snap carries it off-screen the moment the
+   reader takes the hint. This is the feed's main forward pull. */
+.next-hint {
+	position: fixed;
+	left: 50%;
+	bottom: calc(var(--action-zone) + env(safe-area-inset-bottom) - var(--space-5));
+	transform: translateX(-50%);
+	z-index: 9;
+	width: 22px;
+	height: 22px;
+	color: var(--muted);
+	opacity: 0.6;
+	pointer-events: none;
+	/* Drift gently while present, then fade away after ~6s and stay gone (it has done
+	   its one orientation job). Under reduced-motion both animations are disabled and
+	   it simply holds at a calm 0.6 — a static, harmless cue. */
+	animation:
+		next-nudge 2.4s var(--ease) 2,
+		next-fade 6s var(--ease) forwards;
+}
+
+@keyframes next-nudge {
+	0%,
+	100% {
+		transform: translate(-50%, 0);
+	}
+	50% {
+		transform: translate(-50%, 5px);
+	}
+}
+
+@keyframes next-fade {
+	0%,
+	72% {
+		opacity: 0.6;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Desktop: same single column; the action stack stays BOTTOM-anchored (a grounded
+   dock, like mobile) but slides into the right gutter beside the column — so it
+   reads as part of the composition, not chrome floating in the middle of the void. */
 @media (min-width: 1100px) {
 	.actions {
-		top: 50%;
-		bottom: auto;
-		right: max(var(--space-5), calc((100% - 640px) / 2 - 4.5rem));
-		transform: translateY(-50%);
+		right: max(var(--space-6), calc((100% - 640px) / 2 - 5.5rem));
 	}
 }
 

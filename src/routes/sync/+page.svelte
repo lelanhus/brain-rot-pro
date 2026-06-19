@@ -204,7 +204,7 @@
 		color: var(--text);
 		background: var(--surface-2);
 		border: 1px solid var(--border);
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		padding: 0.55rem 1rem;
 	}
 	input:focus-visible {
@@ -215,7 +215,7 @@
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		padding: 0.55rem 1.1rem;
 		transition: opacity var(--dur-fast) var(--ease);
 	}

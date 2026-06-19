@@ -80,7 +80,9 @@
 	const offlineFallback = $derived(!online && liveCards.length === 0 && cachedOffline.length > 0);
 
 	$effect(() => {
-		if (online && liveCards.length > 0) void persistCards(liveCards);
+		// Snapshot out of the Svelte/Convex reactive proxies first — IndexedDB's
+		// structured clone can't serialize proxies (throws DataCloneError otherwise).
+		if (online && liveCards.length > 0) void persistCards($state.snapshot(liveCards));
 	});
 
 	// Personalized once it loads; the SSR global feed until then. `notInterested`
@@ -155,8 +157,8 @@
 		// Register today's visit; celebrate a kept or new streak.
 		recordActivity({ deviceId })
 			.then((res) => {
-				if (res.event === 'extended') toast.show(`🔥 ${res.currentStreak}-day streak!`);
-				else if (res.event === 'started') toast.show('🔥 Streak started — see you tomorrow!');
+				if (res.event === 'extended') toast.show(`${res.currentStreak}-day streak`);
+				else if (res.event === 'started') toast.show('Streak started — see you tomorrow');
 			})
 			.catch((err) => console.error('[stats] recordActivity failed', err));
 		return () => {
@@ -178,7 +180,7 @@
 		const milestone = SESSION_MILESTONES.find((m) => m === sessionCount);
 		if (milestone && milestone > lastMilestone) {
 			lastMilestone = milestone;
-			toast.show(`✨ ${milestone} learned this session!`);
+			toast.show(`${milestone} ideas this session`);
 		}
 	}
 
@@ -326,15 +328,17 @@
 			class="hud-pill streak"
 			title={`Longest streak: ${stats.data?.longestStreak ?? streak} days · ${stats.data?.daysLearned ?? 0} days learned`}
 		>
-			<span class="hud-icon" aria-hidden="true">🔥</span>
+			<span class="hud-tick" aria-hidden="true"></span>
 			<span class="hud-value">{streak}</span>
+			<span class="hud-label" aria-hidden="true">{streak === 1 ? 'day' : 'days'}</span>
 			<span class="sr-only">day streak</span>
 		</span>
 	{/if}
 	{#if sessionCount > 0}
 		<span class="hud-pill session" data-testid="session-count">
-			<span class="hud-icon" aria-hidden="true">✨</span>
+			<span class="hud-tick" aria-hidden="true"></span>
 			{#key sessionCount}<span class="hud-value pop">{sessionCount}</span>{/key}
+			<span class="hud-label" aria-hidden="true">read</span>
 			<span class="sr-only">learned this session</span>
 		</span>
 	{/if}
@@ -435,14 +439,19 @@
 			<section class="state subtle">Loading more…</section>
 		{:else if feed.status === 'Exhausted'}
 			<section class="state end">
-				<h2>You're caught up</h2>
-				<p>That's every idea for now — more are on the way.</p>
+				<span class="end-kicker">That's today</span>
+				{#if sessionCount > 0}
+					<h2>You explored {sessionCount} {sessionCount === 1 ? 'idea' : 'ideas'}</h2>
+				{:else}
+					<h2>You're caught up</h2>
+				{/if}
+				<p>More are on the way — pick the thread back up whenever you like.</p>
 				<button
 					type="button"
 					class="restart"
 					onclick={() => feedEl?.scrollTo({ top: 0, behavior: 'smooth' })}
 				>
-					Back to the top
+					Back to the top →
 				</button>
 			</section>
 		{/if}
@@ -457,4 +466,19 @@
 		onSave={() => handleSave(activeCard)}
 		onNotInterested={() => handleNotInterested(activeCard)}
 	/>
+{/if}
+
+<!-- Continuation cue: a quiet "there's more this way" that appears with the first
+     card (you load at the top) and gently fades itself out after a few seconds so it
+     never lingers — an orientation nudge, not permanent chrome (ui-ux.md §3). -->
+{#if visibleResults.length > 0}
+	<svg class="next-hint" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+		<path
+			d="M5 9l7 7 7-7"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
+	</svg>
 {/if}

@@ -196,7 +196,7 @@
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		padding: 0.55rem 1.1rem;
 		transition: opacity var(--dur-fast) var(--ease);
 	}
