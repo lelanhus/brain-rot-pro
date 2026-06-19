@@ -39,9 +39,14 @@
 	--space-7: 48px;
 	--space-8: 64px;
 
-	/* The thumb-zone strip reserved so content never runs under the action bar.
-	   Derived: two 52px buttons + 16px gap + bottom inset ≈ 136px → round up. */
+	/* Floating action buttons (ui-ux.md §4). --action-size is the tap target
+	   (kept ≥44px), smaller on phones. --action-zone reserves the bottom strip so a
+	   short card's last line clears the buttons; on phones --slot-pad-right also
+	   reserves a right rail so a tall card scrolling under the fixed buttons never
+	   hides its text behind them. */
+	--action-size: 56px;
 	--action-zone: 9.5rem;
+	--slot-pad-right: var(--space-5);
 
 	/* Radius scale — crisp and editorial. The old design rounded *everything* to a
 	   999px pill, so confident content sat inside timid bubbles. Geometry is now a
@@ -167,8 +172,8 @@ body {
 	scroll-snap-align: start;
 	/* Top space scales with viewport height so short phones don't overflow; bottom
 	   padding reserves the fixed action-bar strip so content never hides under it. */
-	padding: clamp(var(--space-5), 9vh, 6rem) var(--space-5)
-		calc(var(--action-zone) + env(safe-area-inset-bottom));
+	padding: clamp(var(--space-5), 9vh, 6rem) var(--slot-pad-right)
+		calc(var(--action-zone) + env(safe-area-inset-bottom)) var(--space-5);
 	/* Browser owns vertical scroll; horizontal-dominant gestures go to swipeActions
 	   (so swipe-to-act never fights the feed's vertical scroll). */
 	touch-action: pan-y;
@@ -530,8 +535,8 @@ body {
    blurred glass pane (blur-on-everything is an AI-design tell; there's nothing to
    blur over a near-black feed anyway). */
 .action {
-	width: 56px;
-	height: 56px;
+	width: var(--action-size);
+	height: var(--action-size);
 	display: grid;
 	place-items: center;
 	border-radius: var(--radius-md);
@@ -905,6 +910,25 @@ body {
 	}
 	100% {
 		opacity: 0;
+	}
+}
+
+/* Below the desktop breakpoint the actions float as a bottom-right overlay over
+   the reading column, so reserve a right rail (button + edge inset + gap) on the
+   slot. Without it, a tall card scrolling under the fixed buttons slides its text
+   behind them. Desktop (≥1100px) instead moves the stack out into the gutter, so
+   no rail is needed there and the column keeps its symmetric padding. */
+@media (max-width: 1099px) {
+	:root {
+		--slot-pad-right: calc(var(--action-size) + var(--space-4) + var(--space-4));
+	}
+}
+
+/* Phone (< 700px, ui-ux.md §6): keep the floating buttons compact — 48px is still
+   a comfortable ≥44px target without dominating the one-card-per-screen layout. */
+@media (max-width: 699px) {
+	:root {
+		--action-size: 48px;
 	}
 }
 
