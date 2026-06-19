@@ -40,6 +40,27 @@ test('personal feed with no profile still returns published cards', async () => 
 	expect(personal.length).toBeGreaterThan(0);
 });
 
+// Regression: the SSR global feed (cards.feed) is what renders on first paint;
+// the client then upgrades to feed.personal on hydration. With no profile yet,
+// both must agree on order or the first card visibly swaps ("flashes") the
+// instant the live query resolves. Lock the two orderings together.
+test('SSR feed and empty-profile personal feed start with the same card (no hydration flash)', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(api.seed.seed, {});
+
+	const ssr = await t.query(api.cards.feed, { paginationOpts: { numItems: 8, cursor: null } });
+	const personal = await t.query(api.feed.personal, { deviceId: 'fresh-device' });
+
+	expect(ssr.page.length).toBeGreaterThan(0);
+	expect(personal.length).toBeGreaterThan(0);
+
+	// First paint card must equal the first live card — otherwise it flashes.
+	expect(ssr.page[0]._id).toBe(personal[0]._id);
+	// And the whole SSR prefix must match the live order, so hydrating in more
+	// of the feed never reshuffles what the user is already looking at.
+	expect(personal.slice(0, ssr.page.length).map((c) => c._id)).toEqual(ssr.page.map((c) => c._id));
+});
+
 test('focusConcept floats matching cards to the top without dropping the rest', async () => {
 	const t = convexTest(schema, modules);
 	await t.mutation(api.seed.seed, {});

@@ -10,6 +10,12 @@ import { query } from './_generated/server';
  *
  * Consumed via `convexLoadPaginated(api.cards.feed, {}, { initialNumItems })`
  * for SSR-to-live (no loading flash), then live updates after hydration.
+ *
+ * Order is `shuffleKey` DESCENDING — deliberately matching the baseline order
+ * `feed.personal` produces for an empty profile (its wildcard term scores higher
+ * `shuffleKey` first, sorted descending). If these disagree, the first card
+ * visibly swaps the instant the personalized query resolves on hydration. Keep
+ * them in lockstep (see feed.test.ts "no hydration flash").
  */
 export const feed = query({
 	args: { paginationOpts: paginationOptsValidator },
@@ -17,7 +23,7 @@ export const feed = query({
 		return await ctx.db
 			.query('knowledgeCards')
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
-			.order('asc')
+			.order('desc')
 			.paginate(args.paginationOpts);
 	}
 });
