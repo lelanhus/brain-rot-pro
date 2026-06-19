@@ -7,8 +7,8 @@
 	--surface-2: #23232f;
 	--border: #25252f;
 	--text: #f3f3f7; /* hook — brightest tier */
-	--text-2: #c8c8d2; /* body — mid tier */
-	--muted: #9a9aa8; /* tag, chips, source — dim tier */
+	--text-2: #d9d9e1; /* body — lifted for legibility; hook still clearly brighter */
+	--muted: #a2a2b0; /* tag, chips, source — dim tier (nudged up a touch) */
 	/* Accent — a warm ember, not the stock indigo every generated app ships. It's
 	   the one chosen "spark of an idea": editorial, distinct from the green/red
 	   signals, AA-clear on the near-black (7.3:1). Light mode is a deeper burnt
@@ -24,7 +24,7 @@
 	--fs-tag: 0.75rem; /* 12px */
 	--fs-meta: 0.8125rem; /* 13px — chips, source */
 	--fs-why: 0.9375rem; /* 15px — why-it-matters is prose to read, not metadata */
-	--fs-body: 1.0625rem; /* 17px — iOS-native */
+	--fs-body: 1.125rem; /* 18px — comfortable phone reading (the main reading text) */
 	--fs-hook: clamp(1.9rem, 1.2rem + 3vw, 3rem); /* 30px mobile → 48px desktop poster */
 	--tracking-tag: 0.12em; /* small bold caps need wide tracking to breathe */
 	--measure: 60ch; /* line length cap for why/source on the wide desktop column */
@@ -292,14 +292,14 @@ body {
 	text-wrap: balance;
 }
 
-/* Body — mid brightness tier, ~58ch measure (the readability sweet spot), 1.55
-   leading (light-on-dark reads a touch heavy; this respects that without drifting
-   into a loose wall of text). The generous sink below the hook is set here. */
+/* Body — the main reading text, so legibility wins: 18px, a comfortable 1.6 leading,
+   ~58ch measure (the readability sweet spot), on the lifted body tier. The generous
+   sink below the hook is set here. */
 .body {
 	margin-top: var(--space-6);
 	max-width: 58ch;
 	font-size: var(--fs-body);
-	line-height: 1.55;
+	line-height: 1.6;
 	color: var(--text-2);
 	text-wrap: pretty;
 }
