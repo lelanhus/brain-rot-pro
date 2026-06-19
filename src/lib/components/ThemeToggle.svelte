@@ -27,7 +27,7 @@
 		display: inline-flex;
 		gap: 0.25rem;
 		background: var(--surface-2);
-		border-radius: 999px;
+		border-radius: var(--radius-sm);
 		padding: 0.25rem;
 	}
 	.opt {
@@ -36,7 +36,7 @@
 		color: var(--muted);
 		background: transparent;
 		border: none;
-		border-radius: 999px;
+		border-radius: var(--radius-xs);
 		padding: 0.35rem 0.85rem;
 		cursor: pointer;
 		transition: color var(--dur-fast) var(--ease);
