@@ -405,6 +405,18 @@ body {
 	cursor: pointer;
 }
 
+/* Source content inside the overlay. */
+.reveal-overlay blockquote {
+	max-width: var(--measure);
+	margin: var(--space-3) 0;
+	font-style: italic;
+	color: var(--text-2);
+}
+
+.reveal-overlay a {
+	color: var(--accent);
+}
+
 /* Explore cluster (chips + "more") detaches from the reading column with a true
    section gap so proximity — not a divider — tells the eye it's a new zone. */
 .chips {
@@ -504,55 +516,17 @@ body {
 	cursor: default;
 }
 
-/* Source — the trust affordance floats off as its own quiet zone on a full section
-   of whitespace (no hairline rule: the 48px gap is the divider), with a closing
-   breath beneath so the card doesn't trail straight into the action strip. */
-.source {
+/* Source toggle — same visual style as "why it matters" but floats off into its own
+   zone with a full section gap above (48px) and a closing breath below. Now renders
+   as an overlay button (not a <details>); the source content opens in .reveal-overlay. */
+.source-toggle {
 	margin-top: var(--space-7);
 	margin-bottom: var(--space-6);
-	font-size: var(--fs-meta);
-	color: var(--muted);
-}
-
-.source summary {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	min-height: 44px;
-	cursor: pointer;
-	color: var(--muted);
-	width: fit-content;
-	list-style: none;
-	transition: color var(--dur-fast) var(--ease);
-}
-
-/* Drop the native disclosure triangle (we supply our own caret to match the
-   "why it matters" affordance, so "Source" reads as a control, not an orphan label). */
-.source summary::-webkit-details-marker {
-	display: none;
-}
-
-.source summary:hover {
-	color: var(--text-2);
-}
-
-.source[open] summary .why-caret {
-	transform: rotate(90deg);
-}
-
-.source blockquote {
-	max-width: var(--measure);
-	margin: var(--space-3) 0;
-	font-style: italic;
-	color: var(--text-2);
-}
-
-.source a {
-	color: var(--accent);
 }
 
 /* License — genuine fine print; demoted to 11px so it reads as legal metadata, not
-   content (rebuilds hierarchy below the body without adding chrome). */
+   content (rebuilds hierarchy below the body without adding chrome). Used inside
+   the .reveal-overlay when the source panel is open. */
 .license {
 	margin: var(--space-2) 0 0;
 	font-size: 0.6875rem;

@@ -75,4 +75,34 @@ test.describe('feed (one-screen fit)', () => {
 			expect(overflow).toEqual([]);
 		});
 	}
+
+	// Guards the silent-clip failure mode: overflow:hidden on .slot hides controls
+	// without producing scroll. Asserts that both in-card toggle buttons are visible
+	// and their bounding boxes sit within the first slot's client rect at 375×667.
+	test('in-card toggles (Why / Source) are within the first slot at 375×667', async ({ page }) => {
+		await page.setViewportSize({ width: 375, height: 667 });
+		await page.goto('/');
+		await expect(page.locator('.slot').first()).toBeVisible();
+
+		const slotBox = await page.locator('.slot').first().boundingBox();
+		expect(slotBox).not.toBeNull();
+
+		const whyToggle = page.getByRole('button', { name: /why it matters/i }).first();
+		const sourceToggle = page.getByRole('button', { name: /source/i }).first();
+
+		await expect(whyToggle).toBeVisible();
+		await expect(sourceToggle).toBeVisible();
+
+		const whyBox = await whyToggle.boundingBox();
+		const sourceBox = await sourceToggle.boundingBox();
+
+		expect(whyBox).not.toBeNull();
+		expect(sourceBox).not.toBeNull();
+
+		// Both toggles must sit within the slot's vertical bounds.
+		expect(whyBox!.y).toBeGreaterThanOrEqual(slotBox!.y);
+		expect(whyBox!.y + whyBox!.height).toBeLessThanOrEqual(slotBox!.y + slotBox!.height);
+		expect(sourceBox!.y).toBeGreaterThanOrEqual(slotBox!.y);
+		expect(sourceBox!.y + sourceBox!.height).toBeLessThanOrEqual(slotBox!.y + slotBox!.height);
+	});
 });

@@ -22,13 +22,17 @@
 		onExpand?: () => void;
 	} = $props();
 
-	// "Why it matters" is significance, not the payload — it competes with the
-	// hook (ui-ux.md §3), so the glanceable card hides it behind this toggle and
-	// reveals it on demand (the long-defined `card_expand` signal).
-	let expanded = $state(false);
+	// "Why it matters" and "Source" each open a non-scrolling overlay anchored to
+	// the card. Only one panel is open at a time; `reveal` tracks which (or null).
+	// Overlays avoid flow-height changes that would break the slot's overflow:hidden.
+	let reveal = $state<'why' | 'source' | null>(null);
 	function toggleWhy() {
-		if (!expanded) onExpand?.(); // count the first reveal as a deepening signal
-		expanded = !expanded;
+		if (reveal !== 'why') onExpand?.(); // count the first reveal as a deepening signal
+		reveal = reveal === 'why' ? null : 'why';
+	}
+	function toggleSource() {
+		if (reveal !== 'source') onSource?.(); // fire once when source is first opened
+		reveal = reveal === 'source' ? null : 'source';
 	}
 </script>
 
@@ -60,8 +64,8 @@
 			<button
 				type="button"
 				class="why-toggle"
-				class:open={expanded}
-				aria-expanded={expanded}
+				class:open={reveal === 'why'}
+				aria-expanded={reveal === 'why'}
 				onclick={toggleWhy}
 			>
 				Why it matters
@@ -81,30 +85,34 @@
 			</button>
 		{/if}
 
-		<details class="source" ontoggle={(e) => e.currentTarget.open && onSource?.()}>
-			<summary>
-				Source
-				<span class="why-caret" aria-hidden="true"></span>
-			</summary>
-			<blockquote>{card.source.sourceSpan}</blockquote>
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external source link, not an internal route -->
-			<a href={card.source.articleUrl} target="_blank" rel="noreferrer noopener">
-				{card.source.articleTitle} — Wikipedia
-			</a>
-			<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
-		</details>
+		<button
+			type="button"
+			class="why-toggle source-toggle"
+			class:open={reveal === 'source'}
+			aria-expanded={reveal === 'source'}
+			onclick={toggleSource}
+		>
+			Source
+			<span class="why-caret" aria-hidden="true"></span>
+		</button>
 	</div>
 	<!-- Overlay: floats over the lower card area so opening it never changes the
 	     card's flow height (the slot's overflow:hidden stays undisturbed). -->
-	{#if expanded}
+	{#if reveal !== null}
 		<div class="reveal-overlay" transition:fade={{ duration: 140 }}>
-			<button
-				type="button"
-				class="reveal-close"
-				onclick={() => (expanded = false)}
-				aria-label="Close">×</button
+			<button type="button" class="reveal-close" onclick={() => (reveal = null)} aria-label="Close"
+				>×</button
 			>
-			<p class="why">{card.whyItMatters}</p>
+			{#if reveal === 'why'}
+				<p class="why">{card.whyItMatters}</p>
+			{:else}
+				<blockquote>{card.source.sourceSpan}</blockquote>
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external source link, not an internal route -->
+				<a href={card.source.articleUrl} target="_blank" rel="noreferrer noopener">
+					{card.source.articleTitle} — Wikipedia
+				</a>
+				<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
+			{/if}
 		</div>
 	{/if}
 </article>

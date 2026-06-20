@@ -6,6 +6,7 @@ import type { Doc } from '$convex/_generated/dataModel';
 
 // Hoisted so assertions get a non-optional `string` (whyItMatters is optional on Doc).
 const WHY = 'It scrambles the mental timeline.';
+const SOURCE_SPAN = 'There is evidence of teaching at Oxford as early as 1096.';
 
 const sample = {
 	_id: 'card_1',
@@ -19,7 +20,7 @@ const sample = {
 		articleTitle: 'University of Oxford',
 		articleUrl: 'https://en.wikipedia.org/wiki/University_of_Oxford',
 		revisionId: null,
-		sourceSpan: 'There is evidence of teaching at Oxford as early as 1096.'
+		sourceSpan: SOURCE_SPAN
 	},
 	status: 'published',
 	shuffleKey: 0.5,
@@ -31,8 +32,9 @@ test('renders the hook and body, and reveals a source link', async () => {
 	await expect.element(page.getByRole('heading', { name: sample.hook })).toBeInTheDocument();
 	await expect.element(page.getByText(sample.body)).toBeInTheDocument();
 
-	// The source link lives behind a disclosure; opening it should reveal it.
-	await page.getByText('Source', { exact: true }).click();
+	// The source link lives behind a toggle button; opening it should reveal it in the overlay.
+	const sourceToggle = page.getByRole('button', { name: /source/i });
+	await sourceToggle.click();
 	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
 });
 
@@ -96,4 +98,59 @@ test('keeps "why it matters" collapsed until the toggle reveals it in the overla
 	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
 	await expect.element(page.getByRole('button', { name: 'Close' })).not.toBeInTheDocument();
 	expect(expands).toBe(1);
+});
+
+test('source toggle opens an overlay with blockquote/link/license and fires onSource once', async () => {
+	let sourceFires = 0;
+	render(Card, { card: sample, onSource: () => (sourceFires += 1) });
+
+	// Source content hidden by default.
+	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
+
+	const toggle = page.getByRole('button', { name: /source/i });
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+	await toggle.click();
+
+	// Panel opens with source content, close button, aria-expanded true.
+	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
+	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+	expect(sourceFires).toBe(1);
+
+	// Close button hides the overlay; onSource does not fire again.
+	await page.getByRole('button', { name: 'Close' }).click();
+	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
+	expect(sourceFires).toBe(1);
+});
+
+test('opening one panel closes the other (only one overlay at a time)', async () => {
+	let expands = 0;
+	let sourceFires = 0;
+	render(Card, {
+		card: sample,
+		onExpand: () => (expands += 1),
+		onSource: () => (sourceFires += 1)
+	});
+
+	const whyToggle = page.getByRole('button', { name: /why it matters/i });
+	const sourceToggle = page.getByRole('button', { name: /source/i });
+
+	// Open "why it matters".
+	await whyToggle.click();
+	await expect.element(page.getByText(WHY)).toBeVisible();
+	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
+	await expect.element(whyToggle).toHaveAttribute('aria-expanded', 'true');
+	await expect.element(sourceToggle).toHaveAttribute('aria-expanded', 'false');
+
+	// Open "source" — why panel must disappear.
+	await sourceToggle.click();
+	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
+	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
+	await expect.element(sourceToggle).toHaveAttribute('aria-expanded', 'true');
+	await expect.element(whyToggle).toHaveAttribute('aria-expanded', 'false');
+
+	// Each handler fired exactly once.
+	expect(expands).toBe(1);
+	expect(sourceFires).toBe(1);
 });
