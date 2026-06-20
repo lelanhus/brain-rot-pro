@@ -3,6 +3,13 @@ import { v } from 'convex/values';
 import { DISCLOSURE, ctr, tallyOfferEvents, type OfferNetwork } from './affiliateLogic';
 import { assertAdmin } from './adminAuth';
 
+const networkValidator = v.union(
+	v.literal('bookshop'),
+	v.literal('amazon'),
+	v.literal('course'),
+	v.literal('direct')
+);
+
 /**
  * Sponsored "Go deeper" offers (ADR-008). `active` is a light query — it reads
  * only the small `affiliateOffers` table (never events/profile), so it respects
@@ -19,12 +26,7 @@ export const active = query({
 			imageUrl: v.optional(v.string()),
 			cta: v.string(),
 			url: v.string(),
-			network: v.union(
-				v.literal('bookshop'),
-				v.literal('amazon'),
-				v.literal('course'),
-				v.literal('direct')
-			),
+			network: networkValidator,
 			disclosure: v.string(),
 			conceptTags: v.array(v.string()),
 			weight: v.number()
@@ -49,13 +51,6 @@ export const active = query({
 		}));
 	}
 });
-
-const networkValidator = v.union(
-	v.literal('bookshop'),
-	v.literal('amazon'),
-	v.literal('course'),
-	v.literal('direct')
-);
 
 /**
  * CTR report for the admin page (ADR-008, phase B). Joins every offer (active +

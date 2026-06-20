@@ -1,4 +1,4 @@
-import { mutation, query } from './_generated/server';
+import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { accumulateWeights } from './profileLogic';
@@ -60,17 +60,5 @@ export const recompute = mutation({
 			seen: profile.seen.length,
 			notInterested: profile.notInterested.length
 		};
-	}
-});
-
-/** Read a device's profile (for debugging / the feed). */
-export const get = query({
-	args: { deviceId: v.string() },
-	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) return null;
-		return await ctx.db
-			.query('userProfiles')
-			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
-			.unique();
 	}
 });

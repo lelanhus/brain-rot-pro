@@ -26,7 +26,6 @@ test('deleteData erases every trace of a device across all tables', async () => 
 
 	// Everything keyed on the device is gone.
 	expect(await t.query(api.saved.savedIds, { deviceId })).toHaveLength(0);
-	expect(await t.query(api.profile.get, { deviceId })).toBeNull();
 	expect(await t.query(api.stats.get, { deviceId })).toEqual({
 		currentStreak: 0,
 		longestStreak: 0,
@@ -42,9 +41,13 @@ test('deleteData erases every trace of a device across all tables', async () => 
 			.query('syncCodes')
 			.filter((q) => q.eq(q.field('deviceId'), deviceId))
 			.collect();
-		return { events: events.length, codes: codes.length };
+		const profile = await ctx.db
+			.query('userProfiles')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.unique();
+		return { events: events.length, codes: codes.length, profile: profile === null };
 	});
-	expect(leftovers).toEqual({ events: 0, codes: 0 });
+	expect(leftovers).toEqual({ events: 0, codes: 0, profile: true });
 });
 
 test('deleteData leaves other devices untouched', async () => {

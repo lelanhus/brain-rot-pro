@@ -31,7 +31,22 @@ export const articlesNeedingCards = internalQuery({
 	}
 });
 
-/** Insert a generated card as a draft (needs_review or validation_failed — never published directly). */
+/** Has a card already been generated from this article? Workpool dedup so a
+ *  re-enqueued title never produces a duplicate card. Small-scale scan (see note
+ *  on `articlesNeedingCards`). */
+export const articleHasCard = internalQuery({
+	args: { articleId: v.id('sourceArticles') },
+	handler: async (ctx, { articleId }) => {
+		const cards = await ctx.db.query('knowledgeCards').collect();
+		return cards.some((c) => c.generation?.sourceArticleId === articleId);
+	}
+});
+
+/**
+ * Insert a generated card. With no human in the loop, a high-confidence grounded
+ * card is inserted straight as `published` (with its embedding, so it's instantly
+ * searchable AND dedups the next card); a low-confidence one as `validation_failed`.
+ */
 export const insertGeneratedCard = internalMutation({
 	args: {
 		hook: v.string(),
@@ -41,7 +56,8 @@ export const insertGeneratedCard = internalMutation({
 		conceptTags: v.array(v.string()),
 		source: sourceValidator,
 		image: v.optional(image),
-		status: v.union(v.literal('needs_review'), v.literal('validation_failed')),
+		embedding: v.optional(v.array(v.float64())),
+		status: v.union(v.literal('published'), v.literal('validation_failed')),
 		generation: generationValidator
 	},
 	returns: v.id('knowledgeCards'),

@@ -5,11 +5,11 @@ import { dayKey } from './streakLogic';
  * Convex so the counting is unit-testable without a deployment, and so the
  * `admin.overview` query stays a thin "read tables → fold" shape. These fold
  * over full table reads today; for a real user base they move behind the
- * Aggregate component (same note as `metrics.ts`).
+ * Aggregate component.
  */
 
-// CCR continuation events — keep in sync with src/lib/metrics.ts (the
-// unit-tested source of truth) and convex/metrics.ts.
+// CCR continuation events — the source-of-truth definition for the north-star
+// metric (computed server-side here for the admin overview).
 export const CONTINUATION_TYPES = [
 	'card_complete',
 	'save',

@@ -1,4 +1,5 @@
 import { paginationOptsValidator } from 'convex/server';
+import { v } from 'convex/values';
 import { query } from './_generated/server';
 
 /**
@@ -25,5 +26,19 @@ export const feed = query({
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
 			.order('desc')
 			.paginate(args.paginationOpts);
+	}
+});
+
+/**
+ * A single card by id — for shareable deep links (`/c/[id]`). Returns null when
+ * the id is missing or the card isn't published (so an unpublished/suppressed id
+ * never leaks via a shared URL). SSR-loaded so link unfurlers get OG metadata.
+ */
+export const byId = query({
+	args: { id: v.id('knowledgeCards') },
+	handler: async (ctx, args) => {
+		const card = await ctx.db.get(args.id);
+		if (!card || card.status !== 'published') return null;
+		return card;
 	}
 });

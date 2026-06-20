@@ -4,6 +4,13 @@
  * concept-overlap fallback used when a card has no embedding yet.
  */
 
+/** The embedding model slug (Vercel AI Gateway), env-overridable. Single source
+ * of truth shared by the generation pipeline and the embed/backfill actions. */
+const DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+export function embeddingModel(): string {
+	return process.env.EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
+}
+
 /** What we feed the embedding model: the card's meaning, not its formatting. */
 export function buildEmbeddingText(card: {
 	hook: string;

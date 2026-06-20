@@ -1,8 +1,10 @@
-import { action, internalMutation, query } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery } from './_generated/server';
 import { internal } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { capText, looksLikeArticleTitle, stripCategoryPrefix, toParagraphs } from './ingestUtils';
 import { selectFreeImage, type CardImage, type RawImageInfo } from './imageLicense';
+import { imageCandidates } from './imageCandidates';
 import { classifyTopic, decideArticleStatus, type TopicClaims } from './wikidataLogic';
 import { image as imageValidator } from './schema';
 
@@ -24,10 +26,12 @@ type WikiPage = {
 	categories?: { title: string }[];
 	revisions?: { revid: number }[];
 	pageimage?: string; // representative image file name (no namespace)
+	images?: { title: string }[]; // all File: on the page, in page order (prop=images)
 	pageprops?: { wikibase_item?: string }; // linked Wikidata QID
 };
 
-type WikidataClaim = { mainsnak?: { datavalue?: { value?: { id?: string } } } };
+// P31/P279/P106 carry an entity ref ({id}); P18 (image) carries a filename string.
+type WikidataClaim = { mainsnak?: { datavalue?: { value?: { id?: string } | string } } };
 
 // Thumbnail width requested from Commons; matches the card's max-width.
 const IMAGE_THUMB_WIDTH = 640;
@@ -61,21 +65,26 @@ export const upsertArticle = internalMutation({
 	}
 });
 
-/** Dev query: summarize ingested articles to verify provenance was captured. */
-export const recent = query({
-	args: {},
-	handler: async (ctx) => {
-		const rows = await ctx.db.query('sourceArticles').order('desc').take(20);
-		return rows.map((r) => ({
-			_id: r._id,
-			title: r.title,
-			revisionId: r.revisionId,
-			paragraphs: r.paragraphs.length,
-			categories: r.categories.length,
-			url: r.url,
-			image: r.image ? `${r.image.licenseShortName} — ${r.image.author}` : null,
-			firstParagraph: r.paragraphs[0]?.slice(0, 120) ?? ''
-		}));
+/** Published cards that have no image yet — the backfill work-list. */
+export const imagelessPublished = internalQuery({
+	args: { limit: v.number() },
+	handler: async (ctx, { limit }) => {
+		const cards = await ctx.db
+			.query('knowledgeCards')
+			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
+			.take(2000);
+		return cards
+			.filter((c) => !c.image)
+			.slice(0, limit)
+			.map((c) => ({ _id: c._id, title: c.source.articleTitle }));
+	}
+});
+
+/** Patch a (now-cleared, free-licensed) image onto an existing card. */
+export const setCardImage = internalMutation({
+	args: { cardId: v.id('knowledgeCards'), image: imageValidator },
+	handler: async (ctx, { cardId, image }) => {
+		await ctx.db.patch(cardId, { image });
 	}
 });
 
@@ -95,13 +104,14 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 		action: 'query',
 		format: 'json',
 		formatversion: '2',
-		prop: 'extracts|info|categories|revisions|pageimages|pageprops',
+		prop: 'extracts|info|categories|revisions|pageimages|pageprops|images',
 		inprop: 'url',
 		explaintext: '1',
 		exlimit: '1',
 		rvprop: 'ids',
 		rvlimit: '1',
 		cllimit: '50',
+		imlimit: '40', // candidate images on the page, in page order (filtered later)
 		clshow: '!hidden', // content categories only — skip maintenance cats (year noise)
 		piprop: 'name', // representative image file name; license fetched separately
 		ppprop: 'wikibase_item', // the linked Wikidata QID, for the topic allowlist
@@ -117,13 +127,12 @@ async function fetchArticle(title: string): Promise<WikiPage | null> {
 }
 
 /**
- * Fetch the article's lead image with its Commons license metadata and clear it
- * through the fail-closed licensing check (ADR-005). Returns a ready-to-store
- * `CardImage` only when the license is provably free; otherwise `null` (no image
- * is preferable to an unlicensed one). Network/parse failures degrade to `null`
- * so a missing image never aborts ingestion of otherwise-good text.
+ * Fetch one Commons file's license metadata and clear it through the fail-closed
+ * licensing check (ADR-005). Returns a ready-to-store `CardImage` only when the
+ * license is provably free; otherwise `null` (no image is preferable to an
+ * unlicensed one). Network/parse failures degrade to `null`.
  */
-async function fetchLeadImage(fileName: string | undefined): Promise<CardImage | null> {
+async function fetchCommonsImage(fileName: string | undefined): Promise<CardImage | null> {
 	if (!fileName) return null;
 	const params = new URLSearchParams({
 		action: 'query',
@@ -144,11 +153,37 @@ async function fetchLeadImage(fileName: string | undefined): Promise<CardImage |
 }
 
 /**
+ * Find the best free-licensed image for an article (ADR-005 image coverage): try
+ * the lead image, then the Wikidata entity image (P18), then other images on the
+ * page — each through the fail-closed gate — and keep the FIRST that clears.
+ * Bounded by `imageCandidates`' cap so we make only a handful of license checks.
+ * Returns `null` when nothing clears (the card simply ships without an image).
+ */
+async function fetchBestImage(
+	page: WikiPage,
+	wikidataImage: string | undefined
+): Promise<CardImage | null> {
+	const candidates = imageCandidates({
+		leadImage: page.pageimage,
+		wikidataImage,
+		pageImages: (page.images ?? []).map((i) => i.title)
+	});
+	for (const fileName of candidates) {
+		const cleared = await fetchCommonsImage(fileName);
+		if (cleared) return cleared;
+	}
+	return null;
+}
+
+/**
  * Fetch the Wikidata `instance of` / `subclass of` / `occupation` claims for a
- * QID, for the topic allowlist (`classifyTopic`). Returns null on any failure so
+ * QID (for the topic allowlist, `classifyTopic`) plus the entity's `image` (P18,
+ * a Commons filename) for image coverage. Returns null on any failure so
  * ingestion degrades to the category heuristic rather than aborting.
  */
-async function fetchWikidataClaims(qid: string): Promise<TopicClaims | null> {
+async function fetchWikidataClaims(
+	qid: string
+): Promise<(TopicClaims & { image?: string }) | null> {
 	const params = new URLSearchParams({
 		action: 'wbgetentities',
 		format: 'json',
@@ -162,9 +197,12 @@ async function fetchWikidataClaims(qid: string): Promise<TopicClaims | null> {
 	if (!claims) return null;
 	const ids = (prop: string): string[] =>
 		(claims[prop] ?? [])
-			.map((c) => c.mainsnak?.datavalue?.value?.id)
+			.map((c) => c.mainsnak?.datavalue?.value)
+			.map((val) => (val && typeof val === 'object' ? val.id : undefined))
 			.filter((v): v is string => !!v);
-	return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106') };
+	const p18 = claims['P18']?.[0]?.mainsnak?.datavalue?.value;
+	const image = typeof p18 === 'string' ? p18 : undefined;
+	return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106'), image };
 }
 
 /**
@@ -205,7 +243,7 @@ export const ingestTitles = action({
 				decisions.push({ title: page.title, status, basis });
 				const accepted = status === 'fetched';
 				// Only spend the image request on articles we'd actually generate from.
-				const leadImage = accepted ? await fetchLeadImage(page.pageimage) : null;
+				const leadImage = accepted ? await fetchBestImage(page, claims?.image) : null;
 				await ctx.runMutation(internal.ingest.upsertArticle, {
 					pageId: page.pageid!,
 					title: page.title,
@@ -229,6 +267,100 @@ export const ingestTitles = action({
 		return { ingested, filtered, skipped, errors, decisions };
 	}
 });
+
+/**
+ * Ingest a SINGLE title and return its articleId — the unit of work the
+ * demand-driven Workpool enqueues. Mirrors one iteration of `ingestTitles`:
+ * fetch → Wikidata/category topic gate → fail-closed Commons lead image →
+ * upsert. `accepted` is false when the topic was filtered out (no card should
+ * be generated). Returns `articleId` only when accepted, so the caller can chain
+ * straight into generation.
+ */
+export const ingestOne = internalAction({
+	args: { title: v.string() },
+	handler: async (
+		ctx,
+		{ title }
+	): Promise<{ articleId: Id<'sourceArticles'> | null; accepted: boolean }> => {
+		if (!looksLikeArticleTitle(title)) return { articleId: null, accepted: false };
+		const page = await fetchArticle(title);
+		if (!page || !page.extract) return { articleId: null, accepted: false };
+		const categories = (page.categories ?? []).map((c) => stripCategoryPrefix(c.title));
+		const qid = page.pageprops?.wikibase_item;
+		const claims = qid ? await fetchWikidataClaims(qid) : null;
+		const verdict = claims ? classifyTopic(claims) : null;
+		const { status } = decideArticleStatus({ verdict, categories });
+		const accepted = status === 'fetched';
+		const leadImage = accepted ? await fetchBestImage(page, claims?.image) : null;
+		const articleId = await ctx.runMutation(internal.ingest.upsertArticle, {
+			pageId: page.pageid!,
+			title: page.title,
+			url:
+				page.canonicalurl ??
+				page.fullurl ??
+				`https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
+			revisionId: page.revisions?.[0]?.revid ?? null,
+			extract: capText(page.extract),
+			paragraphs: toParagraphs(page.extract),
+			categories,
+			image: leadImage ?? undefined,
+			status
+		});
+		return { articleId: accepted ? articleId : null, accepted };
+	}
+});
+
+/**
+ * Backfill images onto already-published cards that have none (ADR-005 coverage).
+ * For each imageless card, re-fetch its source article and, if a free image now
+ * clears the fail-closed gate (via the wider candidate search), patch it on.
+ *   npx convex run ingest:backfillImages '{"limit":40}'
+ */
+export const backfillImages = action({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, args): Promise<{ scanned: number; updated: number; titles: string[] }> => {
+		const cards = await ctx.runQuery(internal.ingest.imagelessPublished, {
+			limit: args.limit ?? 40
+		});
+		const titles: string[] = [];
+		for (const card of cards) {
+			const page = await fetchArticle(card.title);
+			if (!page) continue;
+			const qid = page.pageprops?.wikibase_item;
+			const claims = qid ? await fetchWikidataClaims(qid) : null;
+			const image = await fetchBestImage(page, claims?.image);
+			if (image) {
+				await ctx.runMutation(internal.ingest.setCardImage, { cardId: card._id, image });
+				titles.push(card.title);
+			}
+		}
+		return { scanned: cards.length, updated: titles.length, titles };
+	}
+});
+
+/**
+ * Search Wikipedia for article titles matching a concept (Action API
+ * `list=search`, namespace 0, popularity-ranked). Powers demand-driven
+ * generation: turn an in-demand concept into candidate articles to ingest.
+ * Plain helper (no ctx) — callable directly inside an action.
+ */
+export async function searchArticleTitles(query: string, limit = 3): Promise<string[]> {
+	const params = new URLSearchParams({
+		action: 'query',
+		format: 'json',
+		formatversion: '2',
+		list: 'search',
+		srsearch: query,
+		srlimit: String(limit),
+		srnamespace: '0',
+		srqiprofile: 'popular_inclinks_pv'
+	});
+	const data = await getJsonOrNull<{ query?: { search?: { title: string }[] } }>(
+		ACTION_API,
+		params
+	);
+	return (data?.query?.search ?? []).map((s) => s.title).filter(looksLikeArticleTitle);
+}
 
 /**
  * Fetch candidate titles from top-pageviews (design doc §8.2), filtered to

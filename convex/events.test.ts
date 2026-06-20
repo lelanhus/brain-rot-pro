@@ -11,7 +11,7 @@ async function firstCardId(t: ReturnType<typeof convexTest>) {
 	return page.page[0]._id;
 }
 
-test('events.log writes a batch; metrics.summary computes CCR', async () => {
+test('events.log writes the whole batch keyed to the device', async () => {
 	const t = convexTest(schema, modules);
 	const cardId = await firstCardId(t);
 	const deviceId = 'device-a';
@@ -28,10 +28,13 @@ test('events.log writes a batch; metrics.summary computes CCR', async () => {
 	});
 	expect(res.logged).toBe(4);
 
-	const summary = await t.query(api.metrics.summary, { deviceId });
-	expect(summary.impressions).toBe(2);
-	expect(summary.continuations).toBe(1); // the one complete
-	expect(summary.ccr).toBeCloseTo(0.5);
+	const stored = await t.run(async (ctx) =>
+		ctx.db
+			.query('events')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.collect()
+	);
+	expect(stored).toHaveLength(4);
 });
 
 test('events.log fails fast on empty identity', async () => {

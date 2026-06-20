@@ -5,19 +5,14 @@ import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { embed, embedMany } from 'ai';
-import { buildEmbeddingText, relatedByConcepts } from './embedLogic';
+import { buildEmbeddingText, embeddingModel, relatedByConcepts } from './embedLogic';
 import { requireGatewayKey } from './aiKey';
 
-// Env-overridable, but the dimension is locked to the schema's vector index
-// (1536). Overriding to a model with different dimensions requires a reindex.
-const DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
-
-function embeddingModel(): string {
-	return process.env.EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
-}
+// The embedding dimension is locked to the schema's vector index (1536).
+// Overriding EMBEDDING_MODEL to a model with different dimensions requires a reindex.
 
 /**
- * Embed one card and store the vector. Internal — scheduled by `review.approve`
+ * Embed one card and store the vector. Internal — scheduled when a card is published
  * when a card is published. No-op (silently) if the card is gone or unpublished
  * by the time it runs.
  */

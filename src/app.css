@@ -552,8 +552,9 @@ body {
 		border-color var(--dur-fast) var(--ease);
 }
 
-/* Dismiss is recessive (dim icon); Save carries full weight (Von Restorff). */
-.action.dismiss {
+/* Dismiss and Share are recessive (dim icon); Save carries full weight (Von Restorff). */
+.action.dismiss,
+.action.share {
 	color: var(--muted);
 }
 

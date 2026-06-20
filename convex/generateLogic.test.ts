@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	buildGenerationPrompt,
-	decideStatus,
+	decidePublish,
 	generatedCardSchema,
-	spanIsFromSource,
-	SUPPORT_THRESHOLD
+	spanIsFromSource
 } from './generateLogic';
 
 describe('buildGenerationPrompt', () => {
@@ -20,13 +19,27 @@ describe('buildGenerationPrompt', () => {
 	});
 });
 
-describe('decideStatus', () => {
-	it('routes supported + high score to review', () => {
-		expect(decideStatus({ supported: true, score: 0.9, reason: '' })).toBe('needs_review');
+describe('decidePublish (auto-publish gate, default threshold 0.9)', () => {
+	it('publishes a grounded, supported, high-confidence card', () => {
+		expect(decidePublish(true, { supported: true, score: 0.95, reason: '' })).toBe('published');
+		expect(decidePublish(true, { supported: true, score: 0.9, reason: '' })).toBe('published');
 	});
-	it('fails unsupported or low score', () => {
-		expect(decideStatus({ supported: false, score: 0.95, reason: '' })).toBe('validation_failed');
-		expect(decideStatus({ supported: true, score: SUPPORT_THRESHOLD - 0.01, reason: '' })).toBe(
+	it('fails an ungrounded card even at score 1.0', () => {
+		expect(decidePublish(false, { supported: true, score: 1, reason: '' })).toBe(
+			'validation_failed'
+		);
+	});
+	it('fails when the validator says unsupported', () => {
+		expect(decidePublish(true, { supported: false, score: 0.99, reason: '' })).toBe(
+			'validation_failed'
+		);
+	});
+	it('fails just below the auto-publish bar (stricter than the old review bar)', () => {
+		expect(decidePublish(true, { supported: true, score: 0.89, reason: '' })).toBe(
+			'validation_failed'
+		);
+		// A card that would have entered the human queue (>=0.7) no longer auto-publishes.
+		expect(decidePublish(true, { supported: true, score: 0.8, reason: '' })).toBe(
 			'validation_failed'
 		);
 	});

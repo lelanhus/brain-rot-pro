@@ -2,6 +2,8 @@ import { mutation, query } from './_generated/server';
 import { internal } from './_generated/api';
 import { ConvexError, v } from 'convex/values';
 import { assertAdmin } from './adminAuth';
+import { ctr } from './affiliateLogic';
+import { cardStatus } from './schema';
 import {
 	bucketByStatus,
 	bucketByType,
@@ -17,8 +19,8 @@ const ACTIVITY_DAYS = 14;
  * Admin analytics overview (ADR-009). One gated read that folds the current
  * state of the product into a dashboard payload: content pipeline, audience,
  * engagement (CCR), and monetization. Admin-only and infrequent, so full table
- * reads are acceptable here (same trade-off as `metrics.ts`); behind the
- * Aggregate component when the user base grows.
+ * reads are acceptable here; move behind the Aggregate component when the user
+ * base grows.
  */
 export const overview = query({
 	args: { token: v.string() },
@@ -88,7 +90,7 @@ export const overview = query({
 			monetization: {
 				impressions: adImpressions,
 				clicks: adClicks,
-				ctr: adImpressions === 0 ? 0 : adClicks / adImpressions
+				ctr: ctr(adClicks, adImpressions)
 			},
 			activity: dailyActivity(events, now, ACTIVITY_DAYS)
 		};
@@ -189,18 +191,9 @@ export const account = query({
 	}
 });
 
-const statusValidator = v.union(
-	v.literal('draft'),
-	v.literal('needs_review'),
-	v.literal('validation_failed'),
-	v.literal('approved'),
-	v.literal('published'),
-	v.literal('suppressed')
-);
-
 /** Card list/search for content moderation (ADR-009 phase 3). */
 export const cards = query({
-	args: { token: v.string(), status: v.optional(statusValidator), search: v.optional(v.string()) },
+	args: { token: v.string(), status: v.optional(cardStatus), search: v.optional(v.string()) },
 	returns: v.array(
 		v.object({
 			_id: v.id('knowledgeCards'),
@@ -238,9 +231,10 @@ export const cards = query({
 });
 
 /**
- * Moderate a card (ADR-009 phase 3): publish or suppress. Publishing schedules
- * the embedding so it joins "more like this" (same as `review.approve`). This is
- * the gated admin path; `review.ts` stays for the CLI/legacy queue.
+ * Moderate a card (ADR-009 phase 3): publish or suppress. Cards auto-publish via
+ * the generation pipeline; this is the admin override for suppressing a bad card
+ * or re-publishing a suppressed one. Publishing schedules the embedding so it
+ * joins "more like this".
  */
 export const setCardStatus = mutation({
 	args: {

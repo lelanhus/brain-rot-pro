@@ -5,25 +5,12 @@
 	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 
 	// Content management (ADR-009 phase 3): browse/search cards by status and
-	// moderate them. Defaults to the needs_review queue, so it also serves as the
-	// gated review surface (the legacy /review + CLI still exist for now).
-	type Status =
-		| 'draft'
-		| 'needs_review'
-		| 'validation_failed'
-		| 'approved'
-		| 'published'
-		| 'suppressed';
-	const STATUSES: Status[] = [
-		'needs_review',
-		'published',
-		'suppressed',
-		'draft',
-		'approved',
-		'validation_failed'
-	];
+	// moderate them. Cards auto-publish, so this is the admin override for
+	// suppressing a bad card (or re-publishing a suppressed one).
+	type Status = 'published' | 'suppressed' | 'validation_failed';
+	const STATUSES: Status[] = ['published', 'suppressed', 'validation_failed'];
 
-	let status = $state<Status>('needs_review');
+	let status = $state<Status>('published');
 	let search = $state('');
 
 	const cards = useQuery(api.admin.cards, () => ({

@@ -22,6 +22,7 @@
 	import { persistCards, readCards } from '$lib/offlineFeed';
 	import { createToast } from '$lib/toast.svelte';
 	import { cooldownGate } from '$lib/cooldownGate';
+	import { shareCard } from '$lib/share';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -193,6 +194,12 @@
 		} catch (err) {
 			console.error('[feed] save failed', err);
 		}
+	}
+
+	async function handleShare(card: Doc<'knowledgeCards'>) {
+		const result = await shareCard(card._id, card.hook);
+		if (result === 'copied') toast.show('Link copied');
+		else if (result === 'failed') toast.show('Could not share');
 	}
 
 	// The dismiss button is stationary and the next card snaps into its slot
@@ -465,6 +472,7 @@
 		saved={savedSet.has(activeCard._id)}
 		onSave={() => handleSave(activeCard)}
 		onNotInterested={() => handleNotInterested(activeCard)}
+		onShare={() => handleShare(activeCard)}
 	/>
 {/if}
 

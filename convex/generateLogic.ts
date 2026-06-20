@@ -92,12 +92,26 @@ export function buildValidationPrompt(card: GeneratedCard): string {
 	].join('\n');
 }
 
-/** Minimum support score to enter the review queue; below this is auto-failed. */
-export const SUPPORT_THRESHOLD = 0.7;
+/**
+ * Auto-publish bar (the feed has no human in the loop — see ADR / feed memory).
+ * A card publishes itself ONLY when it is grounded in a real source span AND an
+ * independent validator confirms the source supports the claim at high confidence.
+ * The card is then as correct as the Wikipedia passage it cites — relying on
+ * Wikipedia for truth, on the validator for faithfulness. Higher than the old
+ * review bar (0.9 vs 0.7) precisely because nothing downstream catches a miss.
+ * Env-overridable to tune precision/recall without a deploy.
+ */
+export function autoPublishThreshold(): number {
+	const raw = Number(process.env.AUTO_PUBLISH_THRESHOLD);
+	return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : 0.9;
+}
 
-export function decideStatus(validation: Validation): 'needs_review' | 'validation_failed' {
-	return validation.supported && validation.score >= SUPPORT_THRESHOLD
-		? 'needs_review'
+export function decidePublish(
+	grounded: boolean,
+	validation: Validation
+): 'published' | 'validation_failed' {
+	return grounded && validation.supported && validation.score >= autoPublishThreshold()
+		? 'published'
 		: 'validation_failed';
 }
 
