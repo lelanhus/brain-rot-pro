@@ -86,9 +86,11 @@ Make the slot a true one-viewport box so it physically cannot scroll:
 There are published cards with bodies up to 1,400 chars in production.
 
 - The `line-clamp` safety net (§2) keeps them within one screen immediately.
-- **Then:** a one-time pass that suppresses or regenerates bodies over the new
-  cap, so legacy cards aren't silently truncated mid-fact (a clamped fact loses
-  its payoff). Preferred over leaving them to age out of the feed.
+- **Then:** a one-time backfill over published cards whose body exceeds the new
+  cap. Preference: **regenerate** the body shorter (keeps the card in the feed);
+  **suppress** only as a fallback for any card that fails to regenerate. This
+  avoids legacy cards being silently truncated mid-fact (a clamped fact loses its
+  payoff). Chosen over leaving them to age out of the feed.
 
 ## Testing
 
