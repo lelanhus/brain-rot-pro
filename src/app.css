@@ -211,6 +211,7 @@ body {
 }
 
 .card {
+	position: relative; /* positioning context for .reveal-overlay (Task 3) */
 	width: 100%;
 	max-width: 640px;
 	display: flex;
@@ -372,6 +373,31 @@ body {
 	font-size: var(--fs-why);
 	line-height: 1.55;
 	color: var(--muted);
+}
+
+/* Reveal panel: floats over the lower card area so opening it never changes the
+   card's flow height (and thus never causes the slot to scroll). Content here is
+   short (whyItMatters ≤ 360 chars), so it fits without internal scroll. */
+.reveal-overlay {
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0;
+	z-index: 2;
+	padding: var(--space-4);
+	background: color-mix(in srgb, var(--surface) 92%, transparent);
+	backdrop-filter: blur(6px);
+	border-top: 1px solid var(--border);
+	border-radius: var(--radius) var(--radius) 0 0;
+}
+.reveal-close {
+	float: right;
+	font: inherit;
+	font-size: 1.2rem;
+	line-height: 1;
+	color: var(--muted);
+	background: none;
+	border: none;
+	cursor: pointer;
 }
 
 /* Explore cluster (chips + "more") detaches from the reading column with a true

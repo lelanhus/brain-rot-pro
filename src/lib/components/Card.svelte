@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
-	import { slide } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import { formatName } from '$lib/cards';
 
 	// Card is pure content. Save/dismiss live in a single viewport-fixed action
@@ -67,9 +67,6 @@
 				Why it matters
 				<span class="why-caret" aria-hidden="true"></span>
 			</button>
-			{#if expanded}
-				<p class="why" transition:slide={{ duration: 180 }}>{card.whyItMatters}</p>
-			{/if}
 		{/if}
 
 		<div class="chips">
@@ -97,4 +94,17 @@
 			<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
 		</details>
 	</div>
+	<!-- Overlay: floats over the lower card area so opening it never changes the
+	     card's flow height (the slot's overflow:hidden stays undisturbed). -->
+	{#if expanded}
+		<div class="reveal-overlay" transition:fade={{ duration: 140 }}>
+			<button
+				type="button"
+				class="reveal-close"
+				onclick={() => (expanded = false)}
+				aria-label="Close">×</button
+			>
+			<p class="why">{card.whyItMatters}</p>
+		</div>
+	{/if}
 </article>

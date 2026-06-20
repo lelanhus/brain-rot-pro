@@ -73,7 +73,7 @@ test('renders a free-licensed image with attribution when present', async () => 
 	await expect.element(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toBeVisible();
 });
 
-test('keeps "why it matters" collapsed until the toggle reveals it, firing card_expand once', async () => {
+test('keeps "why it matters" collapsed until the toggle reveals it in the overlay, firing card_expand once', async () => {
 	let expands = 0;
 	render(Card, { card: sample, onExpand: () => (expands += 1) });
 
@@ -81,12 +81,19 @@ test('keeps "why it matters" collapsed until the toggle reveals it, firing card_
 	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
 
 	const toggle = page.getByRole('button', { name: /why it matters/i });
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
 	await toggle.click();
+
+	// The text now appears inside the overlay panel (not inline in the card flow).
+	// The overlay's close button confirms the panel is rendered (not just the text).
 	await expect.element(page.getByText(WHY)).toBeVisible();
+	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
 	expect(expands).toBe(1);
 
-	// Collapsing again hides it without re-firing the deepening signal.
+	// Collapsing again hides the overlay without re-firing the deepening signal.
 	await toggle.click();
 	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: 'Close' })).not.toBeInTheDocument();
 	expect(expands).toBe(1);
 });

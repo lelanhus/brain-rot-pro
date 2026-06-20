@@ -37,6 +37,22 @@ test.describe('feed (interaction, needs WebSocket)', () => {
 	});
 });
 
+// Reveal overlay: opening "why it matters" must not introduce scroll on the slot.
+// Gated like the other SSR tests (needs live Convex + seeded cards).
+test.describe('feed (reveal overlay)', () => {
+	test.skip(!process.env.E2E_LIVE, 'requires a live Convex deployment (set E2E_LIVE=1)');
+
+	test('opening "why it matters" does not introduce scroll', async ({ page }) => {
+		await page.setViewportSize({ width: 375, height: 667 });
+		await page.goto('/');
+		await expect(page.locator('.slot').first()).toBeVisible();
+		const slot = page.locator('.slot').first();
+		await page.getByRole('button', { name: 'Why it matters' }).first().click();
+		const overflow = await slot.evaluate((s) => s.scrollHeight - s.clientHeight);
+		expect(overflow).toBeLessThanOrEqual(1);
+	});
+});
+
 // One-screen guarantee: no card scrolls within its slot at the target phone
 // sizes. Gated like the other SSR tests (needs live Convex + seeded cards).
 test.describe('feed (one-screen fit)', () => {
