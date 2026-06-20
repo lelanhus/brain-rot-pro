@@ -324,6 +324,10 @@
 <svelte:window onkeydown={onKeydown} />
 <svelte:head><title>Brain Rot Pro</title></svelte:head>
 
+<!-- Scrim behind the fixed top controls: card images/titles read as sliding
+     *under* the chrome instead of colliding with the pills' negative space. -->
+<div class="feed-topscrim" aria-hidden="true"></div>
+
 <nav class="feed-nav">
 	<a class="nav-pill" href={resolve('/saved')}>Saved</a>
 	<a class="nav-pill" href={resolve('/account')}>Account</a>

@@ -673,6 +673,26 @@ body {
 }
 
 /* Unobtrusive link to the saved view; fixed so it never shifts card layout. */
+/* Fixed scrim behind the top controls (nav + HUD). The feed snaps content to the
+   top edge, so without this an image or hook scrolls through the empty space
+   around the fixed pills. A short bg→transparent fade keeps the pills legible and
+   lets content slide cleanly under the chrome. Theme-aware via var(--bg). */
+.feed-topscrim {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: calc(env(safe-area-inset-top) + 5rem);
+	z-index: 9;
+	pointer-events: none;
+	background: linear-gradient(
+		to bottom,
+		var(--bg) 0%,
+		color-mix(in srgb, var(--bg) 65%, transparent) 50%,
+		transparent 100%
+	);
+}
+
 .feed-nav {
 	position: fixed;
 	top: calc(env(safe-area-inset-top) + var(--space-3));
