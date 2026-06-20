@@ -388,6 +388,11 @@ body {
 	backdrop-filter: blur(6px);
 	border-top: 1px solid var(--border);
 	border-radius: var(--radius) var(--radius) 0 0;
+	/* Cap panel height; scrolls internally only in the rare case content exceeds
+	   the cap (whyItMatters is schema-capped at 360 chars, so this almost never
+	   engages). Does not affect slot no-scroll — overlay is position:absolute. */
+	max-height: 60%;
+	overflow-y: auto;
 }
 .reveal-close {
 	float: right;
