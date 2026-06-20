@@ -181,6 +181,42 @@ export const generateFromArticle = action({
 });
 
 /**
+ * One-time: shorten legacy published cards whose body exceeds the one-screen cap.
+ * Suppress the old card first (so the fresh short card isn't dropped by the
+ * publish-time dedup), then regenerate from its source article.
+ *   npx convex run generate:backfillShortenOverlong '{"limit":50}'
+ */
+export const backfillShortenOverlong = action({
+	args: { cap: v.optional(v.number()), limit: v.optional(v.number()) },
+	handler: async (
+		ctx,
+		args
+	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number }> => {
+		const cap = args.cap ?? 480;
+		const limit = args.limit ?? 50;
+		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, limit });
+		let regenerated = 0;
+		let suppressedOnly = 0;
+		for (const row of rows) {
+			await ctx.runMutation(internal.generateDb.setCardStatus, {
+				cardId: row._id,
+				status: 'suppressed'
+			});
+			if (row.articleId === null) {
+				suppressedOnly++;
+				continue;
+			}
+			const r = await ctx.runAction(api.generate.generateFromArticle, {
+				articleId: row.articleId
+			});
+			if (r.status === 'published') regenerated++;
+			else suppressedOnly++;
+		}
+		return { scanned: rows.length, regenerated, suppressedOnly };
+	}
+});
+
+/**
  * Generate cards for up to `limit` ingested articles that don't have one yet.
  * Sequential to stay polite to the model + within action limits.
  *   npx convex run generate:generateBatch '{"limit":3}'

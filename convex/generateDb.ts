@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from './_generated/server';
 import { v } from 'convex/values';
-import { cardFormat, generationValidator, image, sourceValidator } from './schema';
+import { cardFormat, cardStatus, generationValidator, image, sourceValidator } from './schema';
 
 // DB access for the generation pipeline. Kept out of the "use node" action file
 // because Convex queries/mutations must run in the V8 runtime, not Node.
@@ -39,6 +39,29 @@ export const articleHasCard = internalQuery({
 	handler: async (ctx, { articleId }) => {
 		const cards = await ctx.db.query('knowledgeCards').collect();
 		return cards.some((c) => c.generation?.sourceArticleId === articleId);
+	}
+});
+
+/** Published cards whose body exceeds the one-screen cap — the shorten work-list. */
+export const overlongPublished = internalQuery({
+	args: { cap: v.number(), limit: v.number() },
+	handler: async (ctx, { cap, limit }) => {
+		const cards = await ctx.db
+			.query('knowledgeCards')
+			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
+			.take(2000);
+		return cards
+			.filter((c) => c.body.length > cap)
+			.slice(0, limit)
+			.map((c) => ({ _id: c._id, articleId: c.generation?.sourceArticleId ?? null }));
+	}
+});
+
+/** Patch the status of a card — internal counterpart to the public admin mutation. */
+export const setCardStatus = internalMutation({
+	args: { cardId: v.id('knowledgeCards'), status: cardStatus },
+	handler: async (ctx, { cardId, status }) => {
+		await ctx.db.patch(cardId, { status });
 	}
 });
 
