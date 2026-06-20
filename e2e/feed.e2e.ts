@@ -50,6 +50,7 @@ test.describe('feed (one-screen fit)', () => {
 			await page.setViewportSize({ width: vp.width, height: vp.height });
 			await page.goto('/');
 			await expect(page.getByTestId('feed')).toBeVisible();
+			await expect(page.locator('.slot').first()).toBeVisible();
 			const overflow = await page
 				.locator('.slot')
 				.evaluateAll((slots) =>
