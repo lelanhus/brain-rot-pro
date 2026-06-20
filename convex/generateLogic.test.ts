@@ -85,4 +85,28 @@ describe('generatedCardSchema', () => {
 		};
 		expect(generatedCardSchema.safeParse(bad).success).toBe(false);
 	});
+
+	it('rejects a body longer than the one-screen cap (480)', () => {
+		const card = {
+			hook: 'A valid declarative hook.',
+			body: 'a'.repeat(481),
+			whyItMatters: 'It matters.',
+			format: 'object_story',
+			conceptTags: ['t'],
+			sourceSpan: 'a'.repeat(30)
+		};
+		expect(generatedCardSchema.safeParse(card).success).toBe(false);
+	});
+
+	it('accepts a body exactly at the cap (480)', () => {
+		const card = {
+			hook: 'A valid declarative hook.',
+			body: 'a'.repeat(480),
+			whyItMatters: 'It matters.',
+			format: 'object_story',
+			conceptTags: ['t'],
+			sourceSpan: 'a'.repeat(30)
+		};
+		expect(generatedCardSchema.safeParse(card).success).toBe(true);
+	});
 });

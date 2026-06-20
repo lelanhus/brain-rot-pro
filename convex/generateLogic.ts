@@ -35,8 +35,10 @@ export const generatedCardSchema = z.object({
 	body: z
 		.string()
 		.min(80)
-		.max(1400)
-		.describe('Roughly 40–120 words explaining the one idea, in plain language.'),
+		.max(480)
+		.describe(
+			'One tight paragraph (≈2–4 short sentences, ~80 words max) explaining the one idea, in plain language.'
+		),
 	whyItMatters: z
 		.string()
 		.max(360)
@@ -72,6 +74,7 @@ export function buildGenerationPrompt(article: { title: string; paragraphs: stri
 		'- The claim MUST be fully supported by the source paragraphs below. Do not add facts that are not present.',
 		'- Choose the single paragraph that best supports your card and copy it VERBATIM into `sourceSpan`.',
 		'- The hook must be specific and true — never sensationalized or misleading.',
+		'- Keep the body to ONE tight paragraph: at most 3–4 short sentences (~80 words). Brevity is the format — a card is read in one screen, never scrolled.',
 		`- Set \`format\` to exactly one of: ${CARD_FORMATS.join(', ')}.`,
 		'',
 		'Source paragraphs:',
