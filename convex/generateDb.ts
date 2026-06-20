@@ -49,7 +49,7 @@ export const overlongPublished = internalQuery({
 		const cards = await ctx.db
 			.query('knowledgeCards')
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
-			.take(2000);
+			.collect();
 		return cards
 			.filter((c) => c.body.length > cap)
 			.slice(0, limit)
