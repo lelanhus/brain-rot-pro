@@ -25,7 +25,7 @@
 	--fs-meta: 0.8125rem; /* 13px — chips, source */
 	--fs-why: 0.9375rem; /* 15px — why-it-matters is prose to read, not metadata */
 	--fs-body: 1.125rem; /* 18px — comfortable phone reading (the main reading text) */
-	--fs-hook: clamp(1.9rem, 1.2rem + 3vw, 3rem); /* 30px mobile → 48px desktop poster */
+	--fs-hook: clamp(1.6rem, 4.5vw, 2.3rem); /* spec size; was drifted to 3rem */
 	--tracking-tag: 0.12em; /* small bold caps need wide tracking to breathe */
 	--measure: 60ch; /* line length cap for why/source on the wide desktop column */
 
@@ -155,16 +155,18 @@ body {
 	);
 }
 
-/* Each slot is one snap stop and the positioning context for its action bar.
-   Content is TOP-anchored, not centred: every card's tag/hook lands at the same
-   Y regardless of body length, so swiping the feed never makes the hook jump —
-   calm and predictable ("snappy, not floaty", ui-ux.md §11). The generous top
-   space gives the hook a stage (active whitespace; web-design 03); bottom
-   padding reserves the thumb-zone strip. Top-anchoring also never clips a tall
-   card (the slot just grows past 100dvh and the feed scrolls). */
+/* Each slot is exactly one viewport — a fixed 100dvh box that never grows past
+   it. Content is TOP-anchored, not centred: every card's tag/hook lands at the
+   same Y regardless of body length, so swiping the feed never makes the hook
+   jump — calm and predictable ("snappy, not floaty", ui-ux.md §11). The
+   generous top space gives the hook a stage (active whitespace; web-design 03);
+   bottom padding reserves the thumb-zone strip. overflow:hidden clips any rare
+   legacy card that exceeds the box (safety net; new bodies are capped at 480
+   chars by Task 1 and won't reach the clip). */
 .slot {
 	position: relative;
-	min-height: 100dvh;
+	height: 100dvh;
+	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -211,14 +213,21 @@ body {
 .card {
 	width: 100%;
 	max-width: 640px;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0; /* allow children to shrink instead of forcing overflow */
 }
 
 /* Vertical rhythm via per-element margins (proximity: tight within a group,
    loose between groups; web-design 03/06). No card border — the viewport edge
-   and the whitespace are the boundary (Gestalt closure). */
+   and the whitespace are the boundary (Gestalt closure). flex:1 + min-height:0
+   lets the body region flex-shrink within the card column. */
 .card-body {
 	display: flex;
 	flex-direction: column;
+	flex: 1;
+	min-height: 0;
 }
 
 .card-body > * {
@@ -233,7 +242,7 @@ body {
 .card-image img {
 	display: block;
 	width: 100%;
-	max-height: 38dvh;
+	max-height: 30dvh; /* image never takes more than ~⅓ of the screen */
 	object-fit: cover;
 	border-radius: var(--radius);
 	background: var(--surface-2);
@@ -299,7 +308,9 @@ body {
 
 /* Body — the main reading text, so legibility wins: 18px, a comfortable 1.6 leading,
    ~58ch measure (the readability sweet spot), on the lifted body tier. The generous
-   sink below the hook is set here. */
+   sink below the hook is set here. flex:1 1 auto + min-height:0 makes the body the
+   flexible region that absorbs/clips slack; overflow:hidden is the safety net for any
+   legacy >480-char body (new bodies are capped by Task 1 and won't clip). */
 .body {
 	margin-top: var(--space-6);
 	max-width: 58ch;
@@ -307,6 +318,9 @@ body {
 	line-height: 1.6;
 	color: var(--text-2);
 	text-wrap: pretty;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden; /* clip, never scroll; legacy >480-char bodies are shortened in Task 4 */
 }
 
 /* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding

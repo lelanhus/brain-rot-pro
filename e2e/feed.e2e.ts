@@ -36,3 +36,26 @@ test.describe('feed (interaction, needs WebSocket)', () => {
 		await page.screenshot({ path: 'feed-actions-screenshot.png' });
 	});
 });
+
+// One-screen guarantee: no card scrolls within its slot at the target phone
+// sizes. Gated like the other SSR tests (needs live Convex + seeded cards).
+test.describe('feed (one-screen fit)', () => {
+	test.skip(!process.env.E2E_LIVE, 'requires a live Convex deployment (set E2E_LIVE=1)');
+
+	for (const vp of [
+		{ name: 'iPhone SE 2022', width: 375, height: 667 },
+		{ name: 'iPhone 14', width: 390, height: 844 }
+	]) {
+		test(`no in-card scroll at ${vp.name}`, async ({ page }) => {
+			await page.setViewportSize({ width: vp.width, height: vp.height });
+			await page.goto('/');
+			await expect(page.getByTestId('feed')).toBeVisible();
+			const overflow = await page
+				.locator('.slot')
+				.evaluateAll((slots) =>
+					slots.map((s) => s.scrollHeight - s.clientHeight).filter((d) => d > 1)
+				);
+			expect(overflow).toEqual([]);
+		});
+	}
+});
