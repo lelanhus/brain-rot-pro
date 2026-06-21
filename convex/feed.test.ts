@@ -146,5 +146,7 @@ test('feed.unseen ranks an on-taste card ahead of an off-taste one', async () =>
 		paginationOpts: { numItems: 50, cursor: null }
 	});
 	const ids = res.page.map((c) => c._id);
+	// far has shuffleKey 0.9 > 0.1 (near), so scoreCard ranker would rank it first.
+	// Only cosine ranking makes near win despite the lower shuffleKey.
 	expect(ids.indexOf(near)).toBeLessThan(ids.indexOf(far)); // on-taste first despite higher far shuffleKey
 });

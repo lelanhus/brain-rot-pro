@@ -41,13 +41,14 @@ export const recompute = mutation({
 			if (e.cardId === undefined || e.cardId === null) continue;
 			if (e.type === 'not_interested') notInterested.add(e.cardId);
 		}
-		const tasteVector = buildTasteVector(events, embeddingByCard, Date.now());
+		const now = Date.now();
+		const tasteVector = buildTasteVector(events, embeddingByCard, now);
 
 		const profile = {
 			deviceId: args.deviceId,
 			conceptWeights: Object.entries(weights).map(([concept, weight]) => ({ concept, weight })),
 			notInterested: [...notInterested],
-			updatedAt: Date.now()
+			updatedAt: now
 		};
 
 		const existing = await ctx.db

@@ -100,7 +100,18 @@ describe('buildTasteVector', () => {
 			{ type: 'save', cardId: 'b', ts: old } //  [0,1] weight 3·0.5
 		];
 		const v = buildTasteVector(events, { a: [1, 0], b: [0, 1] }, NOW)!;
-		expect(v[0]).toBeGreaterThan(v[1]); // recent 'a' dominates
+		expect(v[0]).toBeCloseTo(2 / 3);
+		expect(v[1]).toBeCloseTo(1 / 3);
+	});
+
+	it('skips embeddings whose length mismatches the accumulator (no throw)', () => {
+		const events = [
+			{ type: 'save', cardId: 'a', ts: NOW },
+			{ type: 'save', cardId: 'b', ts: NOW }
+		];
+		const v = buildTasteVector(events, { a: [1, 0], b: [1, 0, 0] }, NOW)!;
+		expect(v.length).toBe(2); // only 'a' contributed; mismatched 'b' skipped
+		expect(v[0]).toBeCloseTo(1);
 	});
 });
 
@@ -137,5 +148,13 @@ describe('scoreByTaste', () => {
 		);
 		// equals the concept-affinity score (5) — no embedding term applied
 		expect(score).toBeCloseTo(5);
+	});
+
+	it('falls back to scoreCard on embedding/taste dimension mismatch (no throw)', () => {
+		const score = scoreByTaste(
+			{ conceptTags: ['x'], embedding: [1, 0, 0] },
+			{ tasteVector: [1, 0], weights: { x: 5 }, shuffleKey: 0 }
+		);
+		expect(score).toBeCloseTo(5); // concept-affinity fallback, no cosine throw
 	});
 });
