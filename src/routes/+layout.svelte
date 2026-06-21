@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { setupConvex, useAuth, getConvexClient } from '@mmailaender/convex-svelte';
+	import { useAuth, getConvexClient } from 'convex-svelte';
 	import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { env } from '$env/dynamic/public';
 	import { authClient } from '$lib/auth-client';
@@ -9,16 +9,18 @@
 
 	let { children } = $props();
 
-	// Reuses the singleton created by initConvex() in hooks.ts; the URL is already
-	// validated there, so a missing value would have failed loudly before this runs.
-	setupConvex(env.PUBLIC_CONVEX_URL ?? '');
-	// Wire Better Auth into the reactive Convex client (provides useAuth()).
-	// authClient's plugin-augmented type doesn't structurally match the adapter's
-	// narrower AuthClient union (version skew between @convex-dev/better-auth's
-	// convexClient plugin types and the adapter's expected types); the client is
-	// valid at runtime, so cast to the adapter's own arg type.
+	// createSvelteAuthClient is the SINGLE Convex client setup for the reactive
+	// layer: it calls setupConvex() internally (via resolveConvexClient) and wires
+	// Better Auth session state into that client, so useAuth()/useQuery() all
+	// resolve from one shared context. Calling setupConvex() separately would
+	// double-initialize the context. convexUrl is passed explicitly because the
+	// app reads it from $env/dynamic/public (the adapter defaults to the static
+	// PUBLIC_CONVEX_URL otherwise).
+	// (Cast: authClient's plugin-augmented type doesn't structurally match the
+	// adapter's narrower AuthClient union; it's valid at runtime.)
 	createSvelteAuthClient({
-		authClient
+		authClient,
+		convexUrl: env.PUBLIC_CONVEX_URL ?? ''
 	} as unknown as Parameters<typeof createSvelteAuthClient>[0]);
 
 	// Link-on-auth: when the user signs in, bind/merge this anonymous device into

@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
-	import { useQuery, useMutation, usePaginatedQuery, getConvexClient } from '@mmailaender/convex-svelte';
+	import { useQuery, useMutation, usePaginatedQuery, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
