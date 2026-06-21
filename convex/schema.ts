@@ -259,5 +259,35 @@ export default defineSchema({
 	supplyState: defineTable({
 		key: v.string(),
 		lastTriggeredAt: v.number()
+	}).index('by_key', ['key']),
+
+	/**
+	 * Topic catalog: one row per Wikipedia article seen in top-pageview data,
+	 * deduped by slug. `pageviews` is cumulative popularity (ranking + generation
+	 * priority); `cardCount` is denormalized so generation can cheaply find
+	 * popular topics that still lack cards (0 = needs generation).
+	 */
+	topics: defineTable({
+		title: v.string(),
+		slug: v.string(),
+		pageviews: v.number(),
+		cardCount: v.number(),
+		source: v.string(),
+		updatedAt: v.number()
+	})
+		.index('by_slug', ['slug'])
+		.index('by_pageviews', ['pageviews'])
+		.index('by_cardCount_pageviews', ['cardCount', 'pageviews'])
+		.searchIndex('search_title', { searchField: 'title' }),
+
+	/**
+	 * Singleton (`key: 'global'`) tracking catalog harvest progress so the
+	 * bounded backfill action can resume across runs.
+	 */
+	catalogState: defineTable({
+		key: v.string(),
+		lastHarvestedDate: v.string(), // ISO 'YYYY-MM-DD' of latest day the daily cron harvested
+		backfillCursorDate: v.optional(v.string()), // ISO date the historical backfill has reached
+		updatedAt: v.number()
 	}).index('by_key', ['key'])
 });
