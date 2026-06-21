@@ -31,6 +31,9 @@ export const FOCUS_BOOST = 100;
  * near-ties (the discovery slice). */
 export const RELEVANCE_WEIGHT = 10;
 
+/** Additive rank bump for cards whose source topic the user explicitly follows. */
+export const INTEREST_BOOST = 5;
+
 /** Half-life for recency weighting of taste signals (14 days). */
 export const TASTE_HALFLIFE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -101,25 +104,33 @@ export function buildTasteVector(
  * Taste-aware score: when a taste vector and the card's embedding are both
  * present, rank by cosine similarity + novelty + focus. Otherwise fall back to
  * concept-affinity (scoreCard) — cold-start and un-embedded cards rank sanely.
+ * An optional interest boost is added at the end when the card's slug is in
+ * the device's followed topics set.
  */
 export function scoreByTaste(
-	card: { conceptTags: string[]; embedding?: number[] },
+	card: { conceptTags: string[]; embedding?: number[]; slug?: string },
 	ctx: {
 		tasteVector?: number[];
 		weights: Record<string, number>;
 		shuffleKey: number;
 		focusConcept?: string | null;
+		interestSlugs?: ReadonlySet<string>;
 	}
 ): number {
 	const emb = card.embedding;
+	let score: number;
 	if (ctx.tasteVector !== undefined && emb !== undefined && emb.length === ctx.tasteVector.length) {
-		let score = RELEVANCE_WEIGHT * cosineSimilarity(ctx.tasteVector, emb);
+		score = RELEVANCE_WEIGHT * cosineSimilarity(ctx.tasteVector, emb);
 		score += WILDCARD_WEIGHT * ctx.shuffleKey;
 		if (ctx.focusConcept && card.conceptTags.includes(ctx.focusConcept)) score += FOCUS_BOOST;
-		return score;
+	} else {
+		score = scoreCard(card.conceptTags, ctx.weights, {
+			shuffleKey: ctx.shuffleKey,
+			focusConcept: ctx.focusConcept
+		});
 	}
-	return scoreCard(card.conceptTags, ctx.weights, {
-		shuffleKey: ctx.shuffleKey,
-		focusConcept: ctx.focusConcept
-	});
+	if (ctx.interestSlugs !== undefined && card.slug !== undefined && ctx.interestSlugs.has(card.slug)) {
+		score += INTEREST_BOOST;
+	}
+	return score;
 }

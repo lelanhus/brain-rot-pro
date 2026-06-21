@@ -5,7 +5,8 @@ import {
 	FOCUS_BOOST,
 	buildTasteVector,
 	TASTE_HALFLIFE_MS,
-	scoreByTaste
+	scoreByTaste,
+	INTEREST_BOOST
 } from './profileLogic';
 
 describe('accumulateWeights', () => {
@@ -156,5 +157,16 @@ describe('scoreByTaste', () => {
 			{ tasteVector: [1, 0], weights: { x: 5 }, shuffleKey: 0 }
 		);
 		expect(score).toBeCloseTo(5); // concept-affinity fallback, no cosine throw
+	});
+});
+
+describe('scoreByTaste interest boost', () => {
+	const base = { conceptTags: ['x'], embedding: undefined, slug: 'cleopatra' };
+	const ctx = { tasteVector: undefined, weights: {}, shuffleKey: 0, focusConcept: null };
+	it('adds INTEREST_BOOST iff the card slug is followed', () => {
+		const followed = new Set(['cleopatra']);
+		const withBoost = scoreByTaste(base, { ...ctx, interestSlugs: followed });
+		const without = scoreByTaste(base, { ...ctx, interestSlugs: new Set() });
+		expect(withBoost - without).toBeCloseTo(INTEREST_BOOST);
 	});
 });

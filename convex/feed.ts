@@ -2,6 +2,7 @@ import { query } from './_generated/server';
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
 import { scoreByTaste } from './profileLogic';
+import { toSlug } from './topicsLogic';
 
 /**
  * Unseen feed (never-repeat at scale). Paginates published cards, HARD-EXCLUDES
@@ -27,6 +28,15 @@ export const unseen = query({
 		const weights: Record<string, number> = {};
 		for (const { concept, weight } of profile?.conceptWeights ?? []) weights[concept] = weight;
 		const notInterested = new Set((profile?.notInterested ?? []).map(String));
+
+		const interestSlugs = new Set<string>();
+		if (args.deviceId.length > 0) {
+			const ints = await ctx.db
+				.query('interests')
+				.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
+				.collect();
+			for (const i of ints) interestSlugs.add(i.slug);
+		}
 
 		const page = await ctx.db
 			.query('knowledgeCards')
@@ -55,18 +65,14 @@ export const unseen = query({
 		const tasteVector = profile?.tasteVector;
 		unseenCards.sort(
 			(a, b) =>
-				scoreByTaste(b, {
-					tasteVector,
-					weights,
-					shuffleKey: b.shuffleKey,
-					focusConcept: args.focusConcept
-				}) -
-				scoreByTaste(a, {
-					tasteVector,
-					weights,
-					shuffleKey: a.shuffleKey,
-					focusConcept: args.focusConcept
-				})
+				scoreByTaste(
+					{ conceptTags: b.conceptTags, embedding: b.embedding, slug: toSlug(b.source.articleTitle) },
+					{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
+				) -
+				scoreByTaste(
+					{ conceptTags: a.conceptTags, embedding: a.embedding, slug: toSlug(a.source.articleTitle) },
+					{ tasteVector, weights, shuffleKey: a.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
+				)
 		);
 
 		return { ...page, page: unseenCards };
