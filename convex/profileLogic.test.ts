@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { accumulateWeights, scoreCard, FOCUS_BOOST } from './profileLogic';
+import {
+	accumulateWeights,
+	scoreCard,
+	FOCUS_BOOST,
+	buildTasteVector,
+	TASTE_HALFLIFE_MS
+} from './profileLogic';
 
 describe('accumulateWeights', () => {
 	it('adds positive weight for likes and negative for not-interested', () => {
@@ -52,5 +58,47 @@ describe('scoreCard', () => {
 		});
 		const without = scoreCard(['rome'], weights, { shuffleKey: 0.5 });
 		expect(withFocus).toBe(without);
+	});
+});
+
+describe('buildTasteVector', () => {
+	const NOW = 1_000_000_000_000;
+	it('returns undefined when no positive event has an embedding', () => {
+		const events = [{ type: 'card_skip', cardId: 'a', ts: NOW }];
+		expect(buildTasteVector(events, { a: [1, 0] }, NOW)).toBeUndefined();
+		// positive event but no embedding for the card:
+		expect(buildTasteVector([{ type: 'save', cardId: 'b', ts: NOW }], {}, NOW)).toBeUndefined();
+	});
+
+	it('averages positively-engaged embeddings weighted by EVENT_DELTA', () => {
+		// save (delta 3) of [1,0] and complete (delta 1) of [0,1], same time → (3·[1,0]+1·[0,1])/4
+		const events = [
+			{ type: 'save', cardId: 'a', ts: NOW },
+			{ type: 'card_complete', cardId: 'b', ts: NOW }
+		];
+		const v = buildTasteVector(events, { a: [1, 0], b: [0, 1] }, NOW)!;
+		expect(v[0]).toBeCloseTo(0.75);
+		expect(v[1]).toBeCloseTo(0.25);
+	});
+
+	it('ignores skip / not_interested when shaping taste', () => {
+		const events = [
+			{ type: 'save', cardId: 'a', ts: NOW },
+			{ type: 'not_interested', cardId: 'b', ts: NOW },
+			{ type: 'card_skip', cardId: 'c', ts: NOW }
+		];
+		const v = buildTasteVector(events, { a: [1, 0], b: [0, 1], c: [0, 1] }, NOW)!;
+		expect(v[0]).toBeCloseTo(1); // only 'a' contributed
+		expect(v[1]).toBeCloseTo(0);
+	});
+
+	it('weights recent engagement more (recency half-life)', () => {
+		const old = NOW - TASTE_HALFLIFE_MS; // one half-life ago → weight halved
+		const events = [
+			{ type: 'save', cardId: 'a', ts: NOW }, // [1,0] weight 3·1
+			{ type: 'save', cardId: 'b', ts: old } //  [0,1] weight 3·0.5
+		];
+		const v = buildTasteVector(events, { a: [1, 0], b: [0, 1] }, NOW)!;
+		expect(v[0]).toBeGreaterThan(v[1]); // recent 'a' dominates
 	});
 });

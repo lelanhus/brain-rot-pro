@@ -25,6 +25,9 @@ export const WILDCARD_WEIGHT = 0.4;
  */
 export const FOCUS_BOOST = 100;
 
+/** Half-life for recency weighting of taste signals (14 days). */
+export const TASTE_HALFLIFE_MS = 14 * 24 * 60 * 60 * 1000;
+
 export type WeightedEvent = { type: string; cardId?: string | null };
 
 /** Accumulate concept weights from events, given each card's concept tags. */
@@ -55,4 +58,35 @@ export function scoreCard(
 	score += WILDCARD_WEIGHT * opts.shuffleKey;
 	if (opts.focusConcept && tags.includes(opts.focusConcept)) score += FOCUS_BOOST;
 	return score;
+}
+
+/**
+ * Per-user taste vector: a recency-favored, EVENT_DELTA-weighted average of the
+ * embeddings of POSITIVELY-engaged cards. Negatives (skip/not_interested) are
+ * ignored — they only exclude cards elsewhere. Returns undefined when no
+ * positive event has an embedding (cold-start). Pure → unit-testable.
+ */
+export function buildTasteVector(
+	events: ReadonlyArray<{ type: string; cardId?: string | null; ts: number }>,
+	embeddingByCard: Record<string, number[] | undefined>,
+	now: number
+): number[] | undefined {
+	let acc: number[] | null = null;
+	let totalWeight = 0;
+	for (const e of events) {
+		if (e.cardId === undefined || e.cardId === null) continue;
+		const delta = EVENT_DELTA[e.type];
+		if (delta === undefined || delta <= 0) continue; // positives only
+		const emb = embeddingByCard[e.cardId];
+		if (emb === undefined) continue;
+		const recency = Math.pow(0.5, Math.max(0, now - e.ts) / TASTE_HALFLIFE_MS);
+		const w = delta * recency;
+		if (w <= 0) continue;
+		if (acc === null) acc = new Array<number>(emb.length).fill(0);
+		if (emb.length !== acc.length) continue; // dimension guard
+		for (let i = 0; i < acc.length; i++) acc[i] += w * emb[i];
+		totalWeight += w;
+	}
+	if (acc === null || totalWeight === 0) return undefined;
+	return acc.map((x) => x / totalWeight);
 }
