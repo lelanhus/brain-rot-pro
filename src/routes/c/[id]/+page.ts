@@ -1,4 +1,4 @@
-import { convexLoad } from '@mmailaender/convex-svelte/sveltekit';
+import { convexLoad } from 'convex-svelte/sveltekit';
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 

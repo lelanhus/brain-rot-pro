@@ -7,10 +7,10 @@
       "dependencies": {
         "@convex-dev/workpool": "^0.4.7",
         "@mmailaender/convex-better-auth-svelte": "^0.8.0",
-        "@mmailaender/convex-svelte": "^0.19.1",
         "ai": "^6.0.208",
         "better-auth": "~1.6.15",
         "convex": "^1.41.0",
+        "convex-svelte": "^0.13.0",
         "zod": "^4.4.3",
       },
       "devDependencies": {
@@ -174,8 +174,6 @@
     "@mapbox/node-pre-gyp": ["@mapbox/node-pre-gyp@2.0.3", "", { "dependencies": { "consola": "^3.2.3", "detect-libc": "^2.0.0", "https-proxy-agent": "^7.0.5", "node-fetch": "^2.6.7", "nopt": "^8.0.0", "semver": "^7.5.3", "tar": "^7.4.0" }, "bin": { "node-pre-gyp": "bin/node-pre-gyp" } }, "sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg=="],
 
     "@mmailaender/convex-better-auth-svelte": ["@mmailaender/convex-better-auth-svelte@0.8.0", "", { "dependencies": { "is-network-error": "^1.3.2" }, "peerDependencies": { "@convex-dev/better-auth": ">=0.10.10", "better-auth": "^1.4.9", "convex": "^1.31.0", "convex-svelte": ">=0.13.0", "svelte": "^5.0.0" } }, "sha512-ahy/7fEdFtK7YEtKyGqlu9g4OsCNG0Bc2baMjEeZbWF++Djt9ke/oPzq7LCrobqg3jc/4tv5wXX6EOsMxig42Q=="],
-
-    "@mmailaender/convex-svelte": ["@mmailaender/convex-svelte@0.19.1", "", { "dependencies": { "esm-env": "^1.2.2", "runed": "^0.37.1" }, "peerDependencies": { "convex": ">1.10.0", "svelte": ">=5.36.0" } }, "sha512-sK9bHrh/ev6SGdw4Y43aoZ9/yttZqNO3lboNS8l7vWUzdvjGaz0sNnLHzG9f34woXr18VWjG4pEqg0XE8f/c5A=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.5", "", { "dependencies": { "@tybys/wasm-util": "^0.10.2" }, "peerDependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1" } }, "sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q=="],
 

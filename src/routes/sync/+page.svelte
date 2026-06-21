@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { getConvexClient } from '@mmailaender/convex-svelte';
+	import { getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { getDeviceId, setDeviceId } from '$lib/identity';
 	import { errorMessage } from '$lib/errors';
