@@ -31,6 +31,7 @@ import type * as generate from "../generate.js";
 import type * as generateDb from "../generateDb.js";
 import type * as generateLogic from "../generateLogic.js";
 import type * as generationPipeline from "../generationPipeline.js";
+import type * as http from "../http.js";
 import type * as imageCandidates from "../imageCandidates.js";
 import type * as imageLicense from "../imageLicense.js";
 import type * as ingest from "../ingest.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   generateDb: typeof generateDb;
   generateLogic: typeof generateLogic;
   generationPipeline: typeof generationPipeline;
+  http: typeof http;
   imageCandidates: typeof imageCandidates;
   imageLicense: typeof imageLicense;
   ingest: typeof ingest;
@@ -122,4 +124,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   generationPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"generationPool">;
+  betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
 };
