@@ -317,12 +317,24 @@
 	}
 
 	// Prefetch the next batch as the sentinel nears the viewport (instant swipes).
+	// Also fire a fire-and-forget supply trigger when the feed is running low so
+	// the shared library stays ahead of heavy readers.
 	$effect(() => {
 		const el = sentinel;
 		if (!el) return;
 		const io = new IntersectionObserver(
 			(entries) => {
-				if (entries[0]?.isIntersecting && liveFeed.status === 'CanLoadMore') liveFeed.loadMore(6);
+				if (!entries[0]?.isIntersecting) return;
+				if (liveFeed.status === 'CanLoadMore') liveFeed.loadMore(6);
+				// Running-low trigger: ask the backend to generate more cards when the
+				// feed is exhausted or nearing its end. Fire-and-forget — ignore result.
+				if (
+					deviceId !== '' &&
+					online &&
+					(liveFeed.status === 'Exhausted' || liveFeed.status === 'CanLoadMore')
+				) {
+					void getConvexClient().action(api.generationPipeline.ensureSupply, { deviceId });
+				}
 			},
 			{ rootMargin: '800px' }
 		);

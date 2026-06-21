@@ -1,4 +1,4 @@
-import { action, internalAction } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery } from './_generated/server';
 import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
@@ -88,4 +88,58 @@ export const run = action({
 	args: { concepts: v.optional(v.number()), perConcept: v.optional(v.number()) },
 	handler: async (ctx, args): Promise<unknown> =>
 		ctx.runAction(internal.generationPipeline.processDemand, args)
+});
+
+/** True if enough time has passed since the last supply trigger to trigger again. */
+export function supplyThrottleOk(
+	lastTriggeredAt: number | undefined,
+	now: number,
+	cooldownMs = 60_000
+): boolean {
+	return lastTriggeredAt === undefined || now - lastTriggeredAt >= cooldownMs;
+}
+
+export const readSupplyState = internalQuery({
+	args: {},
+	handler: async (ctx): Promise<number | null> => {
+		const row = await ctx.db
+			.query('supplyState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
+		return row?.lastTriggeredAt ?? null;
+	}
+});
+
+export const markSupplyTriggered = internalMutation({
+	args: { now: v.number() },
+	handler: async (ctx, { now }) => {
+		const row = await ctx.db
+			.query('supplyState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
+		if (row !== null) await ctx.db.patch(row._id, { lastTriggeredAt: now });
+		else await ctx.db.insert('supplyState', { key: 'global', lastTriggeredAt: now });
+	}
+});
+
+/**
+ * Throttled public action — clients call this when their unseen feed is running
+ * low. Enqueues a generation pass at most once per minute (cooldown) so rapid
+ * or concurrent calls don't spam the pipeline. Fire-and-forget from the client;
+ * returns `{ triggered: true }` only when a pass was actually enqueued.
+ */
+export const ensureSupply = action({
+	args: { deviceId: v.string() },
+	returns: v.object({ triggered: v.boolean() }),
+	handler: async (ctx): Promise<{ triggered: boolean }> => {
+		const now = Date.now();
+		const last: number | null = await ctx.runQuery(internal.generationPipeline.readSupplyState, {});
+		if (!supplyThrottleOk(last ?? undefined, now)) return { triggered: false };
+		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
+		await ctx.runAction(internal.generationPipeline.processDemand, {
+			concepts: 6,
+			perConcept: 3
+		});
+		return { triggered: true };
+	}
 });

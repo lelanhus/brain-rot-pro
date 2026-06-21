@@ -236,5 +236,15 @@ export default defineSchema({
 		createdAt: v.number(),
 		expiresAt: v.number(),
 		redeemedAt: v.optional(v.number())
-	}).index('by_code', ['code'])
+	}).index('by_code', ['code']),
+
+	/**
+	 * Throttle state for the running-low supply trigger. A singleton row
+	 * (key='global') records the last time `ensureSupply` enqueued a generation
+	 * run, so rapid concurrent client calls don't spam the pipeline.
+	 */
+	supplyState: defineTable({
+		key: v.string(),
+		lastTriggeredAt: v.number()
+	}).index('by_key', ['key'])
 });
