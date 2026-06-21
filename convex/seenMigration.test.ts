@@ -31,8 +31,10 @@ test('backfillSeen copies userProfiles.seen into seenCards, idempotently', async
 
 	const r1 = await t.mutation(internal.seenMigration.backfillSeen, { limit: 100 });
 	expect(r1.rowsInserted).toBe(1);
+	expect(r1.profilesScanned).toBe(1);
 	const r2 = await t.mutation(internal.seenMigration.backfillSeen, { limit: 100 });
 	expect(r2.rowsInserted).toBe(0); // idempotent
+	expect(r2.profilesScanned).toBe(1); // profile still scanned even when nothing new inserted
 
 	const rows = await t.run(async (ctx) =>
 		ctx.db
@@ -42,4 +44,10 @@ test('backfillSeen copies userProfiles.seen into seenCards, idempotently', async
 	);
 	expect(rows).toHaveLength(1);
 	expect(rows[0].cardId).toBe(cardId);
+});
+
+test('backfillSeen with no profiles returns zero for both counters', async () => {
+	const t = convexTest(schema, modules);
+	const result = await t.mutation(internal.seenMigration.backfillSeen, { limit: 100 });
+	expect(result).toEqual({ profilesScanned: 0, rowsInserted: 0 });
 });

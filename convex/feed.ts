@@ -32,6 +32,10 @@ export const unseen = query({
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
 			.paginate(args.paginationOpts);
 
+		// Pages may come back sparse or even empty because seen/notInterested cards
+		// are filtered out WITHIN each paginated page — the Convex cursor still
+		// advances past them, so no unseen card is ever skipped and the loop can't
+		// cycle. The client relies on repeated loadMore() calls to drain sparse pages.
 		const unseenCards = [];
 		for (const card of page.page) {
 			if (notInterested.has(card._id)) continue;

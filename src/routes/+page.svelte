@@ -84,9 +84,10 @@
 	// liveFeed takes over from the SSR anonymous first-paint (data.feed) once
 	// the client subscription is active. Use liveFeed.results when it has data,
 	// otherwise fall back to the SSR paginated results.
-	const liveCards = $derived(
-		liveFeed.results.length > 0 || !liveFeed.isLoading ? liveFeed.results : feed.results
-	);
+	// True once the live (deviceId-keyed) subscription has data or has finished its
+	// first load; until then, show the SSR first-paint results.
+	const hasLiveData = $derived(liveFeed.results.length > 0 || !liveFeed.isLoading);
+	const liveCards = $derived(hasLiveData ? liveFeed.results : feed.results);
 	const sourceCards = $derived(!online && liveCards.length === 0 ? cachedOffline : liveCards);
 	const offlineFallback = $derived(!online && liveCards.length === 0 && cachedOffline.length > 0);
 

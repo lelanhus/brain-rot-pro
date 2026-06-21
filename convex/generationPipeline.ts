@@ -133,6 +133,10 @@ export const ensureSupply = action({
 	returns: v.object({ triggered: v.boolean() }),
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	handler: async (ctx, _args): Promise<{ triggered: boolean }> => {
+		// `deviceId` is accepted for client call-signature stability and future
+		// per-device throttling, but is intentionally unused now — the throttle is
+		// GLOBAL (single key:'global' row) because the library is shared, and cost
+		// is bounded by the Workpool maxParallelism:2 cap + the 60s cooldown.
 		const now = Date.now();
 		// Best-effort throttle: a rare concurrent double-trigger is acceptable (the
 		// Workpool + per-run caps bound cost); strict at-most-once isn't needed here.

@@ -2,7 +2,12 @@ import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import { eventType } from './schema';
 
-function e_ts(args: { events: { cardId?: unknown; ts: number }[] }, cardId: unknown): number {
+const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
+
+function seenAtForCard(
+	args: { events: { cardId?: unknown; ts: number }[] },
+	cardId: unknown
+): number {
 	return args.events.filter((e) => e.cardId === cardId).reduce((max, e) => Math.max(max, e.ts), 0);
 }
 
@@ -51,7 +56,6 @@ export const log = mutation({
 			)
 		);
 		// Record seen (durable, idempotent) for the never-repeat guarantee.
-		const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
 		const seenCardIds = [
 			...new Set(
 				args.events.filter((e) => SEEN_TYPES.has(e.type) && e.cardId).map((e) => e.cardId!)
@@ -67,7 +71,7 @@ export const log = mutation({
 					await ctx.db.insert('seenCards', {
 						deviceId: args.deviceId,
 						cardId,
-						seenAt: e_ts(args, cardId)
+						seenAt: seenAtForCard(args, cardId)
 					});
 				}
 			})

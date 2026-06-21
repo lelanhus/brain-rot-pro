@@ -52,7 +52,7 @@ export const purgeSeenBatch = internalMutation({
 	}
 });
 
-/** Erase all data for a device: saved cards, profile, streak, sync codes, events. */
+/** Erase all data for a device: saved cards, profile, streak, sync codes, events, seen history. */
 export const deleteData = mutation({
 	args: { deviceId: v.string() },
 	returns: v.null(),
