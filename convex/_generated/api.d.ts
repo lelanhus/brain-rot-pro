@@ -10,15 +10,12 @@
 
 import type * as account from "../account.js";
 import type * as accountMerge from "../accountMerge.js";
-import type * as accounts from "../accounts.js";
-import type * as accountsLogic from "../accountsLogic.js";
 import type * as admin from "../admin.js";
 import type * as adminAuth from "../adminAuth.js";
 import type * as adminLogic from "../adminLogic.js";
 import type * as affiliate from "../affiliate.js";
 import type * as affiliateLogic from "../affiliateLogic.js";
 import type * as aiKey from "../aiKey.js";
-import type * as auth from "../auth.js";
 import type * as cards from "../cards.js";
 import type * as crons from "../crons.js";
 import type * as demand from "../demand.js";
@@ -31,7 +28,6 @@ import type * as generate from "../generate.js";
 import type * as generateDb from "../generateDb.js";
 import type * as generateLogic from "../generateLogic.js";
 import type * as generationPipeline from "../generationPipeline.js";
-import type * as http from "../http.js";
 import type * as imageCandidates from "../imageCandidates.js";
 import type * as imageLicense from "../imageLicense.js";
 import type * as ingest from "../ingest.js";
@@ -57,15 +53,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   account: typeof account;
   accountMerge: typeof accountMerge;
-  accounts: typeof accounts;
-  accountsLogic: typeof accountsLogic;
   admin: typeof admin;
   adminAuth: typeof adminAuth;
   adminLogic: typeof adminLogic;
   affiliate: typeof affiliate;
   affiliateLogic: typeof affiliateLogic;
   aiKey: typeof aiKey;
-  auth: typeof auth;
   cards: typeof cards;
   crons: typeof crons;
   demand: typeof demand;
@@ -78,7 +71,6 @@ declare const fullApi: ApiFromModules<{
   generateDb: typeof generateDb;
   generateLogic: typeof generateLogic;
   generationPipeline: typeof generationPipeline;
-  http: typeof http;
   imageCandidates: typeof imageCandidates;
   imageLicense: typeof imageLicense;
   ingest: typeof ingest;
@@ -124,5 +116,4 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   generationPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"generationPool">;
-  betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
 };
