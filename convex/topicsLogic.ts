@@ -25,7 +25,7 @@ export function isRealArticleTitle(title: string): boolean {
 	const t = title.trim();
 	if (t === '' || SKIP_EXACT.has(t)) return false;
 	if (SKIP_PREFIXES.some((p) => t.startsWith(p))) return false;
-	if (t.startsWith('List_of_') || t.startsWith('List of ')) return false;
+	if (t.replace(/\s+/g, '_').startsWith('List_of_')) return false;
 	if (/\(disambiguation\)/i.test(t)) return false;
 	if (/^\d{1,4}$/.test(t)) return false; // bare years / numbers
 	return true;

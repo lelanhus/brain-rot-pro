@@ -13,6 +13,7 @@ describe('isRealArticleTitle', () => {
 		expect(isRealArticleTitle('Wikipedia:About')).toBe(false);
 		expect(isRealArticleTitle('Category:Physics')).toBe(false);
 		expect(isRealArticleTitle('List_of_largest_cities')).toBe(false);
+		expect(isRealArticleTitle('List of\tlargest cities')).toBe(false);
 		expect(isRealArticleTitle('Mercury_(disambiguation)')).toBe(false);
 		expect(isRealArticleTitle('2008')).toBe(false);
 		expect(isRealArticleTitle('   ')).toBe(false);
