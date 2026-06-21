@@ -153,6 +153,25 @@ export const ensureSupply = action({
 	}
 });
 
+/** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
+export const CATALOG_BATCH = 10;
+
+/**
+ * Warm-ahead supply: take the most-viewed catalog topics that still have no
+ * cards and fan a generateForTopic job per topic through the bounded Workpool.
+ * Replaces the retired demand-driven processDemand.
+ */
+export const generateFromCatalog = internalAction({
+	args: { count: v.optional(v.number()) },
+	handler: async (ctx, { count }): Promise<{ enqueued: number }> => {
+		const topics = await ctx.runQuery(internal.topics.needingCards, { limit: count ?? CATALOG_BATCH });
+		for (const topic of topics) {
+			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, { slug: topic.slug });
+		}
+		return { enqueued: topics.length };
+	}
+});
+
 /**
  * Turn one catalog topic into (at most) one published card. Idempotent: a topic
  * that is missing or already has a card is skipped before any ingest/AI work, so
