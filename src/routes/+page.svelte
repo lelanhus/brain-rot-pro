@@ -340,6 +340,22 @@
 		io.observe(el);
 		return () => io.disconnect();
 	});
+
+	// Self-heal when the feed empties out completely. The sentinel-based running-low
+	// trigger above can't fire at zero cards (the sentinel isn't rendered in the
+	// empty state), so a heavy reader who exhausts the library would otherwise get
+	// stuck. Request a supply pass once per exhaustion; the backend throttles it
+	// (60s global cooldown), so this is cheap. Re-arms once cards return.
+	let emptySupplyRequested = false;
+	$effect(() => {
+		const exhausted = deviceId !== '' && online && !liveFeed.isLoading && liveCards.length === 0;
+		if (exhausted && !emptySupplyRequested) {
+			emptySupplyRequested = true;
+			void getConvexClient().action(api.generationPipeline.ensureSupply, { deviceId });
+		} else if (liveCards.length > 0) {
+			emptySupplyRequested = false;
+		}
+	});
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -413,8 +429,8 @@
 		<section class="state">Loading…</section>
 	{:else if liveCards.length === 0}
 		<section class="state">
-			<h2>No cards yet</h2>
-			<p>Seed the library: <code>npx convex run seed:seed</code></p>
+			<h2>You're all caught up</h2>
+			<p>Fresh cards are on the way — check back in a moment.</p>
 		</section>
 	{:else if visibleResults.length === 0}
 		<section class="state">
