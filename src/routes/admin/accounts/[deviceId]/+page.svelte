@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { useQuery, useMutation } from 'convex-svelte';
+	import { useQuery, useMutation } from '@mmailaender/convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';
 

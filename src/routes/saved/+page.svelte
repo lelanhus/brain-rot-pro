@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { useQuery, useMutation } from 'convex-svelte';
+	import { useQuery, useMutation } from '@mmailaender/convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getDeviceId } from '$lib/identity';

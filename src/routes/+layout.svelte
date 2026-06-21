@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { setupConvex } from 'convex-svelte';
+	import { setupConvex } from '@mmailaender/convex-svelte';
 	import { env } from '$env/dynamic/public';
 
 	let { children } = $props();
