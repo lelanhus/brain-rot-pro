@@ -131,8 +131,11 @@ export const markSupplyTriggered = internalMutation({
 export const ensureSupply = action({
 	args: { deviceId: v.string() },
 	returns: v.object({ triggered: v.boolean() }),
-	handler: async (ctx): Promise<{ triggered: boolean }> => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	handler: async (ctx, _args): Promise<{ triggered: boolean }> => {
 		const now = Date.now();
+		// Best-effort throttle: a rare concurrent double-trigger is acceptable (the
+		// Workpool + per-run caps bound cost); strict at-most-once isn't needed here.
 		const last: number | null = await ctx.runQuery(internal.generationPipeline.readSupplyState, {});
 		if (!supplyThrottleOk(last ?? undefined, now)) return { triggered: false };
 		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
