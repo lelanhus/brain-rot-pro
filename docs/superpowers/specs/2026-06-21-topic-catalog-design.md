@@ -132,7 +132,7 @@ All in `convex/`, split by responsibility:
   - `needingCards` (internalQuery) — args `{ limit }`; `by_cardCount_pageviews`
     where `cardCount == 0`, ordered pageviews desc.
   - `bySlug` (query) — args `{ slug }`; single lookup.
-  - `backfillCardCounts` (internalAction, one-time) — map existing published
+  - `backfillCardCounts` (internalMutation, one-time) — map existing published
     `knowledgeCards` to topics by `toSlug(card.source.articleTitle)` (the
     `sourceValidator` field in `schema.ts`) and set initial `cardCount`. Skips
     cards whose source slug isn't in the catalog. Going

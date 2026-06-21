@@ -46,6 +46,8 @@ import type * as stats from "../stats.js";
 import type * as streakLogic from "../streakLogic.js";
 import type * as sync from "../sync.js";
 import type * as syncLogic from "../syncLogic.js";
+import type * as topics from "../topics.js";
+import type * as topicsLogic from "../topicsLogic.js";
 import type * as wikidataLogic from "../wikidataLogic.js";
 
 import type {
@@ -93,6 +95,8 @@ declare const fullApi: ApiFromModules<{
   streakLogic: typeof streakLogic;
   sync: typeof sync;
   syncLogic: typeof syncLogic;
+  topics: typeof topics;
+  topicsLogic: typeof topicsLogic;
   wikidataLogic: typeof wikidataLogic;
 }>;
 
