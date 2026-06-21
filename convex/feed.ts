@@ -36,7 +36,7 @@ export const unseen = query({
 		// are filtered out WITHIN each paginated page — the Convex cursor still
 		// advances past them, so no unseen card is ever skipped and the loop can't
 		// cycle. The client relies on repeated loadMore() calls to drain sparse pages.
-		const unseenCards = [];
+		const unseenCards: typeof page.page = [];
 		for (const card of page.page) {
 			if (notInterested.has(card._id)) continue;
 			if (args.deviceId.length > 0) {

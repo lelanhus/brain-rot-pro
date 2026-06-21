@@ -22,6 +22,10 @@ const pool = new Workpool(components.generationPool, {
 	retryActionsByDefault: true
 });
 
+/** Standard generation batch (concepts × titles-per-concept), shared by the
+ * hourly cron and the running-low `ensureSupply` trigger so they can't drift. */
+export const SUPPLY_BATCH = { concepts: 6, perConcept: 3 } as const;
+
 /**
  * The entrypoint (cron- and manually-triggered). Reads real interest, fans out
  * one job per candidate title into the pool. Internal: triggering generation has
@@ -143,10 +147,7 @@ export const ensureSupply = action({
 		const last: number | null = await ctx.runQuery(internal.generationPipeline.readSupplyState, {});
 		if (!supplyThrottleOk(last ?? undefined, now)) return { triggered: false };
 		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
-		await ctx.runAction(internal.generationPipeline.processDemand, {
-			concepts: 6,
-			perConcept: 3
-		});
+		await ctx.runAction(internal.generationPipeline.processDemand, SUPPLY_BATCH);
 		return { triggered: true };
 	}
 });

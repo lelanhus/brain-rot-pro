@@ -1,15 +1,9 @@
 import { mutation } from './_generated/server';
 import { v } from 'convex/values';
+import type { Id } from './_generated/dataModel';
 import { eventType } from './schema';
 
 const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
-
-function seenAtForCard(
-	args: { events: { cardId?: unknown; ts: number }[] },
-	cardId: unknown
-): number {
-	return args.events.filter((e) => e.cardId === cardId).reduce((max, e) => Math.max(max, e.ts), 0);
-}
 
 /**
  * Batched, append-only event logging (design doc §11.3, §22.2). The client
@@ -55,24 +49,21 @@ export const log = mutation({
 				})
 			)
 		);
-		// Record seen (durable, idempotent) for the never-repeat guarantee.
-		const seenCardIds = [
-			...new Set(
-				args.events.filter((e) => SEEN_TYPES.has(e.type) && e.cardId).map((e) => e.cardId!)
-			)
-		];
+		// Record seen (durable, idempotent) for the never-repeat guarantee. One pass
+		// builds {cardId → max ts} over the seen-type events, deduping as it goes.
+		const seenMax = new Map<Id<'knowledgeCards'>, number>();
+		for (const e of args.events) {
+			if (e.cardId === undefined || !SEEN_TYPES.has(e.type)) continue;
+			seenMax.set(e.cardId, Math.max(seenMax.get(e.cardId) ?? 0, e.ts));
+		}
 		await Promise.all(
-			seenCardIds.map(async (cardId) => {
+			[...seenMax].map(async ([cardId, seenAt]) => {
 				const existing = await ctx.db
 					.query('seenCards')
 					.withIndex('by_device_card', (q) => q.eq('deviceId', args.deviceId).eq('cardId', cardId))
 					.unique();
-				if (!existing) {
-					await ctx.db.insert('seenCards', {
-						deviceId: args.deviceId,
-						cardId,
-						seenAt: seenAtForCard(args, cardId)
-					});
+				if (existing === null) {
+					await ctx.db.insert('seenCards', { deviceId: args.deviceId, cardId, seenAt });
 				}
 			})
 		);
