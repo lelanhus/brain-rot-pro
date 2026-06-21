@@ -2,16 +2,15 @@ import { action, internalAction, internalMutation, internalQuery } from './_gene
 import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
-import { searchArticleTitles } from './ingest';
 import { publishedDelta } from './generateLogic';
 
 /**
- * Demand-driven generation pipeline (the "as users need more / on new interests"
- * loop). A bounded-concurrency, retrying Workpool turns in-demand concepts into
- * `needs_review` cards:
+ * Catalog-driven generation pipeline (the "warm-ahead" loop). A
+ * bounded-concurrency, retrying Workpool turns catalog topics that lack cards
+ * into `needs_review` cards:
  *
- *   demand.topConcepts → search Wikipedia per concept → enqueue per-title jobs
- *   → [Workpool, max 2 at a time] ingest (fail-closed Commons image) + generate
+ *   topics.needingCards → [Workpool, max 2 at a time] generateForTopic
+ *   → ingest (fail-closed Commons image) + generate
  *   → card lands `needs_review` (human publish gate unchanged)
  *
  * maxParallelism is deliberately low to stay polite to anonymous Wikimedia limits
@@ -23,42 +22,41 @@ const pool = new Workpool(components.generationPool, {
 	retryActionsByDefault: true
 });
 
-/** Standard generation batch (concepts × titles-per-concept), shared by the
- * hourly cron and the running-low `ensureSupply` trigger so they can't drift. */
-export const SUPPLY_BATCH = { concepts: 6, perConcept: 3 } as const;
+/** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
+export const CATALOG_BATCH = 10;
 
 /**
- * The entrypoint (cron- and manually-triggered). Reads real interest, fans out
- * one job per candidate title into the pool. Internal: triggering generation has
- * a cost, so it isn't publicly callable — the cron and ops (`run`) invoke it.
+ * Warm-ahead supply: take the most-viewed catalog topics that still have no
+ * cards and fan a generateForTopic job per topic through the bounded Workpool.
  */
-export const processDemand = internalAction({
-	args: { concepts: v.optional(v.number()), perConcept: v.optional(v.number()) },
-	// Explicit return type breaks the self-referential inference cycle (this action
-	// references its own deployment's `internal` api), as in generate.ts.
-	handler: async (
-		ctx,
-		args
-	): Promise<{
-		concepts: string[];
-		enqueued: number;
-		plan: { concept: string; titles: string[] }[];
-	}> => {
-		const top = await ctx.runQuery(internal.demand.topConcepts, { limit: args.concepts ?? 4 });
-		const plan: { concept: string; titles: string[] }[] = [];
-		let enqueued = 0;
-		for (const { concept } of top) {
-			const titles = await searchArticleTitles(concept, args.perConcept ?? 2);
-			plan.push({ concept, titles });
-			for (const title of titles) {
-				await pool.enqueueAction(ctx, internal.generationPipeline.ingestAndGenerate, {
-					title,
-					concept
-				});
-				enqueued++;
-			}
+export const generateFromCatalog = internalAction({
+	args: { count: v.optional(v.number()) },
+	handler: async (ctx, { count }): Promise<{ enqueued: number }> => {
+		const topics = await ctx.runQuery(internal.topics.needingCards, { limit: count ?? CATALOG_BATCH });
+		for (const topic of topics) {
+			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, { slug: topic.slug });
 		}
-		return { concepts: top.map((t) => t.concept), enqueued, plan };
+		return { enqueued: topics.length };
+	}
+});
+
+/**
+ * Turn one catalog topic into (at most) one published card. Idempotent: a topic
+ * that is missing or already has a card is skipped before any ingest/AI work, so
+ * re-enqueuing is safe. On a published result, bump the topic's cardCount.
+ */
+export const generateForTopic = internalAction({
+	args: { slug: v.string() },
+	handler: async (ctx, { slug }): Promise<{ status: string }> => {
+		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
+		if (topic === null || topic.cardCount > 0) return { status: 'skipped' };
+		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
+			title: topic.title
+		});
+		if (publishedDelta(r.status) > 0) {
+			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+		}
+		return { status: r.status };
 	}
 });
 
@@ -87,12 +85,12 @@ export const ingestAndGenerate = internalAction({
 
 /**
  * Manual trigger for demos/ops — same as the cron, runnable from the CLI:
- *   npx convex run generationPipeline:run '{"concepts":3,"perConcept":2}'
+ *   npx convex run generationPipeline:run '{"count":10}'
  */
 export const run = action({
-	args: { concepts: v.optional(v.number()), perConcept: v.optional(v.number()) },
+	args: { count: v.optional(v.number()) },
 	handler: async (ctx, args): Promise<unknown> =>
-		ctx.runAction(internal.generationPipeline.processDemand, args)
+		ctx.runAction(internal.generationPipeline.generateFromCatalog, args)
 });
 
 /** True if enough time has passed since the last supply trigger to trigger again. */
@@ -148,46 +146,7 @@ export const ensureSupply = action({
 		const last: number | null = await ctx.runQuery(internal.generationPipeline.readSupplyState, {});
 		if (!supplyThrottleOk(last ?? undefined, now)) return { triggered: false };
 		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
-		await ctx.runAction(internal.generationPipeline.processDemand, SUPPLY_BATCH);
+		await ctx.runAction(internal.generationPipeline.generateFromCatalog, { count: CATALOG_BATCH });
 		return { triggered: true };
-	}
-});
-
-/** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
-export const CATALOG_BATCH = 10;
-
-/**
- * Warm-ahead supply: take the most-viewed catalog topics that still have no
- * cards and fan a generateForTopic job per topic through the bounded Workpool.
- * Replaces the retired demand-driven processDemand.
- */
-export const generateFromCatalog = internalAction({
-	args: { count: v.optional(v.number()) },
-	handler: async (ctx, { count }): Promise<{ enqueued: number }> => {
-		const topics = await ctx.runQuery(internal.topics.needingCards, { limit: count ?? CATALOG_BATCH });
-		for (const topic of topics) {
-			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, { slug: topic.slug });
-		}
-		return { enqueued: topics.length };
-	}
-});
-
-/**
- * Turn one catalog topic into (at most) one published card. Idempotent: a topic
- * that is missing or already has a card is skipped before any ingest/AI work, so
- * re-enqueuing is safe. On a published result, bump the topic's cardCount.
- */
-export const generateForTopic = internalAction({
-	args: { slug: v.string() },
-	handler: async (ctx, { slug }): Promise<{ status: string }> => {
-		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
-		if (topic === null || topic.cardCount > 0) return { status: 'skipped' };
-		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
-			title: topic.title
-		});
-		if (publishedDelta(r.status) > 0) {
-			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
-		}
-		return { status: r.status };
 	}
 });
