@@ -113,3 +113,42 @@ test('backfillCatalog walks days backward and advances the cursor', async () => 
 
 	vi.unstubAllGlobals();
 });
+
+test('backfillCardCounts sets cardCount from published cards, skipping uncatalogued sources', async () => {
+	const t = convexTest(schema, modules);
+	// Catalog has Marie Curie; "Obscurity" is NOT catalogued.
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Marie Curie',
+		pageviews: 500,
+		source: 'wikipedia-top'
+	});
+	// Two published cards sourced from Marie Curie, one from an uncatalogued article.
+	await t.run(async (ctx) => {
+		// All required knowledgeCards fields (see schema.ts): hook, body, format,
+		// conceptTags, source, status, shuffleKey, createdAt. Optional fields omitted.
+		const base = {
+			hook: 'h',
+			body: 'b',
+			format: 'surprise_fact' as const,
+			conceptTags: ['science'],
+			status: 'published' as const,
+			shuffleKey: 0.5,
+			createdAt: 1
+		};
+		const src = (articleTitle: string) => ({
+			articleTitle,
+			articleUrl: `https://en.wikipedia.org/wiki/${articleTitle}`,
+			revisionId: null,
+			sourceSpan: 's'
+		});
+		await ctx.db.insert('knowledgeCards', { ...base, source: src('Marie Curie') });
+		await ctx.db.insert('knowledgeCards', { ...base, source: src('Marie_Curie') });
+		await ctx.db.insert('knowledgeCards', { ...base, source: src('Obscurity') });
+	});
+
+	const res = await t.mutation(internal.topics.backfillCardCounts, {});
+	expect(res.updated).toBe(1); // only Marie Curie matched the catalog
+
+	const topic = await t.query(api.topics.bySlug, { slug: 'marie_curie' });
+	expect(topic?.cardCount).toBe(2);
+});

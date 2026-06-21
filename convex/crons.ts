@@ -14,4 +14,8 @@ crons.interval(
 	SUPPLY_BATCH
 );
 
+// Daily: append the most recently available day's top-pageview topics to the
+// catalog so it keeps growing without manual backfill runs.
+crons.interval('harvest top pageviews', { hours: 24 }, internal.topics.harvestRecent, {});
+
 export default crons;

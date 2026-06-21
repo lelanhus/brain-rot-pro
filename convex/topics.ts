@@ -1,8 +1,7 @@
 import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
-import { toSlug, mergePageviews } from './topicsLogic';
+import { isRealArticleTitle, toSlug, mergePageviews } from './topicsLogic';
 import { internal } from './_generated/api';
-import { isRealArticleTitle } from './topicsLogic';
 
 /** Insert a topic or accumulate pageviews onto the existing row with this slug. */
 export const upsertTopic = internalMutation({
@@ -182,5 +181,49 @@ export const backfillCatalog = internalAction({
 			cursorMs -= DAY_MS;
 		}
 		return { harvested };
+	}
+});
+
+/** Cron entrypoint: harvest the most recently available day (data lags ~2 days). */
+export const harvestRecent = internalAction({
+	args: {},
+	handler: async (ctx): Promise<void> => {
+		const date = isoDate(Date.now() - 2 * DAY_MS);
+		await ctx.runAction(internal.topics.harvestTopDay, { date });
+		await ctx.runMutation(internal.topics.setLastHarvested, { date });
+	}
+});
+
+/**
+ * One-time: seed `cardCount` from existing published cards by mapping each
+ * card's source article title to a topic slug. Cards whose source isn't in the
+ * catalog are skipped. Going forward, `cardCount` upkeep is owned by the
+ * generation sub-project — this only backfills history.
+ */
+export const backfillCardCounts = internalMutation({
+	args: {},
+	handler: async (ctx): Promise<{ updated: number }> => {
+		const cards = await ctx.db
+			.query('knowledgeCards')
+			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
+			.collect();
+		const counts = new Map<string, number>();
+		for (const c of cards) {
+			const slug = toSlug(c.source.articleTitle);
+			counts.set(slug, (counts.get(slug) ?? 0) + 1);
+		}
+		let updated = 0;
+		const now = Date.now();
+		for (const [slug, count] of counts) {
+			const topic = await ctx.db
+				.query('topics')
+				.withIndex('by_slug', (q) => q.eq('slug', slug))
+				.unique();
+			if (topic !== null) {
+				await ctx.db.patch(topic._id, { cardCount: count, updatedAt: now });
+				updated++;
+			}
+		}
+		return { updated };
 	}
 });
