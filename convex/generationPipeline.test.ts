@@ -49,6 +49,7 @@ test('generateFromCatalog enqueues one job per needing-cards topic, popularity-f
 	const needing = await t.query(internal.topics.needingCards, { limit: 10 });
 	expect(needing).toHaveLength(3); // Alpha, Beta, Gamma — not Covered
 	expect(needing.every((topic) => topic.cardCount === 0)).toBe(true);
+	expect(needing[0]?.slug).toBe('beta'); // popularity-first (pageviews desc)
 	const slugs = needing.map((topic) => topic.slug);
 	expect(slugs).not.toContain('covered');
 });

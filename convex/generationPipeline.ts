@@ -66,7 +66,7 @@ export const generateForTopic = internalAction({
  * a card, so a re-enqueued title never duplicates.
  */
 export const ingestAndGenerate = internalAction({
-	args: { title: v.string(), concept: v.optional(v.string()) },
+	args: { title: v.string() },
 	handler: async (
 		ctx,
 		{ title }
