@@ -5,6 +5,7 @@ import {
 	clampBody,
 	decidePublish,
 	generatedCardSchema,
+	publishedDelta,
 	spanIsFromSource
 } from './generateLogic';
 
@@ -169,5 +170,16 @@ describe('clampBody', () => {
 	it('handles a body that is exactly max chars', () => {
 		const body = 'a'.repeat(BODY_MAX_CHARS);
 		expect(clampBody(body)).toBe(body);
+	});
+});
+
+describe('publishedDelta', () => {
+	it('is 1 only for a published result', () => {
+		expect(publishedDelta('published')).toBe(1);
+		expect(publishedDelta('duplicate')).toBe(0);
+		expect(publishedDelta('filtered')).toBe(0);
+		expect(publishedDelta('validation_failed')).toBe(0);
+		expect(publishedDelta('exists')).toBe(0);
+		expect(publishedDelta('skipped')).toBe(0);
 	});
 });

@@ -3,6 +3,7 @@ import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
 import { searchArticleTitles } from './ingest';
+import { publishedDelta } from './generateLogic';
 
 /**
  * Demand-driven generation pipeline (the "as users need more / on new interests"
@@ -149,5 +150,25 @@ export const ensureSupply = action({
 		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
 		await ctx.runAction(internal.generationPipeline.processDemand, SUPPLY_BATCH);
 		return { triggered: true };
+	}
+});
+
+/**
+ * Turn one catalog topic into (at most) one published card. Idempotent: a topic
+ * that is missing or already has a card is skipped before any ingest/AI work, so
+ * re-enqueuing is safe. On a published result, bump the topic's cardCount.
+ */
+export const generateForTopic = internalAction({
+	args: { slug: v.string() },
+	handler: async (ctx, { slug }): Promise<{ status: string }> => {
+		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
+		if (topic === null || topic.cardCount > 0) return { status: 'skipped' };
+		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
+			title: topic.title
+		});
+		if (publishedDelta(r.status) > 0) {
+			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+		}
+		return { status: r.status };
 	}
 });

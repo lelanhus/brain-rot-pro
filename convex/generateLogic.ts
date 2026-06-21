@@ -163,3 +163,11 @@ export function spanIsFromSource(span: string, paragraphs: string[]): boolean {
 		return np.includes(n) || n.includes(np);
 	});
 }
+
+/**
+ * cardCount delta for a generation result: a topic gains a card only when a NEW
+ * card is published (not on duplicate/filtered/validation_failed/exists/skipped).
+ */
+export function publishedDelta(status: string): number {
+	return status === 'published' ? 1 : 0;
+}
