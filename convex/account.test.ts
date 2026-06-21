@@ -45,9 +45,18 @@ test('deleteData erases every trace of a device across all tables', async () => 
 			.query('userProfiles')
 			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
 			.unique();
-		return { events: events.length, codes: codes.length, profile: profile === null };
+		const seen = await ctx.db
+			.query('seenCards')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.collect();
+		return {
+			events: events.length,
+			codes: codes.length,
+			profile: profile === null,
+			seen: seen.length
+		};
 	});
-	expect(leftovers).toEqual({ events: 0, codes: 0, profile: true });
+	expect(leftovers).toEqual({ events: 0, codes: 0, profile: true, seen: 0 });
 });
 
 test('deleteData leaves other devices untouched', async () => {

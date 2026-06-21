@@ -31,6 +31,27 @@ export const purgeEventsBatch = internalMutation({
 	}
 });
 
+/** Delete one batch of a device's seenCards; reschedule itself while a full batch remains. */
+async function purgeSeen(ctx: MutationCtx, deviceId: string): Promise<void> {
+	const batch = await ctx.db
+		.query('seenCards')
+		.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+		.take(500);
+	await Promise.all(batch.map((s) => ctx.db.delete(s._id)));
+	if (batch.length === 500) {
+		await ctx.scheduler.runAfter(0, internal.account.purgeSeenBatch, { deviceId });
+	}
+}
+
+export const purgeSeenBatch = internalMutation({
+	args: { deviceId: v.string() },
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await purgeSeen(ctx, args.deviceId);
+		return null;
+	}
+});
+
 /** Erase all data for a device: saved cards, profile, streak, sync codes, events. */
 export const deleteData = mutation({
 	args: { deviceId: v.string() },
@@ -62,6 +83,7 @@ export const deleteData = mutation({
 			...(stats ? [ctx.db.delete(stats._id)] : [])
 		]);
 		await purgeEvents(ctx, args.deviceId);
+		await purgeSeen(ctx, args.deviceId);
 		return null;
 	}
 });
