@@ -1,4 +1,4 @@
-import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
 import { toSlug, mergePageviews } from './topicsLogic';
 import { internal } from './_generated/api';
