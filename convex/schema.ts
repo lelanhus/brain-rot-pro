@@ -289,5 +289,20 @@ export default defineSchema({
 		lastHarvestedDate: v.string(), // ISO 'YYYY-MM-DD' of latest day the daily cron harvested
 		backfillCursorDate: v.optional(v.string()), // ISO date the historical backfill has reached
 		updatedAt: v.number()
-	}).index('by_key', ['key'])
+	}).index('by_key', ['key']),
+
+	/**
+	 * Topics a device has explicitly followed. One row per (device, slug).
+	 * `source` is 'explicit' for user-chosen topics; reserved for 'discovered'
+	 * when the feed derives interests from engagement signals (future work).
+	 */
+	interests: defineTable({
+		deviceId: v.string(),
+		slug: v.string(),
+		title: v.string(),
+		source: v.string(), // 'explicit' | 'discovered'
+		createdAt: v.number()
+	})
+		.index('by_device', ['deviceId'])
+		.index('by_device_slug', ['deviceId', 'slug'])
 });

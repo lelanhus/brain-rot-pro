@@ -35,6 +35,7 @@ import type * as imageCandidates from "../imageCandidates.js";
 import type * as imageLicense from "../imageLicense.js";
 import type * as ingest from "../ingest.js";
 import type * as ingestUtils from "../ingestUtils.js";
+import type * as interests from "../interests.js";
 import type * as profile from "../profile.js";
 import type * as profileLogic from "../profileLogic.js";
 import type * as saved from "../saved.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   imageLicense: typeof imageLicense;
   ingest: typeof ingest;
   ingestUtils: typeof ingestUtils;
+  interests: typeof interests;
   profile: typeof profile;
   profileLogic: typeof profileLogic;
   saved: typeof saved;
