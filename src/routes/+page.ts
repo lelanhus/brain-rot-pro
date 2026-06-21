@@ -1,4 +1,4 @@
-import { convexLoadPaginated } from 'convex-svelte/sveltekit';
+import { convexLoadPaginated } from '@mmailaender/convex-svelte/sveltekit';
 import { api } from '$convex/_generated/api';
 
 // SSR-to-live: the first page renders server-side (no loading flash), then

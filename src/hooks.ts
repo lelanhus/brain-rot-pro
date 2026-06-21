@@ -4,7 +4,7 @@ import {
 	decodeConvexLoad,
 	encodeConvexLoadPaginated,
 	decodeConvexLoadPaginated
-} from 'convex-svelte/sveltekit';
+} from '@mmailaender/convex-svelte/sveltekit';
 import { env } from '$env/dynamic/public';
 
 // Fail fast, fail loud (engineering-standards §1): never silently run without a backend.

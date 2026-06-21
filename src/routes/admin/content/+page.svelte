@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useQuery, useMutation } from 'convex-svelte';
+	import { useQuery, useMutation } from '@mmailaender/convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { adminAuth, isUnauthorized } from '$lib/admin.svelte';

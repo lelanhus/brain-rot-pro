@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { getConvexClient } from 'convex-svelte';
+import { getConvexClient } from '@mmailaender/convex-svelte';
 import { api } from '$convex/_generated/api';
 import type { Doc, Id } from '$convex/_generated/dataModel';
 import { getDeviceId, getSessionId } from './identity';
