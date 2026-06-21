@@ -16,8 +16,14 @@ export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
 	betterAuth({
-		// baseURL is inferred from the (Convex site) request host so the OAuth
-		// callback lands on `<deployment>.convex.site/api/auth/callback/google`.
+		// baseURL MUST be the app's own origin (SITE_URL), not the Convex site
+		// host. The SvelteKit handler proxies /api/auth/* to Convex, so the OAuth
+		// state/PKCE cookies are set on the app domain during sign-in; building the
+		// Google callback on the app domain (`<SITE_URL>/api/auth/callback/google`)
+		// keeps the callback same-origin so that cookie is present on return.
+		// Inferring from the convex.site request host instead splits the cookie
+		// domain and fails the callback with `state_mismatch`.
+		baseURL: process.env.SITE_URL as string,
 		database: authComponent.adapter(ctx),
 		socialProviders: {
 			google: {
