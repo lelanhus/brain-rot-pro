@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	BODY_MAX_CHARS,
 	buildGenerationPrompt,
+	clampBody,
 	decidePublish,
 	generatedCardSchema,
 	spanIsFromSource
@@ -86,7 +88,7 @@ describe('generatedCardSchema', () => {
 		expect(generatedCardSchema.safeParse(bad).success).toBe(false);
 	});
 
-	it('rejects a body longer than the one-screen cap (480)', () => {
+	it('accepts a body slightly over the old cap (481 chars) — schema max is now 2000', () => {
 		const card = {
 			hook: 'A valid declarative hook.',
 			body: 'a'.repeat(481),
@@ -95,10 +97,10 @@ describe('generatedCardSchema', () => {
 			conceptTags: ['t'],
 			sourceSpan: 'a'.repeat(30)
 		};
-		expect(generatedCardSchema.safeParse(card).success).toBe(false);
+		expect(generatedCardSchema.safeParse(card).success).toBe(true);
 	});
 
-	it('accepts a body exactly at the cap (480)', () => {
+	it('accepts a body exactly at the old cap (480 chars)', () => {
 		const card = {
 			hook: 'A valid declarative hook.',
 			body: 'a'.repeat(480),
@@ -108,5 +110,64 @@ describe('generatedCardSchema', () => {
 			sourceSpan: 'a'.repeat(30)
 		};
 		expect(generatedCardSchema.safeParse(card).success).toBe(true);
+	});
+
+	it('rejects a body exceeding the new sanity bound (2001 chars)', () => {
+		const card = {
+			hook: 'A valid declarative hook.',
+			body: 'a'.repeat(2001),
+			whyItMatters: 'It matters.',
+			format: 'object_story',
+			conceptTags: ['t'],
+			sourceSpan: 'a'.repeat(30)
+		};
+		expect(generatedCardSchema.safeParse(card).success).toBe(false);
+	});
+});
+
+describe('clampBody', () => {
+	it('returns a short body (<=480) unchanged', () => {
+		const short = 'This is a short body.';
+		expect(clampBody(short)).toBe(short);
+	});
+
+	it('trims leading/trailing whitespace on a short body', () => {
+		expect(clampBody('  hello.  ')).toBe('hello.');
+	});
+
+	it('given a multi-sentence body >480, returns only whole sentences, length <=480, ending at a sentence terminator', () => {
+		// Two sentences each ~280 chars → total ~560 chars (> 480).
+		const s1 = `${'The Romans used volcanic ash mixed with seawater to create concrete that could harden underwater, a technique that modern engineers are only now beginning to fully replicate and understand.'.padEnd(280, ' word')}`;
+		const s2 = `${'This discovery has profound implications for sustainable construction materials that last for millennia without the carbon footprint of Portland cement.'.padEnd(280, ' more')}`;
+		const body = `${s1.trimEnd()}. ${s2.trimEnd()}.`;
+		// Make sure our fixture is actually over the cap.
+		expect(body.length).toBeGreaterThan(BODY_MAX_CHARS);
+
+		const result = clampBody(body);
+		expect(result.length).toBeLessThanOrEqual(BODY_MAX_CHARS);
+		// Must end at a sentence terminator (last char is . ! or ?)
+		expect(result).toMatch(/[.!?]$/);
+	});
+
+	it('given a single sentence >480, returns <=480 with no mid-word cut', () => {
+		// One very long sentence with no sentence terminator
+		const longSentence = 'word '.repeat(120).trim(); // ~599 chars, no sentence terminator
+		const result = clampBody(longSentence);
+		expect(result.length).toBeLessThanOrEqual(BODY_MAX_CHARS);
+		// Must not end mid-word: last character should be end of a word (letter/digit),
+		// and the character right after the result in the original should be a space (or end).
+		const charAfter = longSentence[result.length] ?? ' ';
+		expect(charAfter).toBe(' ');
+	});
+
+	it('never returns more than max chars', () => {
+		const body = 'This is one sentence. '.repeat(40); // well over 480
+		const result = clampBody(body);
+		expect(result.length).toBeLessThanOrEqual(BODY_MAX_CHARS);
+	});
+
+	it('handles a body that is exactly max chars', () => {
+		const body = 'a'.repeat(BODY_MAX_CHARS);
+		expect(clampBody(body)).toBe(body);
 	});
 });

@@ -9,6 +9,7 @@ import {
 	PROMPT_VERSION,
 	buildGenerationPrompt,
 	buildValidationPrompt,
+	clampBody,
 	decidePublish,
 	generatedCardSchema,
 	spanIsFromSource,
@@ -85,6 +86,10 @@ export const generateFromArticle = action({
 		} catch (e) {
 			throw wrapAiError('generation', e);
 		}
+
+		// Enforce the one-screen body cap by trimming after generation (not by hard-
+		// rejecting the model output), so a slightly-long response never crashes the pipeline.
+		card.body = clampBody(card.body);
 
 		// Hard guard against invented spans before we even ask the validator.
 		const grounded = spanIsFromSource(card.sourceSpan, article.paragraphs);
@@ -191,12 +196,13 @@ export const backfillShortenOverlong = action({
 	handler: async (
 		ctx,
 		args
-	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number }> => {
+	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number; failed: number }> => {
 		const cap = args.cap ?? 480;
 		const limit = args.limit ?? 50;
 		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, limit });
 		let regenerated = 0;
 		let suppressedOnly = 0;
+		let failed = 0;
 		for (const row of rows) {
 			await ctx.runMutation(internal.generateDb.setCardStatus, {
 				cardId: row._id,
@@ -206,13 +212,18 @@ export const backfillShortenOverlong = action({
 				suppressedOnly++;
 				continue;
 			}
-			const r = await ctx.runAction(api.generate.generateFromArticle, {
-				articleId: row.articleId
-			});
-			if (r.status === 'published') regenerated++;
-			else suppressedOnly++;
+			try {
+				const r = await ctx.runAction(api.generate.generateFromArticle, {
+					articleId: row.articleId
+				});
+				if (r.status === 'published') regenerated++;
+				else suppressedOnly++;
+			} catch {
+				// Card is already suppressed; a failed regeneration just leaves it suppressed.
+				failed++;
+			}
 		}
-		return { scanned: rows.length, regenerated, suppressedOnly };
+		return { scanned: rows.length, regenerated, suppressedOnly, failed };
 	}
 });
 

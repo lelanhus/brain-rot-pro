@@ -12,6 +12,9 @@ import type { cardFormat } from './schema';
 
 export const PROMPT_VERSION = 'gen-v1';
 
+/** Single source of truth for the one-screen body cap. */
+export const BODY_MAX_CHARS = 480;
+
 // `satisfies` makes this fail to compile if a value drifts from the schema's
 // cardFormat union — one guarded source for the format list.
 export const CARD_FORMATS = [
@@ -35,7 +38,7 @@ export const generatedCardSchema = z.object({
 	body: z
 		.string()
 		.min(80)
-		.max(480)
+		.max(2000)
 		.describe(
 			'One tight paragraph (≈2–4 short sentences, ~80 words max) explaining the one idea, in plain language.'
 		),
@@ -116,6 +119,38 @@ export function decidePublish(
 	return grounded && validation.supported && validation.score >= autoPublishThreshold()
 		? 'published'
 		: 'validation_failed';
+}
+
+/**
+ * Trim a body to <= max chars at a sentence boundary (keep whole sentences).
+ * Falls back to a word boundary if even the first sentence exceeds max.
+ */
+export function clampBody(body: string, max = BODY_MAX_CHARS): string {
+	const trimmed = body.trim();
+	if (trimmed.length <= max) return trimmed;
+
+	// Split into sentences, keeping the terminators attached.
+	const sentences = trimmed.match(/[^.!?]*[.!?]+(\s|$)/g) ?? [];
+
+	let accumulated = '';
+	for (const sentence of sentences) {
+		const candidate = (accumulated + sentence).trimEnd();
+		if (candidate.length <= max) {
+			accumulated = candidate + ' ';
+		} else {
+			break;
+		}
+	}
+	const sentenceResult = accumulated.trimEnd();
+	if (sentenceResult.length > 0) return sentenceResult;
+
+	// No whole sentence fits — fall back to word boundary.
+	const sub = trimmed.slice(0, max);
+	const lastSpace = sub.lastIndexOf(' ');
+	if (lastSpace > 0) return sub.slice(0, lastSpace);
+
+	// Even the first word exceeds max — hard-slice.
+	return sub;
 }
 
 /** Guard: the model must copy a real span from the source, not invent one. */
