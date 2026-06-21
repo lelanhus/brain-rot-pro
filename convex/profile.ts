@@ -3,16 +3,16 @@ import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { accumulateWeights } from './profileLogic';
 
-const SEEN_EVENTS = new Set(['card_impression', 'card_complete', 'card_skip']);
-
 /**
  * Rebuild this device's personalization profile from its events (ADR-007:
  * precompute, so the feed query reads one cheap doc instead of scanning events).
  * Idempotent; called on session start and after strong signals.
+ *
+ * Note: `seen` is no longer written here — `seenCards` is the source of truth.
  */
 export const recompute = mutation({
 	args: { deviceId: v.string() },
-	returns: v.object({ concepts: v.number(), seen: v.number(), notInterested: v.number() }),
+	returns: v.object({ concepts: v.number(), notInterested: v.number() }),
 	handler: async (ctx, args) => {
 		if (args.deviceId.length === 0) throw new Error('recompute: deviceId is required');
 
@@ -32,18 +32,15 @@ export const recompute = mutation({
 		}
 
 		const weights = accumulateWeights(events, tagsByCard);
-		const seen = new Set<Id<'knowledgeCards'>>();
 		const notInterested = new Set<Id<'knowledgeCards'>>();
 		for (const e of events) {
 			if (!e.cardId) continue;
-			if (SEEN_EVENTS.has(e.type)) seen.add(e.cardId);
 			if (e.type === 'not_interested') notInterested.add(e.cardId);
 		}
 
 		const profile = {
 			deviceId: args.deviceId,
 			conceptWeights: Object.entries(weights).map(([concept, weight]) => ({ concept, weight })),
-			seen: [...seen],
 			notInterested: [...notInterested],
 			updatedAt: Date.now()
 		};
@@ -57,7 +54,6 @@ export const recompute = mutation({
 
 		return {
 			concepts: profile.conceptWeights.length,
-			seen: profile.seen.length,
 			notInterested: profile.notInterested.length
 		};
 	}
