@@ -241,6 +241,16 @@ export default defineSchema({
 		redeemedAt: v.optional(v.number())
 	}).index('by_code', ['code']),
 
+	// Maps a Better Auth user to the deviceId-style principal their per-device
+	// data lives under (approach A — no table re-keying).
+	accounts: defineTable({
+		authUserId: v.string(),
+		principal: v.string(),
+		createdAt: v.number()
+	})
+		.index('by_authUser', ['authUserId'])
+		.index('by_principal', ['principal']),
+
 	/**
 	 * Throttle state for the running-low supply trigger. A singleton row
 	 * (key='global') records the last time `ensureSupply` enqueued a generation
