@@ -44,6 +44,28 @@ test('events.log fails fast on empty identity', async () => {
 	).rejects.toThrow();
 });
 
+test('events.log records seenCards for seen-type events, idempotently', async () => {
+	const t = convexTest(schema, modules);
+	const cardId = await firstCardId(t);
+	const deviceId = 'seen-device';
+	await t.mutation(api.events.log, {
+		deviceId,
+		sessionId: 's1',
+		events: [
+			{ type: 'card_impression', cardId, ts: 1 },
+			{ type: 'card_complete', cardId, ts: 2 } // same card again
+		]
+	});
+	const rows = await t.run(async (ctx) =>
+		ctx.db
+			.query('seenCards')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.collect()
+	);
+	expect(rows).toHaveLength(1); // one row per (device, card), not per event
+	expect(rows[0].cardId).toBe(cardId);
+});
+
 test('saved.toggle is idempotent per (device, card); savedIds reflects it', async () => {
 	const t = convexTest(schema, modules);
 	const cardId = await firstCardId(t);

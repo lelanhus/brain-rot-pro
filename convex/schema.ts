@@ -178,6 +178,16 @@ export default defineSchema({
 		status: v.union(v.literal('fetched'), v.literal('filtered_out'))
 	}).index('by_pageId', ['pageId']),
 
+	// Durable "seen" — one row per (device, card). Source of truth for the
+	// never-repeat guarantee; replaces the unbounded userProfiles.seen array.
+	seenCards: defineTable({
+		deviceId: v.string(),
+		cardId: v.id('knowledgeCards'),
+		seenAt: v.number()
+	})
+		.index('by_device_card', ['deviceId', 'cardId'])
+		.index('by_device', ['deviceId']),
+
 	/** Cards a device has saved. Bounded per device. */
 	savedCards: defineTable({
 		deviceId: v.string(),
@@ -196,7 +206,7 @@ export default defineSchema({
 	userProfiles: defineTable({
 		deviceId: v.string(),
 		conceptWeights: v.array(v.object({ concept: v.string(), weight: v.number() })),
-		seen: v.array(v.id('knowledgeCards')),
+		seen: v.optional(v.array(v.id('knowledgeCards'))),
 		notInterested: v.array(v.id('knowledgeCards')),
 		updatedAt: v.number()
 	}).index('by_device', ['deviceId']),

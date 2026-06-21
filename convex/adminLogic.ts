@@ -77,7 +77,7 @@ export function summarizeAudience(
 type ProfileLite = {
 	deviceId: string;
 	conceptWeights: ReadonlyArray<unknown>;
-	seen: ReadonlyArray<unknown>;
+	seen?: ReadonlyArray<unknown>;
 	notInterested: ReadonlyArray<unknown>;
 };
 type StatRowLite = {

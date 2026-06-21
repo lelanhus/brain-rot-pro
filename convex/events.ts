@@ -2,6 +2,11 @@ import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import { eventType } from './schema';
 
+function e_ts(args: { events: { cardId?: unknown; ts: number }[] }, cardId: unknown): number {
+	const hit = args.events.find((e) => e.cardId === cardId);
+	return hit?.ts ?? 0;
+}
+
 /**
  * Batched, append-only event logging (design doc §11.3, §22.2). The client
  * buffers events and flushes them here; writes are fire-and-forget on the
@@ -46,6 +51,29 @@ export const log = mutation({
 				})
 			)
 		);
+		// Record seen (durable, idempotent) for the never-repeat guarantee.
+		const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
+		const seenCardIds = [
+			...new Set(
+				args.events.filter((e) => SEEN_TYPES.has(e.type) && e.cardId).map((e) => e.cardId!)
+			)
+		];
+		await Promise.all(
+			seenCardIds.map(async (cardId) => {
+				const existing = await ctx.db
+					.query('seenCards')
+					.withIndex('by_device_card', (q) => q.eq('deviceId', args.deviceId).eq('cardId', cardId))
+					.unique();
+				if (!existing) {
+					await ctx.db.insert('seenCards', {
+						deviceId: args.deviceId,
+						cardId,
+						seenAt: e_ts(args, cardId)
+					});
+				}
+			})
+		);
+
 		return { logged: args.events.length };
 	}
 });
