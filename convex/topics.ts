@@ -1,6 +1,8 @@
-import { internalMutation, internalQuery, query } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
 import { toSlug, mergePageviews } from './topicsLogic';
+import { internal } from './_generated/api';
+import { isRealArticleTitle } from './topicsLogic';
 
 /** Insert a topic or accumulate pageviews onto the existing row with this slug. */
 export const upsertTopic = internalMutation({
@@ -62,4 +64,123 @@ export const bySlug = query({
 			.query('topics')
 			.withIndex('by_slug', (q) => q.eq('slug', slug))
 			.unique()
+});
+
+// Wikimedia top-pageviews endpoint + descriptive UA (Wikimedia policy, ADR-005).
+const PAGEVIEWS_TOP =
+	'https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia.org/all-access';
+const USER_AGENT =
+	'BrainRotPro/0.1 (https://github.com/lelanhus/brain-rot-pro; leland.husband@gmail.com)';
+
+const DAY_MS = 86_400_000;
+
+/** ISO 'YYYY-MM-DD' (UTC) for a millisecond timestamp. */
+function isoDate(ms: number): string {
+	const dt = new Date(ms);
+	const y = dt.getUTCFullYear();
+	const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+	const d = String(dt.getUTCDate()).padStart(2, '0');
+	return `${y}-${m}-${d}`;
+}
+
+export const readCatalogState = internalQuery({
+	args: {},
+	handler: async (ctx) =>
+		await ctx.db
+			.query('catalogState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique()
+});
+
+export const setBackfillCursor = internalMutation({
+	args: { date: v.string() },
+	handler: async (ctx, { date }) => {
+		const row = await ctx.db
+			.query('catalogState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
+		const now = Date.now();
+		if (row !== null) await ctx.db.patch(row._id, { backfillCursorDate: date, updatedAt: now });
+		else
+			await ctx.db.insert('catalogState', {
+				key: 'global',
+				lastHarvestedDate: '',
+				backfillCursorDate: date,
+				updatedAt: now
+			});
+	}
+});
+
+export const setLastHarvested = internalMutation({
+	args: { date: v.string() },
+	handler: async (ctx, { date }) => {
+		const row = await ctx.db
+			.query('catalogState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
+		const now = Date.now();
+		if (row !== null) await ctx.db.patch(row._id, { lastHarvestedDate: date, updatedAt: now });
+		else
+			await ctx.db.insert('catalogState', {
+				key: 'global',
+				lastHarvestedDate: date,
+				updatedAt: now
+			});
+	}
+});
+
+/** Fetch one day's top-1000, filter noise, upsert survivors. Throws on API error. */
+export const harvestTopDay = internalAction({
+	args: { date: v.string() }, // 'YYYY-MM-DD'
+	handler: async (ctx, { date }): Promise<{ fetched: number; kept: number }> => {
+		const [y, m, d] = date.split('-');
+		const res = await fetch(`${PAGEVIEWS_TOP}/${y}/${m}/${d}`, {
+			headers: { 'User-Agent': USER_AGENT }
+		});
+		if (!res.ok) throw new Error(`Pageviews API ${res.status} for ${date}`);
+		const data = (await res.json()) as {
+			items?: { articles?: { article: string; views: number }[] }[];
+		};
+		const articles = data.items?.[0]?.articles ?? [];
+		let kept = 0;
+		for (const a of articles) {
+			if (!isRealArticleTitle(a.article)) continue;
+			await ctx.runMutation(internal.topics.upsertTopic, {
+				title: a.article,
+				pageviews: a.views,
+				source: 'wikipedia-top'
+			});
+			kept++;
+		}
+		return { fetched: articles.length, kept };
+	}
+});
+
+/**
+ * Bounded, resumable historical backfill. Walks backward `days` days from the
+ * day before the stored cursor (or 2 days ago if none — pageview data lags
+ * ~1–2 days), harvesting each and advancing the cursor only after a day
+ * succeeds. On API failure `harvestTopDay` throws, the run stops, and the
+ * cursor is preserved at the last success so the next run retries that day.
+ */
+export const backfillCatalog = internalAction({
+	args: { days: v.optional(v.number()) },
+	handler: async (ctx, { days }): Promise<{ harvested: number }> => {
+		const state = await ctx.runQuery(internal.topics.readCatalogState, {});
+		const startMs =
+			state?.backfillCursorDate !== undefined && state.backfillCursorDate !== ''
+				? Date.parse(`${state.backfillCursorDate}T00:00:00Z`) - DAY_MS
+				: Date.now() - 2 * DAY_MS;
+		const n = days ?? 30;
+		let cursorMs = startMs;
+		let harvested = 0;
+		for (let i = 0; i < n; i++) {
+			const date = isoDate(cursorMs);
+			await ctx.runAction(internal.topics.harvestTopDay, { date });
+			await ctx.runMutation(internal.topics.setBackfillCursor, { date });
+			harvested++;
+			cursorMs -= DAY_MS;
+		}
+		return { harvested };
+	}
 });
