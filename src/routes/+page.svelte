@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
-	import { useQuery, useMutation, getConvexClient } from 'convex-svelte';
+	import { useQuery, useMutation, usePaginatedQuery, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { PageData } from './$types';
@@ -58,11 +58,16 @@
 	const savedSet = $derived(new Set<string>((savedQuery.data ?? []).map(String)));
 	const toggleSave = useMutation(api.saved.toggle);
 
-	// Personalized feed: takes over from the SSR global feed once the device id
-	// resolves and the profile loads (ADR-007). Reactive on the profile, so it
-	// re-ranks live when recompute() runs after a strong signal.
-	const personal = useQuery(api.feed.personal, () =>
-		deviceId ? { deviceId, focusConcept: focusConcept ?? undefined } : 'skip'
+	// Live paginated unseen feed: re-keys on deviceId + focusConcept so it
+	// switches to personalized seen-exclusion once the device id resolves
+	// (ADR-007). SSR first-paint comes from data.feed (anonymous, deviceId:'').
+	const liveFeed = usePaginatedQuery(
+		api.feed.unseen,
+		() =>
+			deviceId
+				? { deviceId, focusConcept: focusConcept ?? undefined }
+				: { deviceId: '', focusConcept: focusConcept ?? undefined },
+		{ initialNumItems: 8 }
 	);
 	const recompute = useMutation(api.profile.recompute);
 
@@ -76,7 +81,12 @@
 	// personalization need the connection.
 	let online = $state(true);
 	let cachedOffline = $state<Doc<'knowledgeCards'>[]>([]);
-	const liveCards = $derived(personal.data ?? feed.results);
+	// liveFeed takes over from the SSR anonymous first-paint (data.feed) once
+	// the client subscription is active. Use liveFeed.results when it has data,
+	// otherwise fall back to the SSR paginated results.
+	const liveCards = $derived(
+		liveFeed.results.length > 0 || !liveFeed.isLoading ? liveFeed.results : feed.results
+	);
 	const sourceCards = $derived(!online && liveCards.length === 0 ? cachedOffline : liveCards);
 	const offlineFallback = $derived(!online && liveCards.length === 0 && cachedOffline.length > 0);
 
@@ -86,9 +96,9 @@
 		if (online && liveCards.length > 0) void persistCards($state.snapshot(liveCards));
 	});
 
-	// Personalized once it loads; the SSR global feed until then. `notInterested`
-	// is an in-memory optimistic hide for the gap before recompute() rewrites the
-	// profile (the server is the durable source — feed.personal excludes them).
+	// `notInterested` is an in-memory optimistic hide for the gap before
+	// recompute() rewrites the profile (the server is the durable source —
+	// feed.unseen hard-excludes notInterested server-side).
 	const visibleResults = $derived(
 		weaveFeed(sourceCards, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
@@ -312,7 +322,7 @@
 		if (!el) return;
 		const io = new IntersectionObserver(
 			(entries) => {
-				if (entries[0]?.isIntersecting && feed.status === 'CanLoadMore') feed.loadMore(6);
+				if (entries[0]?.isIntersecting && liveFeed.status === 'CanLoadMore') liveFeed.loadMore(6);
 			},
 			{ rootMargin: '800px' }
 		);
@@ -383,14 +393,14 @@
 </div>
 
 <main class="feed" data-testid="feed" bind:this={feedEl} aria-label="Knowledge feed">
-	{#if feed.error}
+	{#if liveFeed.error}
 		<section class="state error">
 			<h2>Something went wrong</h2>
-			<p>{feed.error.message}</p>
+			<p>{liveFeed.error.message}</p>
 		</section>
-	{:else if feed.isLoading && feed.results.length === 0}
+	{:else if liveFeed.isLoading && liveCards.length === 0}
 		<section class="state">Loading…</section>
-	{:else if feed.results.length === 0}
+	{:else if liveCards.length === 0}
 		<section class="state">
 			<h2>No cards yet</h2>
 			<p>Seed the library: <code>npx convex run seed:seed</code></p>
@@ -446,9 +456,9 @@
 			{/if}
 		{/each}
 		<div bind:this={sentinel} class="sentinel" aria-hidden="true"></div>
-		{#if feed.status === 'LoadingMore'}
+		{#if liveFeed.status === 'LoadingMore'}
 			<section class="state subtle">Loading more…</section>
-		{:else if feed.status === 'Exhausted'}
+		{:else if liveFeed.status === 'Exhausted'}
 			<section class="state end">
 				<span class="end-kicker">That's today</span>
 				{#if sessionCount > 0}
