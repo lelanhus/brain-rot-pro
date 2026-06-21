@@ -155,18 +155,14 @@ body {
 	);
 }
 
-/* Each slot is exactly one viewport — a fixed 100dvh box that never grows past
-   it. Content is TOP-anchored, not centred: every card's tag/hook lands at the
-   same Y regardless of body length, so swiping the feed never makes the hook
-   jump — calm and predictable ("snappy, not floaty", ui-ux.md §11). The
-   generous top space gives the hook a stage (active whitespace; web-design 03);
-   bottom padding reserves the thumb-zone strip. overflow:hidden clips any rare
-   legacy card that exceeds the box (safety net; new bodies are capped at 480
-   chars by Task 1 and won't reach the clip). */
+/* Each slot is at least one viewport and TOP-anchored: every card's tag/hook
+   lands at the same Y regardless of body length, so swiping never makes the hook
+   jump — calm and predictable ("snappy, not floaty", ui-ux.md §11). A card whose
+   content exceeds the viewport grows the slot and the feed scrolls to it (the
+   true one-screen-fit layout needs a compaction pass — see design notes). */
 .slot {
 	position: relative;
-	height: 100dvh;
-	overflow: hidden;
+	min-height: 100dvh;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -211,24 +207,17 @@ body {
 }
 
 .card {
-	position: relative; /* positioning context for .reveal-overlay (Task 3) */
+	position: relative; /* positioning context for .reveal-overlay */
 	width: 100%;
 	max-width: 640px;
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	min-height: 0; /* allow children to shrink instead of forcing overflow */
 }
 
 /* Vertical rhythm via per-element margins (proximity: tight within a group,
    loose between groups; web-design 03/06). No card border — the viewport edge
-   and the whitespace are the boundary (Gestalt closure). flex:1 + min-height:0
-   lets the body region flex-shrink within the card column. */
+   and the whitespace are the boundary (Gestalt closure). */
 .card-body {
 	display: flex;
 	flex-direction: column;
-	flex: 1;
-	min-height: 0;
 }
 
 .card-body > * {
@@ -243,7 +232,7 @@ body {
 .card-image img {
 	display: block;
 	width: 100%;
-	max-height: 30dvh; /* image never takes more than ~⅓ of the screen */
+	max-height: 24dvh; /* keep the image compact so hook + body fit one screen */
 	object-fit: cover;
 	border-radius: var(--radius);
 	background: var(--surface-2);
@@ -319,9 +308,6 @@ body {
 	line-height: 1.6;
 	color: var(--text-2);
 	text-wrap: pretty;
-	flex: 1 1 auto;
-	min-height: 0;
-	overflow: hidden; /* clip, never scroll; legacy >480-char bodies are shortened in Task 4 */
 }
 
 /* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding
