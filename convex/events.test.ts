@@ -64,6 +64,7 @@ test('events.log records seenCards for seen-type events, idempotently', async ()
 	);
 	expect(rows).toHaveLength(1); // one row per (device, card), not per event
 	expect(rows[0].cardId).toBe(cardId);
+	expect(rows[0].seenAt).toBe(2); // max ts among the two same-card events (ts:1, ts:2)
 });
 
 test('saved.toggle is idempotent per (device, card); savedIds reflects it', async () => {

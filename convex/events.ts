@@ -3,8 +3,7 @@ import { v } from 'convex/values';
 import { eventType } from './schema';
 
 function e_ts(args: { events: { cardId?: unknown; ts: number }[] }, cardId: unknown): number {
-	const hit = args.events.find((e) => e.cardId === cardId);
-	return hit?.ts ?? 0;
+	return args.events.filter((e) => e.cardId === cardId).reduce((max, e) => Math.max(max, e.ts), 0);
 }
 
 /**
