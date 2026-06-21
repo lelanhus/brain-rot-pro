@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { useQuery, getConvexClient } from '@mmailaender/convex-svelte';
+	import { useQuery, useAuth, getConvexClient } from '@mmailaender/convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { getDeviceId, clearDeviceId } from '$lib/identity';
+	import { authClient } from '$lib/auth-client';
 	import { errorMessage } from '$lib/errors';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
@@ -35,6 +36,21 @@
 			deleteError = errorMessage(err, 'Could not delete your data.');
 			deleting = false;
 		}
+	}
+
+	// Google sign-in (cross-device identity). Anonymous browsing stays the default;
+	// signing in binds this device's data to the account (link-on-auth in +layout).
+	const auth = useAuth();
+	let signingOut = $state(false);
+	function signInGoogle() {
+		void authClient.signIn.social({ provider: 'google' });
+	}
+	async function signOut() {
+		if (signingOut) return;
+		signingOut = true;
+		await authClient.signOut();
+		clearDeviceId(); // revert to a fresh anonymous device
+		location.assign(resolve('/'));
 	}
 
 	const num = (n: number) => n.toLocaleString();
@@ -81,12 +97,22 @@
 	</section>
 
 	<section class="panel">
-		<h2>Devices</h2>
-		<p>Carry your saves and streak to another device with a one-time code.</p>
-		<a class="row-link" href={resolve('/sync')}>Sync to another device →</a>
+		<h2>Cross-device sync</h2>
+		{#if auth.isAuthenticated}
+			<p>You're signed in with Google — your saves, streak, and feed follow you across devices.</p>
+			<button type="button" class="ghost" onclick={signOut} disabled={signingOut}>
+				{signingOut ? 'Signing out…' : 'Sign out'}
+			</button>
+		{:else}
+			<p>
+				Sign in with Google to sync your saves, streak, and personalized feed across your devices.
+			</p>
+			<button type="button" class="ghost" onclick={signInGoogle}>Sign in with Google</button>
+		{/if}
 		<p class="note">
-			Google &amp; Apple sign-in for automatic cross-device sync is coming. Until then, anonymous
-			device sync keeps everything on your devices and off our servers.
+			Prefer to stay anonymous? <a class="row-link" href={resolve('/sync')}
+				>Sync with a one-time code →</a
+			>
 		</p>
 	</section>
 
