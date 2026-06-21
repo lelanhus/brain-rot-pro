@@ -1,13 +1,14 @@
 import { query } from './_generated/server';
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
-import { scoreCard } from './profileLogic';
+import { scoreByTaste } from './profileLogic';
 
 /**
  * Unseen feed (never-repeat at scale). Paginates published cards, HARD-EXCLUDES
  * cards in seenCards + the profile's notInterested, then ranks the surviving
- * page (light concept-affinity now; swap rankPage for AI scoring later). Never
- * collect()s all cards. Seen is the source of truth in seenCards (ADR-007).
+ * page by taste vector (cosine similarity + novelty) with concept-affinity
+ * fallback for cold-start / un-embedded cards. Never collect()s all cards.
+ * Seen is the source of truth in seenCards (ADR-007).
  */
 export const unseen = query({
 	args: {
@@ -51,13 +52,18 @@ export const unseen = query({
 			unseenCards.push(card);
 		}
 
+		const tasteVector = profile?.tasteVector;
 		unseenCards.sort(
 			(a, b) =>
-				scoreCard(b.conceptTags, weights, {
+				scoreByTaste(b, {
+					tasteVector,
+					weights,
 					shuffleKey: b.shuffleKey,
 					focusConcept: args.focusConcept
 				}) -
-				scoreCard(a.conceptTags, weights, {
+				scoreByTaste(a, {
+					tasteVector,
+					weights,
 					shuffleKey: a.shuffleKey,
 					focusConcept: args.focusConcept
 				})

@@ -95,3 +95,56 @@ test('focusConcept floats matching cards above non-matching', async () => {
 	expect(ids).toContain(betaId);
 	expect(ids.indexOf(alphaId)).toBeLessThan(ids.indexOf(betaId)); // focused card ranks first
 });
+
+test('feed.unseen ranks an on-taste card ahead of an off-taste one', async () => {
+	const t = convexTest(schema, modules);
+	const deviceId = 'rank-dev';
+	const near = await t.run(async (ctx) =>
+		ctx.db.insert('knowledgeCards', {
+			hook: 'near',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
+			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'published',
+			shuffleKey: 0.1,
+			createdAt: 0,
+			embedding: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 0 ? 1 : 0))
+		})
+	);
+	const far = await t.run(async (ctx) =>
+		ctx.db.insert('knowledgeCards', {
+			hook: 'far',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
+			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'published',
+			shuffleKey: 0.9,
+			createdAt: 0,
+			embedding: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 1 ? 1 : 0))
+		})
+	);
+	// taste = the 'near' embedding direction
+	await t.run(async (ctx) =>
+		ctx.db.insert('userProfiles', {
+			deviceId,
+			conceptWeights: [],
+			notInterested: [],
+			updatedAt: 0,
+			tasteVector: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 0 ? 1 : 0))
+		})
+	);
+	const res = await t.query(api.feed.unseen, {
+		deviceId,
+		paginationOpts: { numItems: 50, cursor: null }
+	});
+	const ids = res.page.map((c) => c._id);
+	expect(ids.indexOf(near)).toBeLessThan(ids.indexOf(far)); // on-taste first despite higher far shuffleKey
+});
