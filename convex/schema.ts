@@ -208,6 +208,9 @@ export default defineSchema({
 		conceptWeights: v.array(v.object({ concept: v.string(), weight: v.number() })),
 		seen: v.optional(v.array(v.id('knowledgeCards'))),
 		notInterested: v.array(v.id('knowledgeCards')),
+		// Embedding of the user's taste (avg of liked cards), for AI feed ranking.
+		// Optional: only set once they positively engage with embedded cards.
+		tasteVector: v.optional(v.array(v.float64())),
 		updatedAt: v.number()
 	}).index('by_device', ['deviceId']),
 

@@ -1,7 +1,7 @@
 import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
-import { accumulateWeights } from './profileLogic';
+import { accumulateWeights, buildTasteVector } from './profileLogic';
 
 /**
  * Rebuild this device's personalization profile from its events (ADR-007:
@@ -27,16 +27,21 @@ export const recompute = mutation({
 		];
 		const cards = await Promise.all(cardIds.map((id) => ctx.db.get(id)));
 		const tagsByCard: Record<string, string[]> = {};
+		const embeddingByCard: Record<string, number[] | undefined> = {};
 		for (const card of cards) {
-			if (card) tagsByCard[card._id] = card.conceptTags;
+			if (card) {
+				tagsByCard[card._id] = card.conceptTags;
+				embeddingByCard[card._id] = card.embedding;
+			}
 		}
 
 		const weights = accumulateWeights(events, tagsByCard);
 		const notInterested = new Set<Id<'knowledgeCards'>>();
 		for (const e of events) {
-			if (!e.cardId) continue;
+			if (e.cardId === undefined || e.cardId === null) continue;
 			if (e.type === 'not_interested') notInterested.add(e.cardId);
 		}
+		const tasteVector = buildTasteVector(events, embeddingByCard, Date.now());
 
 		const profile = {
 			deviceId: args.deviceId,
@@ -49,8 +54,15 @@ export const recompute = mutation({
 			.query('userProfiles')
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
 			.unique();
-		if (existing) await ctx.db.patch(existing._id, profile);
-		else await ctx.db.insert('userProfiles', profile);
+		if (existing) {
+			// patch with tasteVector set-or-cleared (Convex removes a field set to undefined).
+			await ctx.db.patch(existing._id, { ...profile, tasteVector });
+		} else {
+			await ctx.db.insert(
+				'userProfiles',
+				tasteVector !== undefined ? { ...profile, tasteVector } : profile
+			);
+		}
 
 		return {
 			concepts: profile.conceptWeights.length,
