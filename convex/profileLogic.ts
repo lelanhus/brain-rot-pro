@@ -5,6 +5,8 @@
  * the seenCards table (never-repeat guarantee); scoreCard no longer needs it.
  */
 
+import { cosineSimilarity } from './embedLogic';
+
 /** How much each event type shifts the weight of a card's concepts. */
 export const EVENT_DELTA: Record<string, number> = {
 	save: 3,
@@ -24,6 +26,10 @@ export const WILDCARD_WEIGHT = 0.4;
  * reorder rather than filter, and the feed never empties when a concept runs dry.
  */
 export const FOCUS_BOOST = 100;
+/** How hard taste-similarity (cosine ≈0–1) drives ranking vs the novelty term.
+ * High enough that relevance dominates while WILDCARD_WEIGHT still reshuffles
+ * near-ties (the discovery slice). */
+export const RELEVANCE_WEIGHT = 10;
 
 /** Half-life for recency weighting of taste signals (14 days). */
 export const TASTE_HALFLIFE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -89,4 +95,31 @@ export function buildTasteVector(
 	}
 	if (acc === null || totalWeight === 0) return undefined;
 	return acc.map((x) => x / totalWeight);
+}
+
+/**
+ * Taste-aware score: when a taste vector and the card's embedding are both
+ * present, rank by cosine similarity + novelty + focus. Otherwise fall back to
+ * concept-affinity (scoreCard) — cold-start and un-embedded cards rank sanely.
+ */
+export function scoreByTaste(
+	card: { conceptTags: string[]; embedding?: number[] },
+	ctx: {
+		tasteVector?: number[];
+		weights: Record<string, number>;
+		shuffleKey: number;
+		focusConcept?: string | null;
+	}
+): number {
+	const emb = card.embedding;
+	if (ctx.tasteVector !== undefined && emb !== undefined && emb.length === ctx.tasteVector.length) {
+		let score = RELEVANCE_WEIGHT * cosineSimilarity(ctx.tasteVector, emb);
+		score += WILDCARD_WEIGHT * ctx.shuffleKey;
+		if (ctx.focusConcept && card.conceptTags.includes(ctx.focusConcept)) score += FOCUS_BOOST;
+		return score;
+	}
+	return scoreCard(card.conceptTags, ctx.weights, {
+		shuffleKey: ctx.shuffleKey,
+		focusConcept: ctx.focusConcept
+	});
 }

@@ -4,7 +4,8 @@ import {
 	scoreCard,
 	FOCUS_BOOST,
 	buildTasteVector,
-	TASTE_HALFLIFE_MS
+	TASTE_HALFLIFE_MS,
+	scoreByTaste
 } from './profileLogic';
 
 describe('accumulateWeights', () => {
@@ -100,5 +101,41 @@ describe('buildTasteVector', () => {
 		];
 		const v = buildTasteVector(events, { a: [1, 0], b: [0, 1] }, NOW)!;
 		expect(v[0]).toBeGreaterThan(v[1]); // recent 'a' dominates
+	});
+});
+
+describe('scoreByTaste', () => {
+	const taste = [1, 0];
+	it('ranks an on-taste card above an off-taste card', () => {
+		const near = scoreByTaste(
+			{ conceptTags: [], embedding: [1, 0] },
+			{ tasteVector: taste, weights: {}, shuffleKey: 0 }
+		);
+		const far = scoreByTaste(
+			{ conceptTags: [], embedding: [0, 1] },
+			{ tasteVector: taste, weights: {}, shuffleKey: 0 }
+		);
+		expect(near).toBeGreaterThan(far);
+	});
+
+	it('falls back to scoreCard when there is no taste vector', () => {
+		const liked = scoreByTaste(
+			{ conceptTags: ['x'], embedding: [1, 0] },
+			{ tasteVector: undefined, weights: { x: 5 }, shuffleKey: 0 }
+		);
+		const neutral = scoreByTaste(
+			{ conceptTags: ['y'], embedding: [1, 0] },
+			{ tasteVector: undefined, weights: { x: 5 }, shuffleKey: 0 }
+		);
+		expect(liked).toBeGreaterThan(neutral); // concept-affinity, not embedding
+	});
+
+	it('falls back to scoreCard when the card has no embedding', () => {
+		const score = scoreByTaste(
+			{ conceptTags: ['x'] },
+			{ tasteVector: taste, weights: { x: 5 }, shuffleKey: 0 }
+		);
+		// equals the concept-affinity score (5) — no embedding term applied
+		expect(score).toBeCloseTo(5);
 	});
 });
