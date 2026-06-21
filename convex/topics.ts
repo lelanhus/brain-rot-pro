@@ -194,6 +194,20 @@ export const harvestRecent = internalAction({
 	}
 });
 
+/** Increment a topic's published-card count by one. No-op if the slug isn't catalogued. */
+export const incrementCardCount = internalMutation({
+	args: { slug: v.string() },
+	handler: async (ctx, { slug }) => {
+		const topic = await ctx.db
+			.query('topics')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (topic !== null) {
+			await ctx.db.patch(topic._id, { cardCount: topic.cardCount + 1, updatedAt: Date.now() });
+		}
+	}
+});
+
 /**
  * One-time: seed `cardCount` from existing published cards by mapping each
  * card's source article title to a topic slug. Cards whose source isn't in the

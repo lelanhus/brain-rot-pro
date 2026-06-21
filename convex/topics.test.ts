@@ -114,6 +114,23 @@ test('backfillCatalog walks days backward and advances the cursor', async () => 
 	vi.unstubAllGlobals();
 });
 
+test('incrementCardCount bumps an existing topic and no-ops unknown slugs', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Marie Curie',
+		pageviews: 500,
+		source: 'wikipedia-top'
+	});
+
+	await t.mutation(internal.topics.incrementCardCount, { slug: 'marie_curie' });
+	await t.mutation(internal.topics.incrementCardCount, { slug: 'marie_curie' });
+	expect((await t.query(api.topics.bySlug, { slug: 'marie_curie' }))?.cardCount).toBe(2);
+
+	// Unknown slug: no throw, no row created.
+	await t.mutation(internal.topics.incrementCardCount, { slug: 'does_not_exist' });
+	expect(await t.query(api.topics.bySlug, { slug: 'does_not_exist' })).toBeNull();
+});
+
 test('backfillCardCounts sets cardCount from published cards, skipping uncatalogued sources', async () => {
 	const t = convexTest(schema, modules);
 	// Catalog has Marie Curie; "Obscurity" is NOT catalogued.
