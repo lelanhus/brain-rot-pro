@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
+import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic, evergreenFromStatus } from './topicsLogic';
 
 describe('isRealArticleTitle', () => {
 	it('accepts real articles (underscored or spaced)', () => {
@@ -51,5 +51,14 @@ describe('isQualityTopic', () => {
 		expect(isQualityTopic('2026 FIFA World Cup')).toBe(true);
 		expect(isQualityTopic('ChatGPT')).toBe(true);
 		expect(isQualityTopic('Death in Venice')).toBe(true);
+	});
+});
+
+describe('evergreenFromStatus', () => {
+	it('is false only for the ingest "filtered" status', () => {
+		expect(evergreenFromStatus('filtered')).toBe(false);
+		for (const s of ['published', 'exists', 'validation_failed', 'duplicate', 'skipped']) {
+			expect(evergreenFromStatus(s)).toBe(true);
+		}
 	});
 });

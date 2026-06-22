@@ -1,4 +1,4 @@
-import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
 import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
 import { internal } from './_generated/api';
@@ -28,7 +28,8 @@ export const upsertTopic = internalMutation({
 export const topByPageviews = query({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }) =>
-		await ctx.db.query('topics').withIndex('by_pageviews').order('desc').take(limit ?? 50)
+		await ctx.db.query('topics').withIndex('by_pageviews').order('desc')
+			.filter((q) => q.neq(q.field('evergreen'), false)).take(limit ?? 50)
 });
 
 /** Full-text title search over the catalog. Empty query returns nothing. */
@@ -52,6 +53,7 @@ export const needingCards = internalQuery({
 			.query('topics')
 			.withIndex('by_cardCount_pageviews', (q) => q.eq('cardCount', 0))
 			.order('desc')
+			.filter((q) => q.neq(q.field('evergreen'), false))
 			.take(limit ?? 20)
 });
 
@@ -194,6 +196,18 @@ export const harvestRecent = internalAction({
 	}
 });
 
+/** Record a topic's evergreen verdict. No-op if the slug isn't catalogued. */
+export const setEvergreen = internalMutation({
+	args: { slug: v.string(), evergreen: v.boolean() },
+	handler: async (ctx, { slug, evergreen }) => {
+		const topic = await ctx.db
+			.query('topics')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (topic !== null) await ctx.db.patch(topic._id, { evergreen, updatedAt: Date.now() });
+	}
+});
+
 /** Increment a topic's published-card count by one. No-op if the slug isn't catalogued. */
 export const incrementCardCount = internalMutation({
 	args: { slug: v.string() },
@@ -221,6 +235,44 @@ export const purgeLowQuality = internalMutation({
 			}
 		}
 		return { deleted };
+	}
+});
+
+/** Most-popular topics not yet classified (evergreen unset). */
+export const unclassifiedTopByPageviews = internalQuery({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, { limit }) =>
+		await ctx.db
+			.query('topics')
+			.withIndex('by_pageviews')
+			.order('desc')
+			.filter((q) => q.eq(q.field('evergreen'), undefined))
+			.take(limit ?? 50)
+});
+
+/** Proactively classify the top unclassified topics via Wikidata (bounded; ops/cron). */
+export const classifyTopTopics = action({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, { limit }): Promise<{ classified: number }> => {
+		const todo: Array<{ title: string; slug: string }> = await ctx.runQuery(
+			internal.topics.unclassifiedTopByPageviews,
+			{ limit: limit ?? 50 }
+		);
+		let classified = 0;
+		for (const topic of todo) {
+			const r: { evergreen: boolean } | null = await ctx.runAction(
+				internal.ingest.classifyTitle,
+				{ title: topic.title }
+			);
+			if (r !== null) {
+				await ctx.runMutation(internal.topics.setEvergreen, {
+					slug: topic.slug,
+					evergreen: r.evergreen
+				});
+				classified++;
+			}
+		}
+		return { classified };
 	}
 });
 

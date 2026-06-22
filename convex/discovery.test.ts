@@ -15,13 +15,15 @@ test('discoverFor adds up to 3 catalog-present, unfollowed related topics', asyn
 		await mk('Carthage', 'carthage', 50);
 		await mk('Hannibal', 'hannibal', 90);
 		await mk('Punic Wars', 'punic_wars', 30);
+		await mk('Junky', 'junky', 88); // also a morelike candidate below, but evergreen:false → excluded
 	});
+	await t.mutation(internal.topics.setEvergreen, { slug: 'junky', evergreen: false });
 	await t.mutation(internal.interests.addDiscovered, { deviceId, slug: 'hannibal', title: 'Hannibal' }); // already followed → must be skipped
 
 	vi.stubGlobal('fetch', vi.fn(async () => ({
 		ok: true,
 		json: async () => ({ query: { search: [
-			{ title: 'Carthage' }, { title: 'Hannibal' }, { title: 'Punic Wars' }, { title: 'Random Title' }
+			{ title: 'Carthage' }, { title: 'Hannibal' }, { title: 'Punic Wars' }, { title: 'Random Title' }, { title: 'Junky' }
 		] } })
 	}) as unknown as Response));
 
