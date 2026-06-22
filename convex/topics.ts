@@ -28,7 +28,8 @@ export const upsertTopic = internalMutation({
 export const topByPageviews = query({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }) =>
-		await ctx.db.query('topics').withIndex('by_pageviews').order('desc').take(limit ?? 50)
+		await ctx.db.query('topics').withIndex('by_pageviews').order('desc')
+			.filter((q) => q.neq(q.field('evergreen'), false)).take(limit ?? 50)
 });
 
 /** Full-text title search over the catalog. Empty query returns nothing. */
@@ -52,6 +53,7 @@ export const needingCards = internalQuery({
 			.query('topics')
 			.withIndex('by_cardCount_pageviews', (q) => q.eq('cardCount', 0))
 			.order('desc')
+			.filter((q) => q.neq(q.field('evergreen'), false))
 			.take(limit ?? 20)
 });
 

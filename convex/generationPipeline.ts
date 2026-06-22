@@ -3,6 +3,7 @@ import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
 import { publishedDelta } from './generateLogic';
+import { evergreenFromStatus } from './topicsLogic';
 
 /**
  * Catalog-driven generation pipeline (the "warm-ahead" loop). A
@@ -53,6 +54,7 @@ export const generateForTopic = internalAction({
 		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
 			title: topic.title
 		});
+		await ctx.runMutation(internal.topics.setEvergreen, { slug, evergreen: evergreenFromStatus(r.status) });
 		if (publishedDelta(r.status) > 0) {
 			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
 		}

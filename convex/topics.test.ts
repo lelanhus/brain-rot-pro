@@ -177,6 +177,20 @@ test('setEvergreen patches the verdict on a topic', async () => {
 	expect((await t.query(api.topics.bySlug, { slug: 'sportsperson' }))?.evergreen).toBe(false);
 });
 
+test('topByPageviews and needingCards exclude evergreen===false (keep true + unclassified)', async () => {
+	const t = convexTest(schema, modules);
+	await t.mutation(internal.topics.upsertTopic, { title: 'Good', pageviews: 90, source: 'wikipedia-top' }); // undefined
+	await t.mutation(internal.topics.upsertTopic, { title: 'Junk', pageviews: 80, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.setEvergreen, { slug: 'junk', evergreen: false });
+	await t.mutation(internal.topics.upsertTopic, { title: 'Verified', pageviews: 70, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.setEvergreen, { slug: 'verified', evergreen: true });
+
+	const top = (await t.query(api.topics.topByPageviews, { limit: 10 })).map((r) => r.slug);
+	expect(top).toEqual(['good', 'verified']); // junk excluded
+	const needing = (await t.query(internal.topics.needingCards, { limit: 10 })).map((r) => r.slug);
+	expect(needing).toEqual(['good', 'verified']);
+});
+
 test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
 	const t = convexTest(schema, modules);
 	await t.run(async (ctx) => {
