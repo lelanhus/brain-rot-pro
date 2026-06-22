@@ -54,7 +54,7 @@ export function mergePageviews(existing: number, incoming: number): number {
 }
 
 const TLD_RE = /^\.[a-z]{2,}$/i;
-const DEATHS_RE = /^deaths?[\s_]+in(?:[\s_]|$)/i;
+const DEATHS_RE = /^deaths?[\s_]+in[\s_]+\d/i;
 const YEAR_IN_RE = /^\d{3,4}[\s_]+in[\s_]/i;
 
 /**

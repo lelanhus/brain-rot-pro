@@ -50,5 +50,6 @@ describe('isQualityTopic', () => {
 		expect(isQualityTopic('Cape Verde')).toBe(true);
 		expect(isQualityTopic('2026 FIFA World Cup')).toBe(true);
 		expect(isQualityTopic('ChatGPT')).toBe(true);
+		expect(isQualityTopic('Death in Venice')).toBe(true);
 	});
 });
