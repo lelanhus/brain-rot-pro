@@ -13,6 +13,7 @@ export const add = mutation({
 		if (existing !== null) return;
 		await ctx.db.insert('interests', { deviceId, slug, title, source: 'explicit', createdAt: Date.now() });
 		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
+		await ctx.scheduler.runAfter(0, internal.discovery.discoverFor, { deviceId, slug, title });
 	}
 });
 

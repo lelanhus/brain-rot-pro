@@ -21,6 +21,7 @@ import type * as aiKey from "../aiKey.js";
 import type * as auth from "../auth.js";
 import type * as cards from "../cards.js";
 import type * as crons from "../crons.js";
+import type * as discovery from "../discovery.js";
 import type * as discoveryLogic from "../discoveryLogic.js";
 import type * as embedLogic from "../embedLogic.js";
 import type * as embeddings from "../embeddings.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   cards: typeof cards;
   crons: typeof crons;
+  discovery: typeof discovery;
   discoveryLogic: typeof discoveryLogic;
   embedLogic: typeof embedLogic;
   embeddings: typeof embeddings;
