@@ -52,3 +52,20 @@ export function toSlug(title: string): string {
 export function mergePageviews(existing: number, incoming: number): number {
 	return existing + incoming;
 }
+
+const TLD_RE = /^\.[a-z]{2,}$/i;
+const DEATHS_RE = /^deaths?[\s_]+in[\s_]+\d/i;
+const YEAR_IN_RE = /^\d{3,4}[\s_]+in[\s_]/i;
+
+/**
+ * Quality gate (stricter than the structural isRealArticleTitle): rejects clear
+ * junk topic titles — TLDs (.xyz), "Deaths in …", and "YYYY in …" ranking pages.
+ * Conservative: real subjects (people, places, films, year-prefix events) pass.
+ */
+export function isQualityTopic(title: string): boolean {
+	const t = title.trim();
+	if (TLD_RE.test(t)) return false;
+	if (DEATHS_RE.test(t)) return false;
+	if (YEAR_IN_RE.test(t)) return false;
+	return true;
+}

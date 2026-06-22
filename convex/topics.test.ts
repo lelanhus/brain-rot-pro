@@ -169,3 +169,19 @@ test('backfillCardCounts sets cardCount from published cards, skipping uncatalog
 	const topic = await t.query(api.topics.bySlug, { slug: 'marie_curie' });
 	expect(topic?.cardCount).toBe(2);
 });
+
+test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
+	const t = convexTest(schema, modules);
+	await t.run(async (ctx) => {
+		const mk = (title: string, slug: string) =>
+			ctx.db.insert('topics', { title, slug, pageviews: 10, cardCount: 0, source: 'wikipedia-top', updatedAt: 1 });
+		await mk('.xyz', '.xyz');
+		await mk('Deaths in 2026', 'deaths_in_2026');
+		await mk('Cleopatra', 'cleopatra');
+		await mk('Cristiano Ronaldo', 'cristiano_ronaldo');
+	});
+	const res = await t.mutation(internal.topics.purgeLowQuality, {});
+	expect(res.deleted).toBe(2);
+	const left = await t.run(async (ctx) => ctx.db.query('topics').collect());
+	expect(left.map((r) => r.slug).sort()).toEqual(['cleopatra', 'cristiano_ronaldo']);
+});
