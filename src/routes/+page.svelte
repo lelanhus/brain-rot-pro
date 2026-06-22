@@ -23,6 +23,7 @@
 	import { createToast } from '$lib/toast.svelte';
 	import { cooldownGate } from '$lib/cooldownGate';
 	import { shareCard } from '$lib/share';
+	import { toSlug } from '$lib/slug';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
@@ -57,6 +58,17 @@
 	const savedQuery = useQuery(api.saved.savedIds, () => (deviceId ? { deviceId } : 'skip'));
 	const savedSet = $derived(new Set<string>((savedQuery.data ?? []).map(String)));
 	const toggleSave = useMutation(api.saved.toggle);
+
+	const interestsQuery = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
+	const followedSlugs = $derived(new Set<string>((interestsQuery.data ?? []).map((i) => i.slug)));
+	const addInterest = useMutation(api.interests.add);
+	const removeInterest = useMutation(api.interests.remove);
+	function toggleFollow(card: Doc<'knowledgeCards'>) {
+		if (!deviceId) return;
+		const slug = toSlug(card.source.articleTitle);
+		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
+		else void addInterest({ deviceId, slug, title: card.source.articleTitle });
+	}
 
 	// Live paginated unseen feed: re-keys on deviceId + focusConcept so it
 	// switches to personalized seen-exclusion once the device id resolves
@@ -512,6 +524,8 @@
 	<CardActions
 		saved={savedSet.has(activeCard._id)}
 		onSave={() => handleSave(activeCard)}
+		following={followedSlugs.has(toSlug(activeCard.source.articleTitle))}
+		onFollow={() => toggleFollow(activeCard)}
 		onNotInterested={() => handleNotInterested(activeCard)}
 		onShare={() => handleShare(activeCard)}
 	/>
