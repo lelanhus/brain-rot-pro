@@ -305,5 +305,16 @@ export default defineSchema({
 		createdAt: v.number()
 	})
 		.index('by_device', ['deviceId'])
-		.index('by_device_slug', ['deviceId', 'slug'])
+		.index('by_device_slug', ['deviceId', 'slug']),
+
+	/**
+	 * Staging buffer for offline-ETL Wikipedia dump imports. Rows are transient:
+	 * `mergeStagingIntoCatalog` drains them into `topics` and deletes each row as
+	 * it's consumed. Schema mirrors the minimum needed for an upsert-by-slug.
+	 */
+	topicsStaging: defineTable({
+		title: v.string(),
+		slug: v.string(),
+		pageviews: v.number()
+	})
 });
