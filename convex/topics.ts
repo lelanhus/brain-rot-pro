@@ -1,4 +1,4 @@
-import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
 import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
 import { internal } from './_generated/api';
@@ -235,6 +235,44 @@ export const purgeLowQuality = internalMutation({
 			}
 		}
 		return { deleted };
+	}
+});
+
+/** Most-popular topics not yet classified (evergreen unset). */
+export const unclassifiedTopByPageviews = internalQuery({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, { limit }) =>
+		await ctx.db
+			.query('topics')
+			.withIndex('by_pageviews')
+			.order('desc')
+			.filter((q) => q.eq(q.field('evergreen'), undefined))
+			.take(limit ?? 50)
+});
+
+/** Proactively classify the top unclassified topics via Wikidata (bounded; ops/cron). */
+export const classifyTopTopics = action({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, { limit }): Promise<{ classified: number }> => {
+		const todo: Array<{ title: string; slug: string }> = await ctx.runQuery(
+			internal.topics.unclassifiedTopByPageviews,
+			{ limit: limit ?? 50 }
+		);
+		let classified = 0;
+		for (const topic of todo) {
+			const r: { evergreen: boolean } | null = await ctx.runAction(
+				internal.ingest.classifyTitle,
+				{ title: topic.title }
+			);
+			if (r !== null) {
+				await ctx.runMutation(internal.topics.setEvergreen, {
+					slug: topic.slug,
+					evergreen: r.evergreen
+				});
+				classified++;
+			}
+		}
+		return { classified };
 	}
 });
 

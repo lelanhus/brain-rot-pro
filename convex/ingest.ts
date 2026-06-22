@@ -206,6 +206,42 @@ async function fetchWikidataClaims(
 }
 
 /**
+ * Classify a single Wikipedia title via Wikidata — classification only, no
+ * article text extraction, no image fetching, no storage, no card generation.
+ * Used by `topics.classifyTopTopics` to proactively mark topics evergreen/not.
+ *
+ * Returns `{ evergreen: true }` when the article would pass the ingest gate
+ * (`status === 'fetched'`), `{ evergreen: false }` when it would be filtered
+ * out, and `null` when the page can't be resolved (missing/redirect loop/no QID
+ * coverage with an unresolvable category heuristic is fine — we still decide).
+ */
+export const classifyTitle = internalAction({
+	args: { title: v.string() },
+	handler: async (_ctx, { title }): Promise<{ evergreen: boolean } | null> => {
+		const params = new URLSearchParams({
+			action: 'query',
+			format: 'json',
+			formatversion: '2',
+			prop: 'categories|pageprops',
+			cllimit: '50',
+			clshow: '!hidden',
+			ppprop: 'wikibase_item',
+			redirects: '1',
+			titles: title
+		});
+		const data = await getJsonOrNull<{ query?: { pages?: WikiPage[] } }>(ACTION_API, params);
+		const page = data?.query?.pages?.[0];
+		if (!page || page.missing === true || !page.pageid) return null;
+		const categories = (page.categories ?? []).map((c) => stripCategoryPrefix(c.title));
+		const qid = page.pageprops?.wikibase_item;
+		const claims = qid !== undefined ? await fetchWikidataClaims(qid) : null;
+		const verdict = claims !== null ? classifyTopic(claims) : null;
+		const { status } = decideArticleStatus({ verdict, categories });
+		return { evergreen: status === 'fetched' };
+	}
+});
+
+/**
  * Ingest specific article titles. Public dev tooling (runnable via `convex run`).
  * Per-title failures are collected and returned, not thrown, so one bad title
  * doesn't abort the batch.
