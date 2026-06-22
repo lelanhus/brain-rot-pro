@@ -2,8 +2,8 @@ import { action, internalAction, internalMutation, internalQuery } from './_gene
 import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
-import { publishedDelta } from './generateLogic';
-import { evergreenFromStatus } from './topicsLogic';
+import { publishedDelta, fillBudget, shouldKeepFilling } from './generateLogic';
+import { evergreenFromStatus, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 /**
  * Catalog-driven generation pipeline (the "warm-ahead" loop). A
@@ -26,6 +26,8 @@ const pool = new Workpool(components.generationPool, {
 /** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
 export const CATALOG_BATCH = 10;
 
+export { TARGET_CARDS_PER_TOPIC } from './topicsLogic';
+
 /**
  * Warm-ahead supply: take the most-viewed catalog topics that still have no
  * cards and fan a generateForTopic job per topic through the bounded Workpool.
@@ -42,46 +44,67 @@ export const generateFromCatalog = internalAction({
 });
 
 /**
- * Turn one catalog topic into (at most) one published card. Idempotent: a topic
- * that is missing or already has a card is skipped before any ingest/AI work, so
- * re-enqueuing is safe. On a published result, bump the topic's cardCount.
+ * Turn one catalog topic into up to TARGET_CARDS_PER_TOPIC published cards. Idempotent:
+ * a topic that is missing or already at TARGET is skipped before any ingest/AI work, so
+ * re-enqueuing is safe. Ingests the article once, then loops generateFromArticle with
+ * accumulated hooks so each pass surfaces a distinct angle. On each published result,
+ * bumps the topic's cardCount.
  */
 export const generateForTopic = internalAction({
 	args: { slug: v.string() },
 	handler: async (ctx, { slug }): Promise<{ status: string }> => {
 		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
-		if (topic === null || topic.cardCount > 0) return { status: 'skipped' };
-		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
+		if (topic === null || topic.cardCount >= TARGET_CARDS_PER_TOPIC) return { status: 'skipped' };
+
+		// Ingest the article once, then loop only the generation step so each
+		// pass reuses the same source instead of re-ingesting per card.
+		const { articleId, accepted } = await ctx.runAction(internal.ingest.ingestOne, {
 			title: topic.title
 		});
-		await ctx.runMutation(internal.topics.setEvergreen, { slug, evergreen: evergreenFromStatus(r.status) });
-		if (publishedDelta(r.status) > 0) {
-			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+		if (!accepted || articleId === null) {
+			await ctx.runMutation(internal.topics.setEvergreen, {
+				slug,
+				evergreen: evergreenFromStatus('filtered')
+			});
+			return { status: 'filtered' };
 		}
-		return { status: r.status };
-	}
-});
 
-/**
- * One Workpool job: ingest a single title (with its fail-closed Commons image),
- * then generate a card from it. Idempotent — skips if the article already yielded
- * a card, so a re-enqueued title never duplicates.
- */
-export const ingestAndGenerate = internalAction({
-	args: { title: v.string() },
-	handler: async (
-		ctx,
-		{ title }
-	): Promise<{
-		title: string;
-		status: 'filtered' | 'exists' | 'published' | 'validation_failed' | 'duplicate';
-	}> => {
-		const { articleId, accepted } = await ctx.runAction(internal.ingest.ingestOne, { title });
-		if (!accepted || !articleId) return { title, status: 'filtered' };
-		const already = await ctx.runQuery(internal.generateDb.articleHasCard, { articleId });
-		if (already) return { title, status: 'exists' };
-		const r = await ctx.runAction(api.generate.generateFromArticle, { articleId });
-		return { title, status: r.status };
+		// `needed`/`maxAttempts` derive from current cardCount; the loop gates on
+		// cards PUBLISHED this run (not avoidHooks.length), so a partial re-run
+		// still fills toward TARGET even though avoidHooks is pre-seeded below.
+		const budget = fillBudget(topic.cardCount, TARGET_CARDS_PER_TOPIC);
+		// Seed avoidHooks from already-published cards for this article so a
+		// re-run never regenerates angles that are already shipped.
+		const avoidHooks: string[] = await ctx.runQuery(
+			internal.generateDb.cardHooksForArticle,
+			{ articleId }
+		);
+		let attempts = 0;
+		let published = 0;
+		let lastStatus = 'skipped';
+
+		while (shouldKeepFilling(published, attempts, budget)) {
+			attempts++;
+			const r = await ctx.runAction(api.generate.generateFromArticle, {
+				articleId,
+				avoidHooks: avoidHooks.length > 0 ? avoidHooks : undefined
+			});
+			lastStatus = r.status;
+			// Always set evergreen on the first result (once per topic).
+			if (attempts === 1) {
+				await ctx.runMutation(internal.topics.setEvergreen, {
+					slug,
+					evergreen: evergreenFromStatus(r.status)
+				});
+			}
+			if (publishedDelta(r.status) > 0) {
+				await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+				avoidHooks.push(r.hook);
+				published++;
+			}
+		}
+
+		return { status: lastStatus };
 	}
 });
 

@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import { vi } from 'vitest';
 import { api, internal } from './_generated/api';
 import schema from './schema';
+import { TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!./**/*.d.ts']);
 
@@ -39,20 +40,20 @@ test('read queries: search by title, top by pageviews, needingCards, bySlug', as
 		pageviews: 500,
 		source: 'wikipedia-top'
 	});
-	// Give one topic cards so it is excluded from needingCards.
+	// Give one topic TARGET cards so it is fully covered and excluded from needingCards.
 	await t.run(async (ctx) => {
 		const bh = await ctx.db
 			.query('topics')
 			.withIndex('by_slug', (q) => q.eq('slug', 'black_hole'))
 			.unique();
-		if (bh !== null) await ctx.db.patch(bh._id, { cardCount: 2 });
+		if (bh !== null) await ctx.db.patch(bh._id, { cardCount: TARGET_CARDS_PER_TOPIC });
 	});
 
 	const top = await t.query(api.topics.topByPageviews, { limit: 10 });
 	expect(top.map((r) => r.slug)).toEqual(['black_hole', 'marie_curie']);
 
 	const needing = await t.query(internal.topics.needingCards, { limit: 10 });
-	expect(needing.map((r) => r.slug)).toEqual(['marie_curie']); // black_hole excluded (has cards)
+	expect(needing.map((r) => r.slug)).toEqual(['marie_curie']); // black_hole excluded (cardCount===TARGET)
 
 	const found = await t.query(api.topics.search, { query: 'Marie', limit: 10 });
 	expect(found.some((r) => r.slug === 'marie_curie')).toBe(true);

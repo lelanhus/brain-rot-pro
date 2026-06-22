@@ -114,6 +114,84 @@ test('feed.unseen boosts a followed topic above an equivalent unfollowed card', 
 	expect(res.page[0]._id).toBe(ids.low);
 });
 
+test('threadFromCardId biases feed toward a thread neighbor', async () => {
+	const t = convexTest(schema, modules);
+	const deviceId = 'thread-dev';
+
+	// Two cards: highShuffle has shuffleKey 0.9 so it wins without threading.
+	// lowShuffle has shuffleKey 0.1 but its embedding aligns with the thread card.
+	// Thread card has embedding [1,0,0,...] → lowShuffle also [1,0,0,...] → cosine 1.
+	// highShuffle has embedding [0,1,0,...] → cosine 0 with thread.
+	const embedding = (i: number) =>
+		Array(1536)
+			.fill(0)
+			.map((_, j) => (j === i ? 1 : 0));
+
+	const { lowShuffleId, threadCardId } = await t.run(async (ctx) => {
+		const lowShuffleId = await ctx.db.insert('knowledgeCards', {
+			hook: 'low',
+			body: 'b',
+			format: 'surprise_fact' as const,
+			conceptTags: ['t'],
+			source: { articleTitle: 'Low', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'published' as const,
+			shuffleKey: 0.1,
+			createdAt: 0,
+			embedding: embedding(0)
+		});
+		await ctx.db.insert('knowledgeCards', {
+			hook: 'high',
+			body: 'b',
+			format: 'surprise_fact' as const,
+			conceptTags: ['t'],
+			source: { articleTitle: 'High', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'published' as const,
+			shuffleKey: 0.9,
+			createdAt: 0,
+			embedding: embedding(1)
+		});
+		// The thread anchor card — same embedding direction as lowShuffle
+		const threadCardId = await ctx.db.insert('knowledgeCards', {
+			hook: 'thread',
+			body: 'b',
+			format: 'surprise_fact' as const,
+			conceptTags: ['t'],
+			source: { articleTitle: 'Thread', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+			status: 'published' as const,
+			shuffleKey: 0.5,
+			createdAt: 0,
+			embedding: embedding(0)
+		});
+		return { lowShuffleId, threadCardId };
+	});
+
+	// Mark the thread anchor card as seen so it's excluded from feed results
+	await t.mutation(api.events.log, {
+		deviceId,
+		sessionId: 's',
+		events: [{ type: 'card_complete', cardId: threadCardId, ts: 1 }]
+	});
+
+	// Without threading: highShuffle (0.9) ranks above lowShuffle (0.1)
+	const plain = await t.query(api.feed.unseen, {
+		deviceId,
+		paginationOpts: { numItems: 50, cursor: null }
+	});
+	const plainIds = plain.page.map((c) => c._id);
+	// Just verify lowShuffle doesn't win without threading (shuffleKey wins)
+	const plainLowIdx = plainIds.indexOf(lowShuffleId);
+	const plainHighIdx = plainIds.findIndex((id) => id !== lowShuffleId);
+	expect(plainHighIdx).toBeLessThan(plainLowIdx);
+
+	// With threadFromCardId: lowShuffle (aligned with thread) should rank first
+	const threaded = await t.query(api.feed.unseen, {
+		deviceId,
+		paginationOpts: { numItems: 50, cursor: null },
+		threadFromCardId: threadCardId
+	});
+	expect(threaded.page[0]._id).toBe(lowShuffleId);
+});
+
 test('feed.unseen ranks an on-taste card ahead of an off-taste one', async () => {
 	const t = convexTest(schema, modules);
 	const deviceId = 'rank-dev';

@@ -49,6 +49,15 @@
 	const completedThisSession = new SvelteSet<string>();
 	let sessionCount = $state(0);
 	let lastMilestone = $state(0);
+
+	// Connected-wander threading: bias the live feed toward neighbors of the last
+	// completed card. Updated at a coarse cadence (inside scheduleAdapt's settle
+	// callback, ~1.5s after the last engagement signal) to avoid jarring re-sorts.
+	let threadCardId = $state<Id<'knowledgeCards'> | null>(null);
+	// Non-reactive staging var: captures the latest completed card immediately but
+	// only promotes it to threadCardId (triggering a feed re-query) inside the
+	// debounced settle, so the feed re-sorts at most once per ~1.5s window.
+	let _pendingThreadCardId: Id<'knowledgeCards'> | null = null;
 	const toast = createToast();
 
 	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
@@ -76,11 +85,18 @@
 	// Live paginated unseen feed: re-keys on deviceId + focusConcept so it
 	// switches to personalized seen-exclusion once the device id resolves
 	// (ADR-007). SSR first-paint comes from data.feed (anonymous, deviceId:'').
+	// threadCardId biases ranking toward neighbors of the last completed card
+	// (connected-wander); it is updated at a coarse ~1.5s cadence via scheduleAdapt
+	// so re-sorts are infrequent and don't feel jarring.
 	const liveFeed = usePaginatedQuery(
 		api.feed.unseen,
 		() =>
 			deviceId
-				? { deviceId, focusConcept: focusConcept ?? undefined }
+				? {
+						deviceId,
+						focusConcept: focusConcept ?? undefined,
+						threadFromCardId: threadCardId ?? undefined
+					}
 				: { deviceId: '', focusConcept: focusConcept ?? undefined },
 		{ initialNumItems: 8 }
 	);
@@ -160,6 +176,10 @@
 		if (adaptTimer) clearTimeout(adaptTimer);
 		adaptTimer = setTimeout(async () => {
 			adaptTimer = null;
+			// Commit the latest completed card to the feed query arg here (coarse,
+			// ~1.5s cadence) so the live feed re-sorts at most once per settle, not
+			// on every dwell tick or scroll event.
+			if (_pendingThreadCardId !== null) threadCardId = _pendingThreadCardId;
 			await flush(); // persist queued events before recompute reads them
 			recompute({ deviceId }).catch((err) => console.error('[feed] recompute failed', err));
 		}, 1500);
@@ -208,6 +228,10 @@
 			lastMilestone = milestone;
 			toast.show(`${milestone} ideas this session`);
 		}
+		// Stage the completed card for threading; scheduleAdapt's settle will
+		// promote it to threadCardId at the coarse ~1.5s cadence.
+		_pendingThreadCardId = cardId as Id<'knowledgeCards'>;
+		scheduleAdapt();
 	}
 
 	async function handleSave(card: Doc<'knowledgeCards'>) {

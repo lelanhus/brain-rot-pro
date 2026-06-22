@@ -15,7 +15,8 @@ export const unseen = query({
 	args: {
 		deviceId: v.string(),
 		paginationOpts: paginationOptsValidator,
-		focusConcept: v.optional(v.string())
+		focusConcept: v.optional(v.string()),
+		threadFromCardId: v.optional(v.id('knowledgeCards'))
 	},
 	handler: async (ctx, args) => {
 		const profile =
@@ -36,6 +37,12 @@ export const unseen = query({
 				.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
 				.collect();
 			for (const i of ints) interestSlugs.add(i.slug);
+		}
+
+		let threadEmbedding: number[] | undefined;
+		if (args.threadFromCardId !== undefined) {
+			const tc = await ctx.db.get(args.threadFromCardId);
+			threadEmbedding = tc?.embedding;
 		}
 
 		const page = await ctx.db
@@ -67,11 +74,11 @@ export const unseen = query({
 			(a, b) =>
 				scoreByTaste(
 					{ conceptTags: b.conceptTags, embedding: b.embedding, slug: toSlug(b.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
+					{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs, threadEmbedding }
 				) -
 				scoreByTaste(
 					{ conceptTags: a.conceptTags, embedding: a.embedding, slug: toSlug(a.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: a.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
+					{ tasteVector, weights, shuffleKey: a.shuffleKey, focusConcept: args.focusConcept, interestSlugs, threadEmbedding }
 				)
 		);
 

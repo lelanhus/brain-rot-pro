@@ -34,21 +34,54 @@ export const RELEVANCE_WEIGHT = 10;
 /** Additive rank bump for cards whose source topic the user explicitly follows. */
 export const INTEREST_BOOST = 5;
 
+/** Nudge toward the card the user just engaged with (connected-next hop). */
+export const THREAD_WEIGHT = 4;
+
 /** Half-life for recency weighting of taste signals (14 days). */
 export const TASTE_HALFLIFE_MS = 14 * 24 * 60 * 60 * 1000;
 
-export type WeightedEvent = { type: string; cardId?: string | null };
+/** Graded engagement weight: card_complete scales by dwell vs the user's own
+ * baseline (clamped); explicit/negative events keep their flat EVENT_DELTA. */
+export function engagementWeight(
+	type: string,
+	visibleMs: number | undefined,
+	userAvgDwell: number
+): number {
+	const base = EVENT_DELTA[type];
+	if (base === undefined) return 0;
+	if (type !== 'card_complete' || visibleMs === undefined || userAvgDwell <= 0) return base;
+	const ratio = Math.min(2.5, Math.max(0.5, visibleMs / userAvgDwell));
+	return base * ratio;
+}
+
+/** Mean dwell (visibleMs) over a user's card_complete events; 0 when none. */
+export function meanCompleteDwell(
+	events: ReadonlyArray<{ type: string; visibleMs?: number }>
+): number {
+	let sum = 0;
+	let n = 0;
+	for (const e of events) {
+		if (e.type === 'card_complete' && e.visibleMs !== undefined) {
+			sum += e.visibleMs;
+			n += 1;
+		}
+	}
+	return n === 0 ? 0 : sum / n;
+}
+
+export type WeightedEvent = { type: string; cardId?: string | null; visibleMs?: number };
 
 /** Accumulate concept weights from events, given each card's concept tags. */
 export function accumulateWeights(
 	events: ReadonlyArray<WeightedEvent>,
-	tagsByCard: Record<string, string[]>
+	tagsByCard: Record<string, string[]>,
+	userAvgDwell = 0
 ): Record<string, number> {
 	const weights: Record<string, number> = {};
 	for (const e of events) {
 		if (!e.cardId) continue;
-		const delta = EVENT_DELTA[e.type];
-		if (!delta) continue;
+		const delta = engagementWeight(e.type, e.visibleMs, userAvgDwell);
+		if (delta === 0) continue;
 		for (const tag of tagsByCard[e.cardId] ?? []) {
 			weights[tag] = (weights[tag] ?? 0) + delta;
 		}
@@ -76,16 +109,17 @@ export function scoreCard(
  * positive event has an embedding (cold-start). Pure → unit-testable.
  */
 export function buildTasteVector(
-	events: ReadonlyArray<{ type: string; cardId?: string | null; ts: number }>,
+	events: ReadonlyArray<{ type: string; cardId?: string | null; ts: number; visibleMs?: number }>,
 	embeddingByCard: Record<string, number[] | undefined>,
-	now: number
+	now: number,
+	userAvgDwell = 0
 ): number[] | undefined {
 	let acc: number[] | null = null;
 	let totalWeight = 0;
 	for (const e of events) {
 		if (e.cardId === undefined || e.cardId === null) continue;
-		const delta = EVENT_DELTA[e.type];
-		if (delta === undefined || delta <= 0) continue; // positives only
+		const delta = engagementWeight(e.type, e.visibleMs, userAvgDwell);
+		if (delta <= 0) continue; // positives only
 		const emb = embeddingByCard[e.cardId];
 		if (emb === undefined) continue;
 		const recency = Math.pow(0.5, Math.max(0, now - e.ts) / TASTE_HALFLIFE_MS);
@@ -115,6 +149,7 @@ export function scoreByTaste(
 		shuffleKey: number;
 		focusConcept?: string | null;
 		interestSlugs?: ReadonlySet<string>;
+		threadEmbedding?: number[];
 	}
 ): number {
 	const emb = card.embedding;
@@ -131,6 +166,9 @@ export function scoreByTaste(
 	}
 	if (ctx.interestSlugs !== undefined && card.slug !== undefined && ctx.interestSlugs.has(card.slug)) {
 		score += INTEREST_BOOST;
+	}
+	if (ctx.threadEmbedding !== undefined && emb !== undefined && emb.length === ctx.threadEmbedding.length) {
+		score += THREAD_WEIGHT * cosineSimilarity(ctx.threadEmbedding, emb);
 	}
 	return score;
 }

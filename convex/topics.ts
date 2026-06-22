@@ -1,6 +1,6 @@
 import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
-import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
+import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 import { internal } from './_generated/api';
 
 /** Insert a topic or accumulate pageviews onto the existing row with this slug. */
@@ -45,15 +45,20 @@ export const search = query({
 	}
 });
 
-/** Most-popular topics that have no cards yet — the generation priority queue. */
+/** Most-popular topics that still need cards (cardCount < TARGET) — the generation priority queue. */
 export const needingCards = internalQuery({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }) =>
 		await ctx.db
 			.query('topics')
-			.withIndex('by_cardCount_pageviews', (q) => q.eq('cardCount', 0))
+			.withIndex('by_pageviews')
 			.order('desc')
-			.filter((q) => q.neq(q.field('evergreen'), false))
+			.filter((q) =>
+				q.and(
+					q.lt(q.field('cardCount'), TARGET_CARDS_PER_TOPIC),
+					q.neq(q.field('evergreen'), false)
+				)
+			)
 			.take(limit ?? 20)
 });
 

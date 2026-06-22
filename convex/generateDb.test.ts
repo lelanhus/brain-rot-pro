@@ -58,3 +58,49 @@ test('overlongPublished returns only published cards over the cap', async () => 
 	expect(rows).toHaveLength(1);
 	expect(rows[0].articleId).toBe(articleId);
 });
+
+test('cardHooksForArticle returns hooks of published cards for the article', async () => {
+	const t = convexTest(schema, modules);
+	const articleId = await t.run(async (ctx) =>
+		ctx.db.insert('sourceArticles', {
+			pageId: 2,
+			title: 'Octopus',
+			url: 'u2',
+			revisionId: 2,
+			extract: '',
+			paragraphs: ['p'],
+			categories: [],
+			status: 'fetched',
+			fetchedAt: 0
+		})
+	);
+	const base = {
+		body: 'b',
+		format: 'surprise_fact' as const,
+		conceptTags: ['bio'],
+		shuffleKey: 0.5,
+		createdAt: 0,
+		source: {
+			articleTitle: 'Octopus',
+			articleUrl: 'u2',
+			revisionId: 2 as number | null,
+			sourceSpan: 's'
+		},
+		generation: {
+			generationModel: 'gm',
+			validationModel: 'vm',
+			supportScore: 0.9,
+			promptVersion: '1',
+			sourceArticleId: articleId,
+			generatedAt: 0
+		}
+	};
+	await t.run(async (ctx) => {
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'hook-published', status: 'published' });
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'hook-failed', status: 'validation_failed' });
+	});
+
+	const hooks = await t.query(internal.generateDb.cardHooksForArticle, { articleId });
+	// Only the published card's hook is returned.
+	expect(hooks).toEqual(['hook-published']);
+});

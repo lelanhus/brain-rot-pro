@@ -1,7 +1,7 @@
 import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
-import { accumulateWeights, buildTasteVector } from './profileLogic';
+import { accumulateWeights, buildTasteVector, meanCompleteDwell } from './profileLogic';
 
 /**
  * Rebuild this device's personalization profile from its events (ADR-007:
@@ -35,14 +35,15 @@ export const recompute = mutation({
 			}
 		}
 
-		const weights = accumulateWeights(events, tagsByCard);
+		const userAvgDwell = meanCompleteDwell(events);
+		const weights = accumulateWeights(events, tagsByCard, userAvgDwell);
 		const notInterested = new Set<Id<'knowledgeCards'>>();
 		for (const e of events) {
 			if (e.cardId === undefined || e.cardId === null) continue;
 			if (e.type === 'not_interested') notInterested.add(e.cardId);
 		}
 		const now = Date.now();
-		const tasteVector = buildTasteVector(events, embeddingByCard, now);
+		const tasteVector = buildTasteVector(events, embeddingByCard, now, userAvgDwell);
 
 		const profile = {
 			deviceId: args.deviceId,

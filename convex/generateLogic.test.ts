@@ -6,7 +6,9 @@ import {
 	decidePublish,
 	generatedCardSchema,
 	publishedDelta,
-	spanIsFromSource
+	spanIsFromSource,
+	fillBudget,
+	shouldKeepFilling
 } from './generateLogic';
 
 describe('buildGenerationPrompt', () => {
@@ -19,6 +21,27 @@ describe('buildGenerationPrompt', () => {
 		expect(prompt).toContain('[1] First grounding paragraph.');
 		expect(prompt).toContain('[2] Second grounding paragraph.');
 		expect(prompt).toMatch(/verbatim/i);
+	});
+
+	it('omits the avoid-hooks line when avoidHooks is absent or empty', () => {
+		const base = buildGenerationPrompt({
+			title: 'Roman concrete',
+			paragraphs: ['Para one.']
+		});
+		expect(base).not.toContain('DISTINCT');
+
+		const withEmpty = buildGenerationPrompt({ title: 'Roman concrete', paragraphs: ['Para one.'] }, []);
+		expect(withEmpty).not.toContain('DISTINCT');
+	});
+
+	it('includes already-covered hooks in the avoid-hooks line', () => {
+		const prompt = buildGenerationPrompt(
+			{ title: 'Roman concrete', paragraphs: ['Para one.'] },
+			['Romans used volcanic ash', 'It hardened underwater']
+		);
+		expect(prompt).toContain('DISTINCT');
+		expect(prompt).toContain('Romans used volcanic ash');
+		expect(prompt).toContain('It hardened underwater');
 	});
 });
 
@@ -181,5 +204,41 @@ describe('publishedDelta', () => {
 		expect(publishedDelta('validation_failed')).toBe(0);
 		expect(publishedDelta('exists')).toBe(0);
 		expect(publishedDelta('skipped')).toBe(0);
+	});
+});
+
+describe('fillBudget', () => {
+	it('a fresh topic (cardCount 0) needs the full target with 2 spare attempts', () => {
+		expect(fillBudget(0, 3)).toEqual({ needed: 3, maxAttempts: 5 });
+	});
+	it('a partial topic only needs the remainder', () => {
+		expect(fillBudget(1, 3)).toEqual({ needed: 2, maxAttempts: 4 });
+		expect(fillBudget(2, 3)).toEqual({ needed: 1, maxAttempts: 3 });
+	});
+	it('an at/over-target topic needs nothing (never negative)', () => {
+		expect(fillBudget(3, 3)).toEqual({ needed: 0, maxAttempts: 2 });
+		expect(fillBudget(5, 3)).toEqual({ needed: 0, maxAttempts: 2 });
+	});
+});
+
+describe('shouldKeepFilling', () => {
+	it('continues until `needed` cards are published this run', () => {
+		const budget = fillBudget(0, 3); // needed 3, maxAttempts 5
+		expect(shouldKeepFilling(0, 0, budget)).toBe(true);
+		expect(shouldKeepFilling(2, 4, budget)).toBe(true); // 2<3 published, 4<5 attempts
+		expect(shouldKeepFilling(3, 3, budget)).toBe(false); // hit needed
+	});
+	it('stops once attempts are exhausted even if short of needed', () => {
+		const budget = fillBudget(0, 3); // maxAttempts 5
+		expect(shouldKeepFilling(1, 5, budget)).toBe(false); // attempts exhausted
+	});
+	it('partial re-run fills toward target — progress is published, not seeded hooks', () => {
+		// Regression guard: a topic at cardCount=1 (so 1 prior hook seeds avoidHooks)
+		// must still publish `needed`=2 more. Gating on published (not avoidHooks.length)
+		// keeps the loop alive past the seeded count.
+		const budget = fillBudget(1, 3); // needed 2, maxAttempts 4
+		expect(shouldKeepFilling(0, 0, budget)).toBe(true); // start: owe 2
+		expect(shouldKeepFilling(1, 2, budget)).toBe(true); // published 1, owe 1 more
+		expect(shouldKeepFilling(2, 3, budget)).toBe(false); // published 2 == needed → done at TARGET
 	});
 });
