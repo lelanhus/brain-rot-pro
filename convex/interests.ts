@@ -1,4 +1,4 @@
-import { mutation, query } from './_generated/server';
+import { internalMutation, mutation, query } from './_generated/server';
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
 
@@ -35,4 +35,18 @@ export const list = query({
 			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
 			.order('desc')
 			.collect()
+});
+
+/** Add a discovered interest (from auto-discovery). Dedupes; schedules generation; does NOT trigger further discovery. */
+export const addDiscovered = internalMutation({
+	args: { deviceId: v.string(), slug: v.string(), title: v.string() },
+	handler: async (ctx, { deviceId, slug, title }) => {
+		const existing = await ctx.db
+			.query('interests')
+			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
+			.unique();
+		if (existing !== null) return;
+		await ctx.db.insert('interests', { deviceId, slug, title, source: 'discovered', createdAt: Date.now() });
+		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
+	}
 });
