@@ -57,6 +57,12 @@ const TLD_RE = /^\.[a-z]{2,}$/i;
 const DEATHS_RE = /^deaths?[\s_]+in[\s_]+\d/i;
 const YEAR_IN_RE = /^\d{3,4}[\s_]+in[\s_]/i;
 
+/** Catalog evergreen verdict from a generation result: only ingest's 'filtered'
+ * (Wikidata non-evergreen / no free image) marks a topic as non-evergreen. */
+export function evergreenFromStatus(status: string): boolean {
+	return status !== 'filtered';
+}
+
 /**
  * Quality gate (stricter than the structural isRealArticleTitle): rejects clear
  * junk topic titles — TLDs (.xyz), "Deaths in …", and "YYYY in …" ranking pages.

@@ -273,6 +273,7 @@ export default defineSchema({
 		pageviews: v.number(),
 		cardCount: v.number(),
 		source: v.string(),
+		evergreen: v.optional(v.boolean()),
 		updatedAt: v.number()
 	})
 		.index('by_slug', ['slug'])

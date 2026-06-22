@@ -194,6 +194,18 @@ export const harvestRecent = internalAction({
 	}
 });
 
+/** Record a topic's evergreen verdict. No-op if the slug isn't catalogued. */
+export const setEvergreen = internalMutation({
+	args: { slug: v.string(), evergreen: v.boolean() },
+	handler: async (ctx, { slug, evergreen }) => {
+		const topic = await ctx.db
+			.query('topics')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (topic !== null) await ctx.db.patch(topic._id, { evergreen, updatedAt: Date.now() });
+	}
+});
+
 /** Increment a topic's published-card count by one. No-op if the slug isn't catalogued. */
 export const incrementCardCount = internalMutation({
 	args: { slug: v.string() },
