@@ -40,6 +40,7 @@ describe('isQualityTopic', () => {
 		expect(isQualityTopic('.xyz')).toBe(false);
 		expect(isQualityTopic('.xxx')).toBe(false);
 		expect(isQualityTopic('Deaths in 2026')).toBe(false);
+		expect(isQualityTopic('Deaths_in_2026')).toBe(false);
 		expect(isQualityTopic('2008_in_music')).toBe(false);
 		expect(isQualityTopic('2026 in film')).toBe(false);
 	});
