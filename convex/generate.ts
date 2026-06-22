@@ -50,7 +50,7 @@ function wrapAiError(stage: string, e: unknown): Error {
  *   npx convex run generate:generateFromArticle '{"articleId":"<id>"}'
  */
 export const generateFromArticle = action({
-	args: { articleId: v.id('sourceArticles') },
+	args: { articleId: v.id('sourceArticles'), avoidHooks: v.optional(v.array(v.string())) },
 	// Explicit return type breaks the self-referential inference cycle (the
 	// action reads its own deployment's `internal` api).
 	handler: async (
@@ -80,7 +80,10 @@ export const generateFromArticle = action({
 			const generated = await generateObject({
 				model: generationModel,
 				schema: generatedCardSchema,
-				prompt: buildGenerationPrompt({ title: article.title, paragraphs: article.paragraphs })
+				prompt: buildGenerationPrompt(
+					{ title: article.title, paragraphs: article.paragraphs },
+					args.avoidHooks
+				)
 			});
 			card = generated.object;
 		} catch (e) {

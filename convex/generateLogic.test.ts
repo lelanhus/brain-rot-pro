@@ -20,6 +20,27 @@ describe('buildGenerationPrompt', () => {
 		expect(prompt).toContain('[2] Second grounding paragraph.');
 		expect(prompt).toMatch(/verbatim/i);
 	});
+
+	it('omits the avoid-hooks line when avoidHooks is absent or empty', () => {
+		const base = buildGenerationPrompt({
+			title: 'Roman concrete',
+			paragraphs: ['Para one.']
+		});
+		expect(base).not.toContain('DISTINCT');
+
+		const withEmpty = buildGenerationPrompt({ title: 'Roman concrete', paragraphs: ['Para one.'] }, []);
+		expect(withEmpty).not.toContain('DISTINCT');
+	});
+
+	it('includes already-covered hooks in the avoid-hooks line', () => {
+		const prompt = buildGenerationPrompt(
+			{ title: 'Roman concrete', paragraphs: ['Para one.'] },
+			['Romans used volcanic ash', 'It hardened underwater']
+		);
+		expect(prompt).toContain('DISTINCT');
+		expect(prompt).toContain('Romans used volcanic ash');
+		expect(prompt).toContain('It hardened underwater');
+	});
 });
 
 describe('decidePublish (auto-publish gate, default threshold 0.9)', () => {

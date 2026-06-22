@@ -26,6 +26,9 @@ const pool = new Workpool(components.generationPool, {
 /** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
 export const CATALOG_BATCH = 10;
 
+/** Target number of distinct published cards to generate per catalog topic. */
+export const TARGET_CARDS_PER_TOPIC = 3;
+
 /**
  * Warm-ahead supply: take the most-viewed catalog topics that still have no
  * cards and fan a generateForTopic job per topic through the bounded Workpool.
@@ -42,23 +45,59 @@ export const generateFromCatalog = internalAction({
 });
 
 /**
- * Turn one catalog topic into (at most) one published card. Idempotent: a topic
- * that is missing or already has a card is skipped before any ingest/AI work, so
- * re-enqueuing is safe. On a published result, bump the topic's cardCount.
+ * Turn one catalog topic into up to TARGET_CARDS_PER_TOPIC published cards. Idempotent:
+ * a topic that is missing or already at TARGET is skipped before any ingest/AI work, so
+ * re-enqueuing is safe. Ingests the article once, then loops generateFromArticle with
+ * accumulated hooks so each pass surfaces a distinct angle. On each published result,
+ * bumps the topic's cardCount.
  */
 export const generateForTopic = internalAction({
 	args: { slug: v.string() },
 	handler: async (ctx, { slug }): Promise<{ status: string }> => {
 		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
-		if (topic === null || topic.cardCount > 0) return { status: 'skipped' };
-		const r = await ctx.runAction(internal.generationPipeline.ingestAndGenerate, {
+		if (topic === null || topic.cardCount >= TARGET_CARDS_PER_TOPIC) return { status: 'skipped' };
+
+		// Ingest once — ingestAndGenerate re-ingests on every call, so we break out
+		// ingest here and loop only the generation step.
+		const { articleId, accepted } = await ctx.runAction(internal.ingest.ingestOne, {
 			title: topic.title
 		});
-		await ctx.runMutation(internal.topics.setEvergreen, { slug, evergreen: evergreenFromStatus(r.status) });
-		if (publishedDelta(r.status) > 0) {
-			await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+		if (!accepted || articleId === null) {
+			await ctx.runMutation(internal.topics.setEvergreen, {
+				slug,
+				evergreen: evergreenFromStatus('filtered')
+			});
+			return { status: 'filtered' };
 		}
-		return { status: r.status };
+
+		const needed = TARGET_CARDS_PER_TOPIC - topic.cardCount;
+		// Cap total attempts at TARGET+1 to bound cost on a bad run.
+		const maxAttempts = TARGET_CARDS_PER_TOPIC + 1;
+		const avoidHooks: string[] = [];
+		let attempts = 0;
+		let lastStatus = 'exists';
+
+		while (avoidHooks.length < needed && attempts < maxAttempts) {
+			attempts++;
+			const r = await ctx.runAction(api.generate.generateFromArticle, {
+				articleId,
+				avoidHooks: avoidHooks.length > 0 ? avoidHooks : undefined
+			});
+			lastStatus = r.status;
+			// Always set evergreen on the first result (once per topic).
+			if (attempts === 1) {
+				await ctx.runMutation(internal.topics.setEvergreen, {
+					slug,
+					evergreen: evergreenFromStatus(r.status)
+				});
+			}
+			if (publishedDelta(r.status) > 0) {
+				await ctx.runMutation(internal.topics.incrementCardCount, { slug });
+				avoidHooks.push(r.hook);
+			}
+		}
+
+		return { status: lastStatus };
 	}
 });
 

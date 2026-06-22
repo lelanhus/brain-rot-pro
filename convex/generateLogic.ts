@@ -67,8 +67,18 @@ export const validationSchema = z.object({
 });
 export type Validation = z.infer<typeof validationSchema>;
 
-export function buildGenerationPrompt(article: { title: string; paragraphs: string[] }): string {
+export function buildGenerationPrompt(
+	article: { title: string; paragraphs: string[] },
+	avoidHooks?: string[]
+): string {
 	const numbered = article.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
+	const avoidSection =
+		avoidHooks !== undefined && avoidHooks.length > 0
+			? [
+					'',
+					`Surface a surprising fact DISTINCT from these already-covered angles: ${avoidHooks.join(' | ')}`
+				]
+			: [];
 	return [
 		`You are creating ONE short, surprising, source-backed knowledge card from the Wikipedia article "${article.title}".`,
 		'',
@@ -79,6 +89,7 @@ export function buildGenerationPrompt(article: { title: string; paragraphs: stri
 		'- The hook must be specific and true — never sensationalized or misleading.',
 		'- Keep the body to ONE tight paragraph: at most 3–4 short sentences (~80 words). Brevity is the format — a card is read in one screen, never scrolled.',
 		`- Set \`format\` to exactly one of: ${CARD_FORMATS.join(', ')}.`,
+		...avoidSection,
 		'',
 		'Source paragraphs:',
 		numbered
