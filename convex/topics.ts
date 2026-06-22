@@ -1,6 +1,6 @@
 import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
-import { isRealArticleTitle, toSlug, mergePageviews } from './topicsLogic';
+import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
 import { internal } from './_generated/api';
 
 /** Insert a topic or accumulate pageviews onto the existing row with this slug. */
@@ -143,7 +143,7 @@ export const harvestTopDay = internalAction({
 		const articles = data.items?.[0]?.articles ?? [];
 		let kept = 0;
 		for (const a of articles) {
-			if (!isRealArticleTitle(a.article)) continue;
+			if (!isRealArticleTitle(a.article) || !isQualityTopic(a.article)) continue;
 			await ctx.runMutation(internal.topics.upsertTopic, {
 				title: a.article,
 				pageviews: a.views,
@@ -205,6 +205,22 @@ export const incrementCardCount = internalMutation({
 		if (topic !== null) {
 			await ctx.db.patch(topic._id, { cardCount: topic.cardCount + 1, updatedAt: Date.now() });
 		}
+	}
+});
+
+/** One-time: remove catalog topics whose title fails the quality gate. */
+export const purgeLowQuality = internalMutation({
+	args: {},
+	handler: async (ctx): Promise<{ deleted: number }> => {
+		const all = await ctx.db.query('topics').collect();
+		let deleted = 0;
+		for (const topic of all) {
+			if (!isQualityTopic(topic.title)) {
+				await ctx.db.delete(topic._id);
+				deleted++;
+			}
+		}
+		return { deleted };
 	}
 });
 

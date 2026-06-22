@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRealArticleTitle, toSlug, mergePageviews } from './topicsLogic';
+import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic } from './topicsLogic';
 
 describe('isRealArticleTitle', () => {
 	it('accepts real articles (underscored or spaced)', () => {
@@ -32,5 +32,22 @@ describe('mergePageviews', () => {
 	it('sums cumulative views across days', () => {
 		expect(mergePageviews(0, 500)).toBe(500);
 		expect(mergePageviews(500, 300)).toBe(800);
+	});
+});
+
+describe('isQualityTopic', () => {
+	it('rejects TLDs, Deaths-in, and YYYY-in ranking pages', () => {
+		expect(isQualityTopic('.xyz')).toBe(false);
+		expect(isQualityTopic('.xxx')).toBe(false);
+		expect(isQualityTopic('Deaths in 2026')).toBe(false);
+		expect(isQualityTopic('2008_in_music')).toBe(false);
+		expect(isQualityTopic('2026 in film')).toBe(false);
+	});
+	it('accepts real subjects incl. year-prefix events', () => {
+		expect(isQualityTopic('Cleopatra')).toBe(true);
+		expect(isQualityTopic('Cristiano Ronaldo')).toBe(true);
+		expect(isQualityTopic('Cape Verde')).toBe(true);
+		expect(isQualityTopic('2026 FIFA World Cup')).toBe(true);
+		expect(isQualityTopic('ChatGPT')).toBe(true);
 	});
 });
