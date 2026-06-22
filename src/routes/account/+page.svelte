@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { useQuery, useAuth, getConvexClient } from 'convex-svelte';
+	import { useQuery, useMutation, useAuth, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { getDeviceId, clearDeviceId } from '$lib/identity';
 	import { authClient } from '$lib/auth-client';
@@ -17,6 +17,9 @@
 	const savedIds = useQuery(api.saved.savedIds, () => (deviceId ? { deviceId } : 'skip'));
 	const savedCount = $derived((savedIds.data ?? []).length);
 	const s = $derived(stats.data);
+
+	const interests = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
+	const removeInterest = useMutation(api.interests.remove);
 
 	// Delete-my-data (two-step confirm) — the account-level action, relocated here
 	// from /sync so /sync is purely device pairing.
@@ -114,6 +117,22 @@
 				>Sync with a one-time code →</a
 			>
 		</p>
+	</section>
+
+	<section class="panel">
+		<h2>Interests</h2>
+		{#if (interests.data ?? []).length === 0}
+			<p>Follow topics from the feed to personalize what you see.</p>
+		{:else}
+			<ul class="interests">
+				{#each interests.data ?? [] as i (i.slug)}
+					<li>
+						<span>{i.title}</span>
+						<button type="button" class="ghost" onclick={() => deviceId && removeInterest({ deviceId, slug: i.slug })}>Remove</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	</section>
 
 	<section class="panel danger">
@@ -254,6 +273,22 @@
 	}
 	.err {
 		color: var(--negative) !important;
+	}
+	.interests {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.interests li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.92rem;
+	}
+	.interests li:last-child {
+		border-bottom: none;
 	}
 	@media (min-width: 700px) {
 		.stats {
