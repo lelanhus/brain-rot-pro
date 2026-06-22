@@ -219,3 +219,14 @@ describe('accumulateWeights graded dwell', () => {
 		expect(wHigh['topic']).toBeGreaterThan(wLow['topic']!);
 	});
 });
+
+import { THREAD_WEIGHT } from './profileLogic';
+describe('scoreByTaste thread term', () => {
+	it('adds THREAD_WEIGHT*cosine(threadEmbedding, card.embedding) when both present', () => {
+		const card = { conceptTags: ['x'], embedding: [1, 0], slug: 's' };
+		const ctx = { tasteVector: undefined, weights: {}, shuffleKey: 0, focusConcept: null };
+		const near = scoreByTaste(card, { ...ctx, threadEmbedding: [1, 0] }); // cosine 1
+		const none = scoreByTaste(card, { ...ctx });
+		expect(near - none).toBeCloseTo(THREAD_WEIGHT);
+	});
+});

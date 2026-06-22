@@ -34,6 +34,9 @@ export const RELEVANCE_WEIGHT = 10;
 /** Additive rank bump for cards whose source topic the user explicitly follows. */
 export const INTEREST_BOOST = 5;
 
+/** Nudge toward the card the user just engaged with (connected-next hop). */
+export const THREAD_WEIGHT = 4;
+
 /** Half-life for recency weighting of taste signals (14 days). */
 export const TASTE_HALFLIFE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -146,6 +149,7 @@ export function scoreByTaste(
 		shuffleKey: number;
 		focusConcept?: string | null;
 		interestSlugs?: ReadonlySet<string>;
+		threadEmbedding?: number[];
 	}
 ): number {
 	const emb = card.embedding;
@@ -162,6 +166,9 @@ export function scoreByTaste(
 	}
 	if (ctx.interestSlugs !== undefined && card.slug !== undefined && ctx.interestSlugs.has(card.slug)) {
 		score += INTEREST_BOOST;
+	}
+	if (ctx.threadEmbedding !== undefined && emb !== undefined && emb.length === ctx.threadEmbedding.length) {
+		score += THREAD_WEIGHT * cosineSimilarity(ctx.threadEmbedding, emb);
 	}
 	return score;
 }
