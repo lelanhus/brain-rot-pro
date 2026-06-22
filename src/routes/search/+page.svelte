@@ -44,7 +44,7 @@
 	/>
 	{#if q.trim().length < 2}
 		<p class="hint">Type at least 2 characters to search.</p>
-	{:else if (results.data ?? []).length === 0}
+	{:else if results.data !== undefined && results.data.length === 0}
 		<p class="hint">No topics found for "{q}".</p>
 	{:else}
 		<ul class="results">
