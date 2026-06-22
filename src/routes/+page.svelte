@@ -378,6 +378,7 @@
 <div class="feed-topscrim" aria-hidden="true"></div>
 
 <nav class="feed-nav">
+	<a class="nav-pill" href={resolve('/search')}>Explore</a>
 	<a class="nav-pill" href={resolve('/saved')}>Saved</a>
 	<a class="nav-pill" href={resolve('/account')}>Account</a>
 </nav>
