@@ -277,6 +277,44 @@ export const classifyTopTopics = action({
 });
 
 /**
+ * Drain a batch of `topicsStaging` into `topics`, upserting by slug. Existing
+ * topics keep their cardCount/evergreen (only pageviews accumulate); new slugs
+ * insert with cardCount:0. Deletes each staging row as it's consumed, so repeated
+ * calls drain the table (no cursor needed). `done` when a partial batch returns.
+ */
+export const mergeStagingIntoCatalog = internalMutation({
+	args: { batch: v.optional(v.number()) },
+	handler: async (ctx, { batch }): Promise<{ merged: number; done: boolean }> => {
+		const size = batch ?? 500;
+		const rows = await ctx.db.query('topicsStaging').take(size);
+		const now = Date.now();
+		for (const row of rows) {
+			const existing = await ctx.db
+				.query('topics')
+				.withIndex('by_slug', (q) => q.eq('slug', row.slug))
+				.unique();
+			if (existing !== null) {
+				await ctx.db.patch(existing._id, {
+					pageviews: mergePageviews(existing.pageviews, row.pageviews),
+					updatedAt: now
+				});
+			} else {
+				await ctx.db.insert('topics', {
+					title: row.title,
+					slug: row.slug,
+					pageviews: row.pageviews,
+					cardCount: 0,
+					source: 'wikipedia-dump',
+					updatedAt: now
+				});
+			}
+			await ctx.db.delete(row._id);
+		}
+		return { merged: rows.length, done: rows.length < size };
+	}
+});
+
+/**
  * One-time: seed `cardCount` from existing published cards by mapping each
  * card's source article title to a topic slug. Cards whose source isn't in the
  * catalog are skipped. Going forward, `cardCount` upkeep is owned by the

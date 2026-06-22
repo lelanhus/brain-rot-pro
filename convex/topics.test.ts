@@ -191,6 +191,32 @@ test('topByPageviews and needingCards exclude evergreen===false (keep true + unc
 	expect(needing).toEqual(['good', 'verified']);
 });
 
+test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/evergreen', async () => {
+	const t = convexTest(schema, modules);
+	// existing topic with state that MUST be preserved
+	await t.mutation(internal.topics.upsertTopic, { title: 'Cleopatra', pageviews: 100, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.setEvergreen, { slug: 'cleopatra', evergreen: true });
+	await t.mutation(internal.topics.incrementCardCount, { slug: 'cleopatra' });
+	// staging: one dup (cleopatra) + one new (hannibal)
+	await t.run(async (ctx) => {
+		await ctx.db.insert('topicsStaging', { title: 'Cleopatra', slug: 'cleopatra', pageviews: 500 });
+		await ctx.db.insert('topicsStaging', { title: 'Hannibal', slug: 'hannibal', pageviews: 300 });
+	});
+
+	const res = await t.mutation(internal.topics.mergeStagingIntoCatalog, { batch: 500 });
+	expect(res).toEqual({ merged: 2, done: true });
+
+	const cleo = await t.query(api.topics.bySlug, { slug: 'cleopatra' });
+	expect(cleo?.cardCount).toBe(1); // preserved
+	expect(cleo?.evergreen).toBe(true); // preserved
+	expect(cleo?.pageviews).toBe(600); // 100 + 500 accumulated
+	const han = await t.query(api.topics.bySlug, { slug: 'hannibal' });
+	expect(han?.cardCount).toBe(0); // new insert
+	expect(han?.source).toBe('wikipedia-dump');
+	// staging drained
+	expect(await t.run(async (ctx) => (await ctx.db.query('topicsStaging').collect()).length)).toBe(0);
+});
+
 test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
 	const t = convexTest(schema, modules);
 	await t.run(async (ctx) => {
