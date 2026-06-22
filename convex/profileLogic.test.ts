@@ -6,7 +6,10 @@ import {
 	buildTasteVector,
 	TASTE_HALFLIFE_MS,
 	scoreByTaste,
-	INTEREST_BOOST
+	INTEREST_BOOST,
+	engagementWeight,
+	meanCompleteDwell,
+	EVENT_DELTA
 } from './profileLogic';
 
 describe('accumulateWeights', () => {
@@ -168,5 +171,51 @@ describe('scoreByTaste interest boost', () => {
 		const withBoost = scoreByTaste(base, { ...ctx, interestSlugs: followed });
 		const without = scoreByTaste(base, { ...ctx, interestSlugs: new Set() });
 		expect(withBoost - without).toBeCloseTo(INTEREST_BOOST);
+	});
+});
+
+describe('engagementWeight (graded dwell)', () => {
+	it('scales card_complete by dwell ratio vs user average, clamped', () => {
+		const base = EVENT_DELTA.card_complete; // 1
+		expect(engagementWeight('card_complete', 4000, 2000)).toBeCloseTo(base * 2); // 2x dwell
+		expect(engagementWeight('card_complete', 20000, 2000)).toBeCloseTo(base * 2.5); // clamped hi
+		expect(engagementWeight('card_complete', 200, 2000)).toBeCloseTo(base * 0.5); // clamped lo
+		expect(engagementWeight('card_complete', undefined, 2000)).toBeCloseTo(base); // no ms → flat
+		expect(engagementWeight('card_complete', 4000, 0)).toBeCloseTo(base); // no baseline → flat
+	});
+	it('leaves explicit + negative events flat', () => {
+		expect(engagementWeight('save', 9999, 2000)).toBe(EVENT_DELTA.save);
+		expect(engagementWeight('not_interested', 100, 2000)).toBe(EVENT_DELTA.not_interested);
+		expect(engagementWeight('card_skip', 100, 2000)).toBe(EVENT_DELTA.card_skip);
+	});
+});
+
+describe('meanCompleteDwell', () => {
+	it('averages visibleMs over card_complete events only', () => {
+		expect(meanCompleteDwell([
+			{ type: 'card_complete', visibleMs: 1000 }, { type: 'card_complete', visibleMs: 3000 },
+			{ type: 'card_skip', visibleMs: 100 }, { type: 'save' }
+		])).toBe(2000);
+		expect(meanCompleteDwell([{ type: 'save' }])).toBe(0); // none → 0 (callers treat 0 as "no baseline")
+	});
+});
+
+describe('accumulateWeights graded dwell', () => {
+	it('high-dwell complete outweighs low-dwell complete for the same card tags', () => {
+		// Two separate cards with the same tag — one completed with high dwell, one with low
+		const tagsByCard = { a: ['topic'], b: ['topic'] };
+		// high-dwell: 4000ms vs avg 2000ms → ratio 2 → weight 2
+		// low-dwell: 500ms vs avg 2000ms → ratio 0.5 → weight 0.5 (clamped lo)
+		const wHigh = accumulateWeights(
+			[{ type: 'card_complete', cardId: 'a', visibleMs: 4000 }],
+			tagsByCard,
+			2000
+		);
+		const wLow = accumulateWeights(
+			[{ type: 'card_complete', cardId: 'b', visibleMs: 500 }],
+			tagsByCard,
+			2000
+		);
+		expect(wHigh['topic']).toBeGreaterThan(wLow['topic']!);
 	});
 });
