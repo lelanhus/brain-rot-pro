@@ -24,11 +24,14 @@
 	import { cooldownGate } from '$lib/cooldownGate';
 	import { shareCard } from '$lib/share';
 	import { toSlug } from '$lib/slug';
+	import OnboardingSheet from '$lib/components/OnboardingSheet.svelte';
+	import { isOnboarded, markOnboarded } from '$lib/onboarding';
 
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
 
 	let deviceId = $state('');
+	let showOnboarding = $state(false);
 	const notInterested = new SvelteSet<string>();
 	// Seeded from a shared/deep-linked ?focus= (e.g. a concept chip tapped on
 	// /saved); read once from SvelteKit's reactive page state, not window.location.
@@ -164,6 +167,7 @@
 
 	onMount(() => {
 		deviceId = getDeviceId();
+		if (!isOnboarded()) showOnboarding = true;
 		online = navigator.onLine;
 		const goOnline = () => (online = true);
 		const goOffline = () => (online = false);
@@ -372,6 +376,16 @@
 
 <svelte:window onkeydown={onKeydown} />
 <svelte:head><title>Brain Rot Pro</title></svelte:head>
+
+{#if showOnboarding && deviceId}
+	<OnboardingSheet
+		{deviceId}
+		onDone={() => {
+			markOnboarded();
+			showOnboarding = false;
+		}}
+	/>
+{/if}
 
 <!-- Scrim behind the fixed top controls: card images/titles read as sliding
      *under* the chrome instead of colliding with the pills' negative space. -->
