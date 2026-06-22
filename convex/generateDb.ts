@@ -33,7 +33,7 @@ export const articlesNeedingCards = internalQuery({
 
 /** Hook strings of PUBLISHED cards already generated from this article.
  *  Used to seed avoidHooks on a re-run so already-shipped angles are never
- *  regenerated. Small-scale scan (mirrors articleHasCard). */
+ *  regenerated. Small-scale scan (see note on `articlesNeedingCards`). */
 export const cardHooksForArticle = internalQuery({
 	args: { articleId: v.id('sourceArticles') },
 	handler: async (ctx, { articleId }): Promise<string[]> => {
@@ -44,17 +44,6 @@ export const cardHooksForArticle = internalQuery({
 		return cards
 			.filter((c) => c.generation?.sourceArticleId === articleId)
 			.map((c) => c.hook);
-	}
-});
-
-/** Has a card already been generated from this article? Workpool dedup so a
- *  re-enqueued title never produces a duplicate card. Small-scale scan (see note
- *  on `articlesNeedingCards`). */
-export const articleHasCard = internalQuery({
-	args: { articleId: v.id('sourceArticles') },
-	handler: async (ctx, { articleId }) => {
-		const cards = await ctx.db.query('knowledgeCards').collect();
-		return cards.some((c) => c.generation?.sourceArticleId === articleId);
 	}
 });
 

@@ -182,3 +182,29 @@ export function spanIsFromSource(span: string, paragraphs: string[]): boolean {
 export function publishedDelta(status: string): number {
 	return status === 'published' ? 1 : 0;
 }
+
+/**
+ * Loop budget for filling a topic toward `target` cards. `needed` is how many
+ * more must publish; `maxAttempts` grants two extra tries to absorb
+ * duplicate/validation_failed results without leaving the topic short.
+ */
+export function fillBudget(
+	cardCount: number,
+	target: number
+): { needed: number; maxAttempts: number } {
+	const needed = Math.max(0, target - cardCount);
+	return { needed, maxAttempts: needed + 2 };
+}
+
+/**
+ * Whether generateForTopic should keep generating. Progress is measured by cards
+ * PUBLISHED this run — never by how many prior hooks were seeded into avoidHooks,
+ * so a partial topic (0 < cardCount < target) still fills toward target.
+ */
+export function shouldKeepFilling(
+	published: number,
+	attempts: number,
+	budget: { needed: number; maxAttempts: number }
+): boolean {
+	return published < budget.needed && attempts < budget.maxAttempts;
+}

@@ -2,7 +2,7 @@ import { action, internalAction, internalMutation, internalQuery } from './_gene
 import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
-import { publishedDelta } from './generateLogic';
+import { publishedDelta, fillBudget, shouldKeepFilling } from './generateLogic';
 import { evergreenFromStatus, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 /**
@@ -56,8 +56,8 @@ export const generateForTopic = internalAction({
 		const topic = await ctx.runQuery(api.topics.bySlug, { slug });
 		if (topic === null || topic.cardCount >= TARGET_CARDS_PER_TOPIC) return { status: 'skipped' };
 
-		// Ingest once — ingestAndGenerate re-ingests on every call, so we break out
-		// ingest here and loop only the generation step.
+		// Ingest the article once, then loop only the generation step so each
+		// pass reuses the same source instead of re-ingesting per card.
 		const { articleId, accepted } = await ctx.runAction(internal.ingest.ingestOne, {
 			title: topic.title
 		});
@@ -69,9 +69,10 @@ export const generateForTopic = internalAction({
 			return { status: 'filtered' };
 		}
 
-		const needed = TARGET_CARDS_PER_TOPIC - topic.cardCount;
-		// Give 2 extra attempts beyond needed to absorb duplicate/validation_failed results.
-		const maxAttempts = needed + 2;
+		// `needed`/`maxAttempts` derive from current cardCount; the loop gates on
+		// cards PUBLISHED this run (not avoidHooks.length), so a partial re-run
+		// still fills toward TARGET even though avoidHooks is pre-seeded below.
+		const budget = fillBudget(topic.cardCount, TARGET_CARDS_PER_TOPIC);
 		// Seed avoidHooks from already-published cards for this article so a
 		// re-run never regenerates angles that are already shipped.
 		const avoidHooks: string[] = await ctx.runQuery(
@@ -79,9 +80,10 @@ export const generateForTopic = internalAction({
 			{ articleId }
 		);
 		let attempts = 0;
+		let published = 0;
 		let lastStatus = 'skipped';
 
-		while (avoidHooks.length < needed && attempts < maxAttempts) {
+		while (shouldKeepFilling(published, attempts, budget)) {
 			attempts++;
 			const r = await ctx.runAction(api.generate.generateFromArticle, {
 				articleId,
@@ -98,6 +100,7 @@ export const generateForTopic = internalAction({
 			if (publishedDelta(r.status) > 0) {
 				await ctx.runMutation(internal.topics.incrementCardCount, { slug });
 				avoidHooks.push(r.hook);
+				published++;
 			}
 		}
 
