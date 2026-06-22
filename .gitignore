@@ -26,3 +26,6 @@ test-results
 
 # Test artifacts
 *-screenshot.png
+
+# offline-ETL output (build-catalog.mjs default --out)
+catalog.jsonl
