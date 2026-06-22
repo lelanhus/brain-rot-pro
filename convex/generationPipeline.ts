@@ -3,7 +3,7 @@ import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
 import { publishedDelta } from './generateLogic';
-import { evergreenFromStatus } from './topicsLogic';
+import { evergreenFromStatus, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 /**
  * Catalog-driven generation pipeline (the "warm-ahead" loop). A
@@ -26,8 +26,7 @@ const pool = new Workpool(components.generationPool, {
 /** Topics to turn into cards per warm-ahead pass (bounded by Workpool maxParallelism + ensureSupply cooldown). */
 export const CATALOG_BATCH = 10;
 
-/** Target number of distinct published cards to generate per catalog topic. */
-export const TARGET_CARDS_PER_TOPIC = 3;
+export { TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 /**
  * Warm-ahead supply: take the most-viewed catalog topics that still have no
@@ -71,11 +70,16 @@ export const generateForTopic = internalAction({
 		}
 
 		const needed = TARGET_CARDS_PER_TOPIC - topic.cardCount;
-		// Cap total attempts at TARGET+1 to bound cost on a bad run.
-		const maxAttempts = TARGET_CARDS_PER_TOPIC + 1;
-		const avoidHooks: string[] = [];
+		// Give 2 extra attempts beyond needed to absorb duplicate/validation_failed results.
+		const maxAttempts = needed + 2;
+		// Seed avoidHooks from already-published cards for this article so a
+		// re-run never regenerates angles that are already shipped.
+		const avoidHooks: string[] = await ctx.runQuery(
+			internal.generateDb.cardHooksForArticle,
+			{ articleId }
+		);
 		let attempts = 0;
-		let lastStatus = 'exists';
+		let lastStatus = 'skipped';
 
 		while (avoidHooks.length < needed && attempts < maxAttempts) {
 			attempts++;
@@ -98,29 +102,6 @@ export const generateForTopic = internalAction({
 		}
 
 		return { status: lastStatus };
-	}
-});
-
-/**
- * One Workpool job: ingest a single title (with its fail-closed Commons image),
- * then generate a card from it. Idempotent — skips if the article already yielded
- * a card, so a re-enqueued title never duplicates.
- */
-export const ingestAndGenerate = internalAction({
-	args: { title: v.string() },
-	handler: async (
-		ctx,
-		{ title }
-	): Promise<{
-		title: string;
-		status: 'filtered' | 'exists' | 'published' | 'validation_failed' | 'duplicate';
-	}> => {
-		const { articleId, accepted } = await ctx.runAction(internal.ingest.ingestOne, { title });
-		if (!accepted || !articleId) return { title, status: 'filtered' };
-		const already = await ctx.runQuery(internal.generateDb.articleHasCard, { articleId });
-		if (already) return { title, status: 'exists' };
-		const r = await ctx.runAction(api.generate.generateFromArticle, { articleId });
-		return { title, status: r.status };
 	}
 });
 

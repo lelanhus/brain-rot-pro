@@ -3,7 +3,8 @@ import { expect, test } from 'vitest';
 import { convexTest } from 'convex-test';
 import { internal, api } from './_generated/api';
 import schema from './schema';
-import { supplyThrottleOk, TARGET_CARDS_PER_TOPIC } from './generationPipeline';
+import { supplyThrottleOk } from './generationPipeline';
+import { TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!./**/*.d.ts']);
 
@@ -48,18 +49,21 @@ test('generateForTopic skips when cardCount >= TARGET_CARDS_PER_TOPIC', async ()
 
 test('generateFromCatalog enqueues one job per needing-cards topic, popularity-first', async () => {
 	const t = convexTest(schema, modules);
-	// Three topics needing cards + one already covered (must be excluded).
+	// Three topics needing cards + one fully covered at TARGET (must be excluded).
 	await t.mutation(internal.topics.upsertTopic, { title: 'Alpha', pageviews: 300, source: 'wikipedia-top' });
 	await t.mutation(internal.topics.upsertTopic, { title: 'Beta', pageviews: 900, source: 'wikipedia-top' });
 	await t.mutation(internal.topics.upsertTopic, { title: 'Gamma', pageviews: 600, source: 'wikipedia-top' });
 	await t.mutation(internal.topics.upsertTopic, { title: 'Covered', pageviews: 999, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.incrementCardCount, { slug: 'covered' });
+	// Bump Covered to exactly TARGET so it is fully covered and excluded.
+	for (let i = 0; i < TARGET_CARDS_PER_TOPIC; i++) {
+		await t.mutation(internal.topics.incrementCardCount, { slug: 'covered' });
+	}
 
 	// Workpool (generationPool component) cannot run under convex-test — fallback:
 	// assert the selection contract via a direct needingCards read (same 3 topics).
 	const needing = await t.query(internal.topics.needingCards, { limit: 10 });
-	expect(needing).toHaveLength(3); // Alpha, Beta, Gamma — not Covered
-	expect(needing.every((topic) => topic.cardCount === 0)).toBe(true);
+	expect(needing).toHaveLength(3); // Alpha, Beta, Gamma — not Covered (cardCount===TARGET)
+	expect(needing.every((topic) => topic.cardCount < TARGET_CARDS_PER_TOPIC)).toBe(true);
 	expect(needing[0]?.slug).toBe('beta'); // popularity-first (pageviews desc)
 	const slugs = needing.map((topic) => topic.slug);
 	expect(slugs).not.toContain('covered');

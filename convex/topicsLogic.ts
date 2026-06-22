@@ -1,5 +1,8 @@
 // Pure helpers for the topic catalog — no Convex deps, unit-tested in isolation.
 
+/** Target number of distinct published cards to generate per catalog topic. */
+export const TARGET_CARDS_PER_TOPIC = 3;
+
 const SKIP_PREFIXES = [
 	'Special:',
 	'Wikipedia:',
