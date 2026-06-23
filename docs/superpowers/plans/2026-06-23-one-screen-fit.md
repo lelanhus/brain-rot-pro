@@ -23,9 +23,11 @@
 ### Task 1: Height-bounded flex layout (`src/app.css`)
 
 **Files:**
+
 - Modify: `src/app.css` (`.slot`, `.card`, `.card-body`, `.card-image`, `.card-image img`, `.hook`, `.body`; add `.body[data-clipped='true']`, `.read-more`, `.body-full`)
 
 **Interfaces:**
+
 - Consumes: existing CSS custom properties (`--space-*`, `--fs-*`, `--dur-fast`, `--ease`, `--text-2`, `--text`, `--measure`).
 - Produces: the CSS hooks Task 2 relies on — class `.read-more`, attribute selector `.body[data-clipped='true']`, class `.body-full` (full body inside the reveal overlay).
 
@@ -97,18 +99,18 @@ Then in `.card-image img`, change `max-height: 24dvh;` to `max-height: clamp(110
 - [ ] **Step 5: Line-clamp the hook as a safety net.** In the `.hook` rule, add these four declarations (keep all existing ones):
 
 ```css
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 5;
-	overflow: hidden;
+display: -webkit-box;
+-webkit-box-orient: vertical;
+-webkit-line-clamp: 5;
+overflow: hidden;
 ```
 
 - [ ] **Step 6: Make the body the shrink-and-clip region, with a fade when clipped.** In the `.body` rule, add:
 
 ```css
-	flex: 0 1 auto;
-	min-height: 0;
-	overflow: hidden;
+flex: 0 1 auto;
+min-height: 0;
+overflow: hidden;
 ```
 
 (`flex-grow:0` keeps short cards' existing whitespace; `flex-shrink:1` + `min-height:0` + `overflow:hidden` lets a long body clip instead of overflowing the card.) Then add a new rule immediately after `.body`:
@@ -174,10 +176,12 @@ git commit -m "feat(feed): height-bounded one-screen card layout (image cap, hoo
 ### Task 2: "Read more" affordance + clip detection (`src/lib/components/Card.svelte`)
 
 **Files:**
+
 - Modify: `src/lib/components/Card.svelte`
 - Test: `src/lib/components/Card.svelte.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `.read-more`, `.body[data-clipped='true']`, `.body-full` from Task 1; the existing `reveal` overlay mechanism and `onExpand` prop.
 - Produces: nothing other tasks consume.
 
@@ -280,17 +284,17 @@ to:
 (4b) Bind the body element and reflect the clipped flag, then add the button. Change:
 
 ```svelte
-		<p class="body">{card.body}</p>
+<p class="body">{card.body}</p>
 ```
 
 to:
 
 ```svelte
-		<p class="body" bind:this={bodyEl} data-clipped={clipped}>{card.body}</p>
+<p class="body" bind:this={bodyEl} data-clipped={clipped}>{card.body}</p>
 
-		{#if clipped}
-			<button type="button" class="read-more" onclick={toggleBody}>Read more</button>
-		{/if}
+{#if clipped}
+	<button type="button" class="read-more" onclick={toggleBody}>Read more</button>
+{/if}
 ```
 
 (4c) Add the `'body'` branch to the overlay. Change:
@@ -356,6 +360,7 @@ git commit -m "chore(feed): tune one-screen fit after visual check" || echo "not
 ## Self-Review
 
 **Spec coverage:**
+
 - `.slot` height:100dvh + card/card-body flex column → Task 1 Steps 1–3. ✅
 - Image yields → Task 1 Step 4. **Deviation (intentional, a correctness fix):** the spec described the image yielding via `figure { flex:0 1 }`; that would let the figure shrink and clip its `<figcaption>`, which is the required CC license attribution (ADR-005). The plan instead pins the figure (`flex:0 0`) and caps the `<img>` with a `dvh` clamp, so the image still yields on short viewports but the attribution caption is never clipped. ✅ (better-honors the attribution constraint)
 - Hook line-clamp safety net + `title` for a11y → Task 1 Step 5, Task 2 Step 4a. ✅
