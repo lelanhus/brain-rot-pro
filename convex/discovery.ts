@@ -40,7 +40,8 @@ export const candidatesBySlugs = internalQuery({
 				.query('topics')
 				.withIndex('by_slug', (q) => q.eq('slug', slug))
 				.unique();
-			if (row !== null && row.evergreen !== false) out.push({ slug: row.slug, title: row.title, pageviews: row.pageviews });
+			if (row !== null && row.evergreen !== false)
+				out.push({ slug: row.slug, title: row.title, pageviews: row.pageviews });
 		}
 		return out;
 	}

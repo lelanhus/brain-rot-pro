@@ -32,10 +32,10 @@ machinery; auth just provides a durable identity that binds to a principal.
 - **Anonymous-first.** Accounts are optional — an upgrade for cross-device sync.
   Unsigned users keep working exactly as today on their `deviceId`.
 - **Library: Better Auth via the official Convex component** (`@convex-dev/better-auth`)
-  + the community Svelte adapter (`@mmailaender/convex-better-auth-svelte`).
-  Convex's first-party `@convex-dev/auth` does not support SvelteKit. Better Auth
-  is framework-agnostic, an official Convex component, and does Google OAuth via
-  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
+  - the community Svelte adapter (`@mmailaender/convex-better-auth-svelte`).
+    Convex's first-party `@convex-dev/auth` does not support SvelteKit. Better Auth
+    is framework-agnostic, an official Convex component, and does Google OAuth via
+    `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
 - **Approach A — bind-principal-and-merge** (reuse the deviceId model; add one
   `accounts` mapping table; merge on sign-in; client adopts the principal).
   Rejected B (re-key every table to the auth userId — a rewrite + migration).
@@ -43,6 +43,7 @@ machinery; auth just provides a durable identity that binds to a principal.
 ## Design
 
 ### 1. Better Auth integration (scaffold)
+
 - Backend: `app.use(betterAuth)` in `convex/convex.config.ts`; `convex/auth.config.ts`
   configuring the Google social provider; mount Better Auth HTTP routes in
   `convex/http.ts` via `authComponent.registerRoutes()`. Read the signed-in user
@@ -59,6 +60,7 @@ machinery; auth just provides a durable identity that binds to a principal.
   real-time client or the SSR-to-live paginated feed.
 
 ### 2. Identity bridge — the testable core
+
 - New table `accounts { authUserId: string, principal: string, createdAt }`,
   index `by_authUser` `['authUserId']` (+ `by_principal` for lookups).
 - A mutation `linkDevice({ deviceId })` (reads the auth user via
@@ -74,6 +76,7 @@ machinery; auth just provides a durable identity that binds to a principal.
   (already tested). This keeps the auth-coupled part minimal.
 
 ### 3. Client glue
+
 - When `useAuth().isAuthenticated` flips true and the device id has resolved:
   call `linkDevice({ deviceId })`, `identity.setDeviceId(principal)`, then reload
   so live queries re-subscribe under the account (same pattern as sync redeem).
@@ -84,13 +87,15 @@ machinery; auth just provides a durable identity that binds to a principal.
 - The existing sync-code flow stays as a no-account fallback (unchanged).
 
 ### 4. Dev / testing story
+
 - The identity bridge (`decideLink`, the merge) is unit-tested with a **simulated
   signed-in user** (convex-test `withIdentity`, or by testing `decideLink` purely
-  + `mergeAccounts` directly) — **no Google credentials needed**, runs in CI.
+  - `mergeAccounts` directly) — **no Google credentials needed**, runs in CI.
 - Google Cloud OAuth credentials (free, Testing mode) are configured only for the
   final end-to-end manual check.
 
 ## Deployment note
+
 Better Auth's OAuth redirect + `SITE_URL` must match the deployment the live site
 uses. Production runs on the Convex **dev** deployment `adept-spoonbill-177`
 (Vercel `PUBLIC_CONVEX_URL`), so the Better Auth env vars + the Google authorized
@@ -99,6 +104,7 @@ it via `npx convex dev --once`. The Google redirect URI registers
 `https://brain-rot-pro.vercel.app` (+ `http://localhost:5173` for dev).
 
 ## Non-goals
+
 - Apple sign-in, email magic-link, email/password (deferred / dropped).
 - Re-keying tables to the auth userId (approach B).
 - Native iOS app.
@@ -106,6 +112,7 @@ it via `npx convex dev --once`. The Google redirect URI registers
   purge remains; account-level deletion is a follow-up).
 
 ## Testing
+
 - Unit: `decideLink` returns claim/merge/noop correctly (no row → claim; same
   principal → noop; different principal → merge).
 - convex-test: `linkDevice` first sign-in creates the account with the device's
@@ -117,6 +124,7 @@ it via `npx convex dev --once`. The Google redirect URI registers
   confirm B sees A's saves/streak; sign out reverts to anonymous.
 
 ## Open items
+
 - Exact Better Auth Convex API symbols (`getAuthUser`, route registration,
   `withIdentity` shape) are pinned during implementation against the current
   `@convex-dev/better-auth` + `@mmailaender/convex-better-auth-svelte` docs

@@ -15,3 +15,8 @@ convex/_generated/
 # Local, git-ignored deployment & editor state (not source)
 .convex/
 .claude/settings.local.json
+
+# Vendored agent-skill packages (installed via `npx convex ai-files install`) —
+# not our source; formatting them is churn that reinstalls overwrite.
+.agents/
+.claude/skills/

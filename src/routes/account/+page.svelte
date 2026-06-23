@@ -128,7 +128,11 @@
 				{#each interests.data ?? [] as i (i.slug)}
 					<li>
 						<span>{i.title}</span>
-						<button type="button" class="ghost" onclick={() => deviceId && removeInterest({ deviceId, slug: i.slug })}>Remove</button>
+						<button
+							type="button"
+							class="ghost"
+							onclick={() => deviceId && removeInterest({ deviceId, slug: i.slug })}>Remove</button
+						>
 					</li>
 				{/each}
 			</ul>

@@ -11,7 +11,13 @@ export const add = mutation({
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
 			.unique();
 		if (existing !== null) return;
-		await ctx.db.insert('interests', { deviceId, slug, title, source: 'explicit', createdAt: Date.now() });
+		await ctx.db.insert('interests', {
+			deviceId,
+			slug,
+			title,
+			source: 'explicit',
+			createdAt: Date.now()
+		});
 		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
 		await ctx.scheduler.runAfter(0, internal.discovery.discoverFor, { deviceId, slug, title });
 	}
@@ -47,7 +53,13 @@ export const addDiscovered = internalMutation({
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
 			.unique();
 		if (existing !== null) return;
-		await ctx.db.insert('interests', { deviceId, slug, title, source: 'discovered', createdAt: Date.now() });
+		await ctx.db.insert('interests', {
+			deviceId,
+			slug,
+			title,
+			source: 'discovered',
+			createdAt: Date.now()
+		});
 		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
 	}
 });

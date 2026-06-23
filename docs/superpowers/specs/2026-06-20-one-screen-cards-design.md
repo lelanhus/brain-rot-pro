@@ -6,10 +6,10 @@
 ## Problem
 
 The feed is meant to be a swipe-driven "one idea, full attention" experience.
-`docs/ui-ux.md` states the intent plainly: *"One card fills the viewport. Nothing
-competes with the hook."* and *"One card == one snap stop."* The implementation
+`docs/ui-ux.md` states the intent plainly: _"One card fills the viewport. Nothing
+competes with the hook."_ and _"One card == one snap stop."_ The implementation
 has drifted from this: on smaller phones a card's content overflows the viewport,
-so the reader scrolls *within* a card before reaching the next snap point.
+so the reader scrolls _within_ a card before reaching the next snap point.
 
 Two causes:
 
@@ -32,7 +32,7 @@ the next card; it never scrolls content within the current one.
 - **Long content → cap it shorter** at generation so every card fits. No body
   scroll, no body "read more" expand.
 - **Visible without any tap:** hook + body + image + tags. "Why it matters",
-  "Source", and "More like this" remain compact tappable controls *on* the
+  "Source", and "More like this" remain compact tappable controls _on_ the
   screen; their detail opens as a non-scrolling overlay/inline reveal that does
   not push content off-screen.
 - **Fit target:** guarantee a no-scroll fit on modern phones, **≥ 375×667 dvh**

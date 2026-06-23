@@ -41,9 +41,7 @@ export const cardHooksForArticle = internalQuery({
 			.query('knowledgeCards')
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
 			.collect();
-		return cards
-			.filter((c) => c.generation?.sourceArticleId === articleId)
-			.map((c) => c.hook);
+		return cards.filter((c) => c.generation?.sourceArticleId === articleId).map((c) => c.hook);
 	}
 });
 

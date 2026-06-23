@@ -93,10 +93,7 @@ test('classifyTitle returns {evergreen:true} for an evergreen taxon (Wikidata Q1
 				return {
 					ok: true,
 					json: async () =>
-						makeWikiResponse(67890, 'Octopus', 'Q162616', [
-							'Cephalopods',
-							'Marine biology'
-						])
+						makeWikiResponse(67890, 'Octopus', 'Q162616', ['Cephalopods', 'Marine biology'])
 				} as unknown as Response;
 			}
 			// wikidata.org — taxon class Q16521
@@ -122,14 +119,17 @@ test('classifyTitle returns null for a missing/unresolvable page', async () => {
 
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(async () => ({
-			ok: true,
-			json: async () => ({
-				query: {
-					pages: [{ title: 'Nonexistent Page XYZ', missing: true }]
-				}
-			})
-		}) as unknown as Response)
+		vi.fn(
+			async () =>
+				({
+					ok: true,
+					json: async () => ({
+						query: {
+							pages: [{ title: 'Nonexistent Page XYZ', missing: true }]
+						}
+					})
+				}) as unknown as Response
+		)
 	);
 
 	const result = await t.action(internal.ingest.classifyTitle, { title: 'Nonexistent Page XYZ' });

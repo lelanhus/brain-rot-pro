@@ -43,6 +43,7 @@ npx convex run topics:mergeStagingIntoCatalog '{"batch":500}'
 
 Run this in a loop until the output contains `"done": true`. Each call
 upserts up to 500 topics from staging into the live `topics` catalog:
+
 - New topics are inserted with their pageview count.
 - Existing topics have their pageview count merged (summed) and keep their
   existing `cardCount`, `evergreen`, and any other metadata intact.
@@ -59,11 +60,11 @@ done
 
 ## Options
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--top N` | `200000` | Maximum topics to emit (sorted by total pageviews desc) |
-| `--out file.jsonl` | `catalog.jsonl` | Output path |
-| `--files urls.txt` | (18 built-in URLs) | Newline-separated list of dump URLs to process |
+| Flag               | Default            | Description                                             |
+| ------------------ | ------------------ | ------------------------------------------------------- |
+| `--top N`          | `200000`           | Maximum topics to emit (sorted by total pageviews desc) |
+| `--out file.jsonl` | `catalog.jsonl`    | Output path                                             |
+| `--files urls.txt` | (18 built-in URLs) | Newline-separated list of dump URLs to process          |
 
 ## Widening coverage
 

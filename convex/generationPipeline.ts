@@ -35,9 +35,13 @@ export { TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 export const generateFromCatalog = internalAction({
 	args: { count: v.optional(v.number()) },
 	handler: async (ctx, { count }): Promise<{ enqueued: number }> => {
-		const topics = await ctx.runQuery(internal.topics.needingCards, { limit: count ?? CATALOG_BATCH });
+		const topics = await ctx.runQuery(internal.topics.needingCards, {
+			limit: count ?? CATALOG_BATCH
+		});
 		for (const topic of topics) {
-			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, { slug: topic.slug });
+			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, {
+				slug: topic.slug
+			});
 		}
 		return { enqueued: topics.length };
 	}
@@ -75,10 +79,9 @@ export const generateForTopic = internalAction({
 		const budget = fillBudget(topic.cardCount, TARGET_CARDS_PER_TOPIC);
 		// Seed avoidHooks from already-published cards for this article so a
 		// re-run never regenerates angles that are already shipped.
-		const avoidHooks: string[] = await ctx.runQuery(
-			internal.generateDb.cardHooksForArticle,
-			{ articleId }
-		);
+		const avoidHooks: string[] = await ctx.runQuery(internal.generateDb.cardHooksForArticle, {
+			articleId
+		});
 		let attempts = 0;
 		let published = 0;
 		let lastStatus = 'skipped';

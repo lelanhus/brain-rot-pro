@@ -23,10 +23,12 @@
 ### Task 1: Pure catalog logic
 
 **Files:**
+
 - Create: `convex/topicsLogic.ts`
 - Test: `convex/topicsLogic.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `isRealArticleTitle(title: string): boolean`
@@ -158,11 +160,13 @@ git commit -m "feat(topics): pure catalog logic (filter, slug, pageview merge)"
 ### Task 2: Schema + `upsertTopic`
 
 **Files:**
+
 - Modify: `convex/schema.ts` (add `topics` and `catalogState` tables)
 - Create: `convex/topics.ts` (just `upsertTopic` in this task)
 - Test: `convex/topics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `toSlug`, `mergePageviews` from `topicsLogic.ts`.
 - Produces:
   - Tables `topics` and `catalogState` (shapes below).
@@ -270,7 +274,14 @@ export const upsertTopic = internalMutation({
 				updatedAt: now
 			});
 		} else {
-			await ctx.db.insert('topics', { title, slug, pageviews, cardCount: 0, source, updatedAt: now });
+			await ctx.db.insert('topics', {
+				title,
+				slug,
+				pageviews,
+				cardCount: 0,
+				source,
+				updatedAt: now
+			});
 		}
 	}
 });
@@ -295,10 +306,12 @@ git commit -m "feat(topics): topics + catalogState schema and upsertTopic"
 ### Task 3: Read queries (`search`, `topByPageviews`, `needingCards`, `bySlug`)
 
 **Files:**
+
 - Modify: `convex/topics.ts`
 - Test: `convex/topics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `topics` table, `upsertTopic` (for test setup).
 - Produces:
   - `api.topics.search({ query: string, limit?: number })` → `Doc<'topics'>[]`
@@ -350,6 +363,7 @@ test('read queries: search by title, top by pageviews, needingCards, bySlug', as
 ```
 
 Add `api` to the import at the top of the file:
+
 ```ts
 import { api, internal } from './_generated/api';
 ```
@@ -372,7 +386,11 @@ import { internalMutation, internalQuery, query } from './_generated/server';
 export const topByPageviews = query({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }) =>
-		await ctx.db.query('topics').withIndex('by_pageviews').order('desc').take(limit ?? 50)
+		await ctx.db
+			.query('topics')
+			.withIndex('by_pageviews')
+			.order('desc')
+			.take(limit ?? 50)
 });
 
 /** Full-text title search over the catalog. Empty query returns nothing. */
@@ -429,10 +447,12 @@ git commit -m "feat(topics): search, topByPageviews, needingCards, bySlug querie
 ### Task 4: Harvest pipeline (`harvestTopDay`, `backfillCatalog`, catalog-state helpers)
 
 **Files:**
+
 - Modify: `convex/topics.ts`
 - Test: `convex/topics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `isRealArticleTitle` from `topicsLogic.ts`; `upsertTopic`; `topics`/`catalogState` tables.
 - Produces:
   - `internal.topics.readCatalogState({})` → `Doc<'catalogState'> | null`
@@ -480,10 +500,13 @@ test('backfillCatalog walks days backward and advances the cursor', async () => 
 	const t = convexTest(schema, modules);
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(async () => ({
-			ok: true,
-			json: async () => ({ items: [{ articles: [{ article: 'Octopus', views: 100 }] }] })
-		}) as unknown as Response)
+		vi.fn(
+			async () =>
+				({
+					ok: true,
+					json: async () => ({ items: [{ articles: [{ article: 'Octopus', views: 100 }] }] })
+				}) as unknown as Response
+		)
 	);
 	// Seed the cursor so the walk is deterministic (no reliance on Date.now()).
 	await t.mutation(internal.topics.setBackfillCursor, { date: '2026-06-10' });
@@ -509,7 +532,13 @@ Expected: FAIL — `harvestTopDay` / `backfillCatalog` / `readCatalogState` / `s
 Widen the imports on line 1 of `convex/topics.ts`:
 
 ```ts
-import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import {
+	action,
+	internalAction,
+	internalMutation,
+	internalQuery,
+	query
+} from './_generated/server';
 ```
 
 Add the `internal` API import near the top:
@@ -661,11 +690,13 @@ git commit -m "feat(topics): in-Convex harvest pipeline (harvestTopDay + resumab
 ### Task 5: Daily cron + one-time card-count backfill
 
 **Files:**
+
 - Modify: `convex/topics.ts` (add `harvestRecent`, `backfillCardCounts`)
 - Modify: `convex/crons.ts` (register daily harvest)
 - Test: `convex/topics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `harvestTopDay`, `setLastHarvested`, `toSlug`, `topics`/`knowledgeCards` tables.
 - Produces:
   - `internal.topics.harvestRecent({})` → void (cron entrypoint: harvest 2 days ago, record `lastHarvestedDate`)

@@ -31,12 +31,14 @@
 (Listed first because it's the testable core and needs no Better Auth / credentials. `linkDevice`'s single auth call is the only Better-Auth-coupled line.)
 
 **Files:**
+
 - Create: `convex/accountsLogic.ts` (pure `decideLink`)
 - Create: `convex/accounts.ts` (`applyLink` internal mutation + `linkDevice` mutation)
 - Modify: `convex/schema.ts` (add `accounts` table)
 - Test: `convex/accountsLogic.test.ts`, `convex/accounts.test.ts`
 
 **Interfaces:**
+
 - Consumes: `accountMerge.mergeAccounts(ctx, from, to)` (existing).
 - Produces: `decideLink(existingPrincipal: string | null, deviceId: string) => { principal: string; action: 'claim' | 'merge' | 'noop' }`; `internal.accounts.applyLink({ authUserId, deviceId }) => { principal: string; merged: boolean }`; `api.accounts.linkDevice({ deviceId }) => { principal: string; merged: boolean }`.
 
@@ -122,7 +124,10 @@ test('applyLink claims the device principal on first sign-in', async () => {
 	const r = await t.mutation(internal.accounts.applyLink, { authUserId: 'u1', deviceId: 'devA' });
 	expect(r).toEqual({ principal: 'devA', merged: false });
 	const row = await t.run(async (ctx) =>
-		ctx.db.query('accounts').withIndex('by_authUser', (q) => q.eq('authUserId', 'u1')).unique()
+		ctx.db
+			.query('accounts')
+			.withIndex('by_authUser', (q) => q.eq('authUserId', 'u1'))
+			.unique()
 	);
 	expect(row?.principal).toBe('devA');
 });
@@ -202,7 +207,10 @@ export const linkDevice = mutation({
 		if (!user) throw new Error('linkDevice: not authenticated');
 		// PIN the exact id field from the Better Auth docs (`user._id` or `user.userId`).
 		const authUserId = user._id;
-		return await ctx.runMutation(internal.accounts.applyLink, { authUserId, deviceId: args.deviceId });
+		return await ctx.runMutation(internal.accounts.applyLink, {
+			authUserId,
+			deviceId: args.deviceId
+		});
 	}
 });
 ```
@@ -227,6 +235,7 @@ git commit -m "feat: accounts identity bridge (decideLink + applyLink + linkDevi
 **Do this with the user present and their Google credentials. Follow the official guide: https://labs.convex.dev/better-auth/framework-guides/sveltekit (pin exact symbols from it).**
 
 **Files (per the guide):**
+
 - Install: `@convex-dev/better-auth`, `@mmailaender/convex-better-auth-svelte`, `better-auth@~1.6.15`.
 - Create/modify: `convex/convex.config.ts` (`app.use(betterAuth)`), `convex/auth.config.ts` (Google provider), `convex/http.ts` (`authComponent.registerRoutes()`), `convex/auth.ts` (export `authComponent` — REPLACES the Task-2 stub).
 - Client: `src/routes/api/auth/[...all]/+server.ts` (`createSvelteKitHandler`), `src/routes/+layout.svelte` (`createSvelteAuthClient({ authClient })`), `src/hooks.server.ts` (`withServerConvexToken`), `src/routes/+layout.server.ts` or `+layout.ts` (`getAuthState()` for SSR).
@@ -243,11 +252,13 @@ git commit -m "feat: accounts identity bridge (decideLink + applyLink + linkDevi
 ### Task 3: Client glue — sign in/out + link-on-auth
 
 **Files:**
+
 - Modify: `src/routes/account/+page.svelte` (Sign in with Google / Sign out in the existing "Devices" panel)
 - Modify: `src/routes/+page.svelte` or a shared place (on-auth `linkDevice` → adopt principal → reload)
 - Test: component test for the Account page auth controls (mock `useAuth`)
 
 **Interfaces:**
+
 - Consumes: `api.accounts.linkDevice` (Task 2); Better Auth `authClient` + `useAuth()` (Task 1); `identity.setDeviceId`/`clearDeviceId` (existing).
 
 - [ ] **Step 1: Add the on-auth link effect.** Where the feed/layout resolves `deviceId`, add: when `useAuth().isAuthenticated` becomes true and `deviceId` is set, call `getConvexClient().mutation(api.accounts.linkDevice, { deviceId })`; on success `identity.setDeviceId(result.principal)` and `location.reload()` (same adopt-and-reload pattern as `/sync` redeem). Guard so it runs once per auth transition.
@@ -257,6 +268,7 @@ git commit -m "feat: accounts identity bridge (decideLink + applyLink + linkDevi
 - [ ] **Step 3: Component test.** Add/extend a `+page.svelte.spec` (vitest-browser-svelte) that mocks `useAuth` to assert the Sign-in button shows when unauthenticated and Sign-out shows when authenticated. (Match the project's existing component-test style.)
 
 - [ ] **Step 4: Verify + commit.** `bun run check` → 0; `bun run test:component` → pass; eslint + prettier on the touched files.
+
 ```bash
 git add src/routes/account/+page.svelte src/routes/+page.svelte src/routes/account/+page.svelte.spec.ts
 git commit -m "feat: Google sign-in/out UI + link-device on auth"

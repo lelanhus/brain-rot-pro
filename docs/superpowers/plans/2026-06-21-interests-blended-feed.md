@@ -24,6 +24,7 @@
 **Files:** Modify `convex/schema.ts`; Create `convex/interests.ts`, `convex/interests.test.ts`.
 
 **Interfaces produced:**
+
 - table `interests` `{ deviceId, slug, title, source, createdAt }` indexes `by_device`, `by_device_slug`.
 - `api.interests.add({ deviceId, slug, title })` → void (idempotent; schedules generateForTopic on new).
 - `api.interests.remove({ deviceId, slug })` → void.
@@ -87,7 +88,13 @@ export const add = mutation({
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
 			.unique();
 		if (existing !== null) return;
-		await ctx.db.insert('interests', { deviceId, slug, title, source: 'explicit', createdAt: Date.now() });
+		await ctx.db.insert('interests', {
+			deviceId,
+			slug,
+			title,
+			source: 'explicit',
+			createdAt: Date.now()
+		});
 		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
 	}
 });
@@ -124,6 +131,7 @@ export const list = query({
 **Files:** Modify `convex/profileLogic.ts`, `convex/profileLogic.test.ts`, `convex/feed.ts`, `convex/feed.test.ts`.
 
 **Interfaces:**
+
 - Consumes: `interests` table; `toSlug` (`convex/topicsLogic.ts`).
 - Produces: `INTEREST_BOOST` const; `scoreByTaste(card{conceptTags,embedding,slug?}, ctx{...,interestSlugs?: ReadonlySet<string>})` adds the boost.
 
@@ -180,7 +188,11 @@ export function scoreByTaste(
 			focusConcept: ctx.focusConcept
 		});
 	}
-	if (ctx.interestSlugs !== undefined && card.slug !== undefined && ctx.interestSlugs.has(card.slug)) {
+	if (
+		ctx.interestSlugs !== undefined &&
+		card.slug !== undefined &&
+		ctx.interestSlugs.has(card.slug)
+	) {
 		score += INTEREST_BOOST;
 	}
 	return score;
@@ -190,27 +202,33 @@ export function scoreByTaste(
 - [ ] **Step 3b: `convex/feed.ts`** — import `toSlug`, load interest slugs, pass to scoreByTaste. Add import: `import { toSlug } from './topicsLogic';`. After building `notInterested`, add:
 
 ```ts
-		const interestSlugs = new Set<string>();
-		if (args.deviceId.length > 0) {
-			const ints = await ctx.db
-				.query('interests')
-				.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
-				.collect();
-			for (const i of ints) interestSlugs.add(i.slug);
-		}
+const interestSlugs = new Set<string>();
+if (args.deviceId.length > 0) {
+	const ints = await ctx.db
+		.query('interests')
+		.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
+		.collect();
+	for (const i of ints) interestSlugs.add(i.slug);
+}
 ```
 
 Change the two `scoreByTaste(x, { ... })` calls to include `slug` + `interestSlugs`:
 
 ```ts
-				scoreByTaste(
-					{ conceptTags: b.conceptTags, embedding: b.embedding, slug: toSlug(b.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
-				) -
-				scoreByTaste(
-					{ conceptTags: a.conceptTags, embedding: a.embedding, slug: toSlug(a.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: a.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
-				)
+scoreByTaste(
+	{ conceptTags: b.conceptTags, embedding: b.embedding, slug: toSlug(b.source.articleTitle) },
+	{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs }
+) -
+	scoreByTaste(
+		{ conceptTags: a.conceptTags, embedding: a.embedding, slug: toSlug(a.source.articleTitle) },
+		{
+			tasteVector,
+			weights,
+			shuffleKey: a.shuffleKey,
+			focusConcept: args.focusConcept,
+			interestSlugs
+		}
+	);
 ```
 
 - [ ] **Step 3c: feed integration test** — append `convex/feed.test.ts` (use its existing convex-test harness pattern). Seed two published cards with embeddings absent (so scoreCard fallback) but DISTINCT shuffleKeys, follow the lower-shuffle card's topic, assert it now ranks first:
@@ -222,15 +240,23 @@ test('feed.unseen boosts a followed topic above an equivalent unfollowed card', 
 	const ids = await t.run(async (ctx) => {
 		const mk = (articleTitle: string, shuffleKey: number) =>
 			ctx.db.insert('knowledgeCards', {
-				hook: 'h', body: 'b', format: 'surprise_fact' as const, conceptTags: ['z'],
+				hook: 'h',
+				body: 'b',
+				format: 'surprise_fact' as const,
+				conceptTags: ['z'],
 				source: { articleTitle, articleUrl: 'u', revisionId: null, sourceSpan: 's' },
-				status: 'published' as const, shuffleKey, createdAt: 1
+				status: 'published' as const,
+				shuffleKey,
+				createdAt: 1
 			});
 		return { low: await mk('Low Topic', 0.1), high: await mk('High Topic', 0.9) };
 	});
 	// Without follow, High (shuffle .9) ranks first. Follow Low's topic → it should jump ahead.
 	await t.mutation(api.interests.add, { deviceId, slug: 'low_topic', title: 'Low Topic' });
-	const res = await t.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 10, cursor: null } });
+	const res = await t.query(api.feed.unseen, {
+		deviceId,
+		paginationOpts: { numItems: 10, cursor: null }
+	});
 	expect(res.page[0]._id).toBe(ids.low);
 });
 ```
@@ -251,43 +277,53 @@ test('feed.unseen boosts a followed topic above an equivalent unfollowed card', 
 ```ts
 /** Topic slug — MUST match convex/topicsLogic.ts toSlug (kept in sync intentionally). */
 export function toSlug(title: string): string {
-	return title.trim().replace(/\s+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+	return title
+		.trim()
+		.replace(/\s+/g, '_')
+		.replace(/_+/g, '_')
+		.replace(/^_+|_+$/g, '')
+		.toLowerCase();
 }
 ```
 
 - [ ] **Step 2: CardActions follow button** — add `following`/`onFollow` props and a button. In the `$props()` destructure add `following: boolean;` and `onFollow: () => void;`. Add this button after the Save button:
 
 ```svelte
-	<button
-		type="button"
-		class="action"
-		class:active={following}
-		aria-pressed={following}
-		aria-label={following ? 'Following topic — tap to unfollow' : 'Follow topic'}
-		title={following ? 'Following topic' : 'Follow topic'}
-		onclick={onFollow}
-	>
-		<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
-			<path d="M12 21s-7-4.35-9.5-8.5C1 9 3 5 6.5 5 9 5 12 8 12 8s3-3 5.5-3C21 5 23 9 21.5 12.5 19 16.65 12 21 12 21z"
-				fill={following ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
-		</svg>
-		<span class="vh">{following ? 'Following topic' : 'Follow topic'}</span>
-	</button>
+<button
+	type="button"
+	class="action"
+	class:active={following}
+	aria-pressed={following}
+	aria-label={following ? 'Following topic — tap to unfollow' : 'Follow topic'}
+	title={following ? 'Following topic' : 'Follow topic'}
+	onclick={onFollow}
+>
+	<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+		<path
+			d="M12 21s-7-4.35-9.5-8.5C1 9 3 5 6.5 5 9 5 12 8 12 8s3-3 5.5-3C21 5 23 9 21.5 12.5 19 16.65 12 21 12 21z"
+			fill={following ? 'currentColor' : 'none'}
+			stroke="currentColor"
+			stroke-width="1.8"
+			stroke-linejoin="round"
+		/>
+	</svg>
+	<span class="vh">{following ? 'Following topic' : 'Follow topic'}</span>
+</button>
 ```
 
 - [ ] **Step 3: wire follow in `src/routes/+page.svelte`** — mirror the saved pattern. Add imports `import { toSlug } from '$lib/slug';`. Add near `savedQuery`:
 
 ```ts
-	const interestsQuery = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
-	const followedSlugs = $derived(new Set<string>((interestsQuery.data ?? []).map((i) => i.slug)));
-	const addInterest = useMutation(api.interests.add);
-	const removeInterest = useMutation(api.interests.remove);
-	function toggleFollow(card: Doc<'knowledgeCards'>) {
-		if (!deviceId) return;
-		const slug = toSlug(card.source.articleTitle);
-		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
-		else void addInterest({ deviceId, slug, title: card.source.articleTitle });
-	}
+const interestsQuery = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
+const followedSlugs = $derived(new Set<string>((interestsQuery.data ?? []).map((i) => i.slug)));
+const addInterest = useMutation(api.interests.add);
+const removeInterest = useMutation(api.interests.remove);
+function toggleFollow(card: Doc<'knowledgeCards'>) {
+	if (!deviceId) return;
+	const slug = toSlug(card.source.articleTitle);
+	if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
+	else void addInterest({ deviceId, slug, title: card.source.articleTitle });
+}
 ```
 
 Pass to the `<CardActions ... />` render: `following={followedSlugs.has(toSlug(activeCard.source.articleTitle))}` and `onFollow={() => toggleFollow(activeCard)}`.
@@ -295,21 +331,25 @@ Pass to the `<CardActions ... />` render: `following={followedSlugs.has(toSlug(a
 - [ ] **Step 4: /account interests panel** — in `src/routes/account/+page.svelte`, add a panel (mirror existing panels). Add near other queries: `const interests = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));` and `const removeInterest = useMutation(api.interests.remove);`. Add the panel markup (place after "Cross-device sync"):
 
 ```svelte
-	<section class="panel">
-		<h2>Interests</h2>
-		{#if (interests.data ?? []).length === 0}
-			<p>Follow topics from the feed to personalize what you see.</p>
-		{:else}
-			<ul class="interests">
-				{#each interests.data ?? [] as i (i.slug)}
-					<li>
-						<span>{i.title}</span>
-						<button type="button" class="ghost" onclick={() => deviceId && removeInterest({ deviceId, slug: i.slug })}>Remove</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-	</section>
+<section class="panel">
+	<h2>Interests</h2>
+	{#if (interests.data ?? []).length === 0}
+		<p>Follow topics from the feed to personalize what you see.</p>
+	{:else}
+		<ul class="interests">
+			{#each interests.data ?? [] as i (i.slug)}
+				<li>
+					<span>{i.title}</span>
+					<button
+						type="button"
+						class="ghost"
+						onclick={() => deviceId && removeInterest({ deviceId, slug: i.slug })}>Remove</button
+					>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+</section>
 ```
 
 Add minimal styles for `.interests` (list reset, row flex space-between) in that file's `<style>`, matching the page's existing visual language.

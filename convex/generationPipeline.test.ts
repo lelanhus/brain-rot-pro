@@ -36,7 +36,9 @@ test('generateForTopic skips when cardCount >= TARGET_CARDS_PER_TOPIC', async ()
 		await t.mutation(internal.topics.incrementCardCount, { slug: 'black_hole' });
 	}
 
-	const covered = await t.action(internal.generationPipeline.generateForTopic, { slug: 'black_hole' });
+	const covered = await t.action(internal.generationPipeline.generateForTopic, {
+		slug: 'black_hole'
+	});
 	expect(covered.status).toBe('skipped');
 
 	// cardCount unchanged (still at TARGET); no card rows created by the skip path.
@@ -50,10 +52,26 @@ test('generateForTopic skips when cardCount >= TARGET_CARDS_PER_TOPIC', async ()
 test('generateFromCatalog enqueues one job per needing-cards topic, popularity-first', async () => {
 	const t = convexTest(schema, modules);
 	// Three topics needing cards + one fully covered at TARGET (must be excluded).
-	await t.mutation(internal.topics.upsertTopic, { title: 'Alpha', pageviews: 300, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Beta', pageviews: 900, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Gamma', pageviews: 600, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Covered', pageviews: 999, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Alpha',
+		pageviews: 300,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Beta',
+		pageviews: 900,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Gamma',
+		pageviews: 600,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Covered',
+		pageviews: 999,
+		source: 'wikipedia-top'
+	});
 	// Bump Covered to exactly TARGET so it is fully covered and excluded.
 	for (let i = 0; i < TARGET_CARDS_PER_TOPIC; i++) {
 		await t.mutation(internal.topics.incrementCardCount, { slug: 'covered' });

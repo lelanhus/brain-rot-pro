@@ -97,7 +97,11 @@ test('cardHooksForArticle returns hooks of published cards for the article', asy
 	};
 	await t.run(async (ctx) => {
 		await ctx.db.insert('knowledgeCards', { ...base, hook: 'hook-published', status: 'published' });
-		await ctx.db.insert('knowledgeCards', { ...base, hook: 'hook-failed', status: 'validation_failed' });
+		await ctx.db.insert('knowledgeCards', {
+			...base,
+			hook: 'hook-failed',
+			status: 'validation_failed'
+		});
 	});
 
 	const hooks = await t.query(internal.generateDb.cardHooksForArticle, { articleId });

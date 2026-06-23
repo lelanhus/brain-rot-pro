@@ -9,6 +9,7 @@
 **Tech Stack:** Convex (actions/mutations/queries), TypeScript, Vitest + convex-test.
 
 ## Global Constraints
+
 - Relatedness via MediaWiki `srsearch=morelike:<title>` (reuse `USER_AGENT` + `https://en.wikipedia.org/w/api.php`, per `ingest.ts`). Best-effort: return `[]` on any failure.
 - Catalog-gate candidates (must exist in `topics` by slug); drop already-followed; rank by `pageviews` desc; cap **3** per follow.
 - Discovered interests: `source:'discovered'`, schedule `generateForTopic`, **never** schedule discovery (no recursion). Display title with underscores→spaces.
@@ -26,6 +27,7 @@
 - [ ] **Step 1: failing tests**
 
 `convex/discoveryLogic.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { pickDiscoveries } from './discoveryLogic';
@@ -44,6 +46,7 @@ describe('pickDiscoveries', () => {
 ```
 
 Append to `convex/interests.test.ts`:
+
 ```ts
 import { internal } from './_generated/api';
 
@@ -57,11 +60,13 @@ test('addDiscovered inserts a discovered interest and dedupes', async () => {
 	expect(rows[0].source).toBe('discovered');
 });
 ```
+
 (Add the `internal` import if `interests.test.ts` doesn't already import it.)
 
 - [ ] **Step 2: run → fail.**
 
 - [ ] **Step 3a: `convex/discoveryLogic.ts`:**
+
 ```ts
 /**
  * Pick up to `limit` discovery candidates: drop already-followed slugs, dedupe by
@@ -85,6 +90,7 @@ export function pickDiscoveries(
 ```
 
 - [ ] **Step 3b: `convex/interests.ts`** — add `addDiscovered` (and ensure `internal` is imported — it already is for `add`):
+
 ```ts
 /** Add a discovered interest (from auto-discovery). Dedupes; schedules generation; does NOT trigger further discovery. */
 export const addDiscovered = internalMutation({
@@ -95,11 +101,18 @@ export const addDiscovered = internalMutation({
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
 			.unique();
 		if (existing !== null) return;
-		await ctx.db.insert('interests', { deviceId, slug, title, source: 'discovered', createdAt: Date.now() });
+		await ctx.db.insert('interests', {
+			deviceId,
+			slug,
+			title,
+			source: 'discovered',
+			createdAt: Date.now()
+		});
 		await ctx.scheduler.runAfter(0, internal.generationPipeline.generateForTopic, { slug });
 	}
 });
 ```
+
 (Add `internalMutation` to the `_generated/server` import in `interests.ts` if not already present — `add`/`remove` use `mutation`; `query` for `list`. Add `internalMutation`.)
 
 - [ ] **Step 4: regenerate + tests + checks** — `npx convex dev --once`; `npx vitest run --project convex convex/discoveryLogic.test.ts convex/interests.test.ts` (PASS); `bun run check` (0); `bunx eslint convex/discoveryLogic.ts convex/interests.ts` (0).
@@ -114,6 +127,7 @@ export const addDiscovered = internalMutation({
 **Interfaces:** Consumes `pickDiscoveries`, `internal.interests.addDiscovered`, `internal.discovery.candidatesBySlugs`, `api.interests.list`, `toSlug`. Produces `internal.discovery.discoverFor({deviceId,slug,title})`.
 
 - [ ] **Step 1: failing test** — `convex/discovery.test.ts` (stubs `fetch` so morelike is deterministic/offline):
+
 ```ts
 import { convexTest } from 'convex-test';
 import { expect, test, vi } from 'vitest';
@@ -128,21 +142,49 @@ test('discoverFor adds up to 3 catalog-present, unfollowed related topics', asyn
 	// Catalog has Rome (followed already), Carthage, Hannibal, Punic_Wars (candidates), but not "Random Title".
 	await t.run(async (ctx) => {
 		const mk = (title: string, slug: string, pageviews: number) =>
-			ctx.db.insert('topics', { title, slug, pageviews, cardCount: 0, source: 'wikipedia-top', updatedAt: 1 });
+			ctx.db.insert('topics', {
+				title,
+				slug,
+				pageviews,
+				cardCount: 0,
+				source: 'wikipedia-top',
+				updatedAt: 1
+			});
 		await mk('Carthage', 'carthage', 50);
 		await mk('Hannibal', 'hannibal', 90);
 		await mk('Punic Wars', 'punic_wars', 30);
 	});
-	await t.mutation(internal.interests.addDiscovered, { deviceId, slug: 'hannibal', title: 'Hannibal' }); // already followed → must be skipped
+	await t.mutation(internal.interests.addDiscovered, {
+		deviceId,
+		slug: 'hannibal',
+		title: 'Hannibal'
+	}); // already followed → must be skipped
 
-	vi.stubGlobal('fetch', vi.fn(async () => ({
-		ok: true,
-		json: async () => ({ query: { search: [
-			{ title: 'Carthage' }, { title: 'Hannibal' }, { title: 'Punic Wars' }, { title: 'Random Title' }
-		] } })
-	}) as unknown as Response));
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(
+			async () =>
+				({
+					ok: true,
+					json: async () => ({
+						query: {
+							search: [
+								{ title: 'Carthage' },
+								{ title: 'Hannibal' },
+								{ title: 'Punic Wars' },
+								{ title: 'Random Title' }
+							]
+						}
+					})
+				}) as unknown as Response
+		)
+	);
 
-	const res = await t.action(internal.discovery.discoverFor, { deviceId, slug: 'rome', title: 'Rome' });
+	const res = await t.action(internal.discovery.discoverFor, {
+		deviceId,
+		slug: 'rome',
+		title: 'Rome'
+	});
 	// Hannibal followed; Random Title not in catalog → Carthage + Punic Wars discovered (cap 3).
 	expect(res.discovered).toBe(2);
 	const slugs = (await t.query(api.interests.list, { deviceId })).map((i) => i.slug).sort();
@@ -154,6 +196,7 @@ test('discoverFor adds up to 3 catalog-present, unfollowed related topics', asyn
 - [ ] **Step 2: run → fail.**
 
 - [ ] **Step 3a: `convex/discovery.ts`:**
+
 ```ts
 import { internalAction, internalQuery } from './_generated/server';
 import { api, internal } from './_generated/api';
@@ -227,8 +270,9 @@ export const discoverFor = internalAction({
 ```
 
 - [ ] **Step 3b: trigger from `interests.add`** — in `convex/interests.ts`, in `add`'s handler, after the existing `generateForTopic` schedule, add the discovery schedule (only fires on a NEW explicit insert, since it's after the `existing !== null` early return):
+
 ```ts
-		await ctx.scheduler.runAfter(0, internal.discovery.discoverFor, { deviceId, slug, title });
+await ctx.scheduler.runAfter(0, internal.discovery.discoverFor, { deviceId, slug, title });
 ```
 
 - [ ] **Step 4: regenerate + tests + full suite + checks** — `npx convex dev --once`; `npx vitest run --project convex convex/discovery.test.ts` (PASS — discovered 2, the followed/non-catalog dropped); `bun run test:convex` (full suite green); `bun run check` (0); `bunx eslint convex/discovery.ts convex/interests.ts` (0).
@@ -237,7 +281,9 @@ export const discoverFor = internalAction({
 ---
 
 ## Post-implementation (controller)
+
 Deploy + push; verify like a human: follow a topic (e.g. via /search or a card), wait a moment, then confirm 1–3 NEW `source:'discovered'` interests appear in /account Interests (and/or via `npx convex run` data check). morelike + scheduling is the coverage boundary (network) — this manual check validates the live path.
 
 ## Coverage boundary
+
 `relatedTitles`'s real network call is not exercised in unit tests; the `discovery.test.ts` stubs `fetch` to cover `discoverFor`'s full orchestration (catalog-gate, followed-drop, cap, addDiscovered) offline. The live morelike call is validated by the controller's post-deploy check.

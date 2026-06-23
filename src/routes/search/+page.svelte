@@ -70,7 +70,8 @@
 	.search {
 		max-width: 560px;
 		margin: 0 auto;
-		padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 4rem);
+		padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem
+			calc(env(safe-area-inset-bottom) + 4rem);
 	}
 	.back {
 		color: var(--muted);

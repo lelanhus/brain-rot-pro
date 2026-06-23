@@ -1,6 +1,18 @@
-import { action, internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import {
+	action,
+	internalAction,
+	internalMutation,
+	internalQuery,
+	query
+} from './_generated/server';
 import { v } from 'convex/values';
-import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
+import {
+	isRealArticleTitle,
+	toSlug,
+	mergePageviews,
+	isQualityTopic,
+	TARGET_CARDS_PER_TOPIC
+} from './topicsLogic';
 import { internal } from './_generated/api';
 
 /** Insert a topic or accumulate pageviews onto the existing row with this slug. */
@@ -19,7 +31,14 @@ export const upsertTopic = internalMutation({
 				updatedAt: now
 			});
 		} else {
-			await ctx.db.insert('topics', { title, slug, pageviews, cardCount: 0, source, updatedAt: now });
+			await ctx.db.insert('topics', {
+				title,
+				slug,
+				pageviews,
+				cardCount: 0,
+				source,
+				updatedAt: now
+			});
 		}
 	}
 });
@@ -28,8 +47,12 @@ export const upsertTopic = internalMutation({
 export const topByPageviews = query({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }) =>
-		await ctx.db.query('topics').withIndex('by_pageviews').order('desc')
-			.filter((q) => q.neq(q.field('evergreen'), false)).take(limit ?? 50)
+		await ctx.db
+			.query('topics')
+			.withIndex('by_pageviews')
+			.order('desc')
+			.filter((q) => q.neq(q.field('evergreen'), false))
+			.take(limit ?? 50)
 });
 
 /** Full-text title search over the catalog. Empty query returns nothing. */
@@ -265,10 +288,9 @@ export const classifyTopTopics = action({
 		);
 		let classified = 0;
 		for (const topic of todo) {
-			const r: { evergreen: boolean } | null = await ctx.runAction(
-				internal.ingest.classifyTitle,
-				{ title: topic.title }
-			);
+			const r: { evergreen: boolean } | null = await ctx.runAction(internal.ingest.classifyTitle, {
+				title: topic.title
+			});
 			if (r !== null) {
 				await ctx.runMutation(internal.topics.setEvergreen, {
 					slug: topic.slug,

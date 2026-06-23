@@ -97,10 +97,13 @@ test('backfillCatalog walks days backward and advances the cursor', async () => 
 	const t = convexTest(schema, modules);
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(async () => ({
-			ok: true,
-			json: async () => ({ items: [{ articles: [{ article: 'Octopus', views: 100 }] }] })
-		}) as unknown as Response)
+		vi.fn(
+			async () =>
+				({
+					ok: true,
+					json: async () => ({ items: [{ articles: [{ article: 'Octopus', views: 100 }] }] })
+				}) as unknown as Response
+		)
 	);
 	// Seed the cursor so the walk is deterministic (no reliance on Date.now()).
 	await t.mutation(internal.topics.setBackfillCursor, { date: '2026-06-10' });
@@ -173,17 +176,33 @@ test('backfillCardCounts sets cardCount from published cards, skipping uncatalog
 
 test('setEvergreen patches the verdict on a topic', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(internal.topics.upsertTopic, { title: 'Sportsperson', pageviews: 99, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Sportsperson',
+		pageviews: 99,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.setEvergreen, { slug: 'sportsperson', evergreen: false });
 	expect((await t.query(api.topics.bySlug, { slug: 'sportsperson' }))?.evergreen).toBe(false);
 });
 
 test('topByPageviews and needingCards exclude evergreen===false (keep true + unclassified)', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(internal.topics.upsertTopic, { title: 'Good', pageviews: 90, source: 'wikipedia-top' }); // undefined
-	await t.mutation(internal.topics.upsertTopic, { title: 'Junk', pageviews: 80, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Good',
+		pageviews: 90,
+		source: 'wikipedia-top'
+	}); // undefined
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Junk',
+		pageviews: 80,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.setEvergreen, { slug: 'junk', evergreen: false });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Verified', pageviews: 70, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Verified',
+		pageviews: 70,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.setEvergreen, { slug: 'verified', evergreen: true });
 
 	const top = (await t.query(api.topics.topByPageviews, { limit: 10 })).map((r) => r.slug);
@@ -195,7 +214,11 @@ test('topByPageviews and needingCards exclude evergreen===false (keep true + unc
 test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/evergreen', async () => {
 	const t = convexTest(schema, modules);
 	// existing topic with state that MUST be preserved
-	await t.mutation(internal.topics.upsertTopic, { title: 'Cleopatra', pageviews: 100, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Cleopatra',
+		pageviews: 100,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.setEvergreen, { slug: 'cleopatra', evergreen: true });
 	await t.mutation(internal.topics.incrementCardCount, { slug: 'cleopatra' });
 	// staging: one dup (cleopatra) + one new (hannibal)
@@ -215,14 +238,23 @@ test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/e
 	expect(han?.cardCount).toBe(0); // new insert
 	expect(han?.source).toBe('wikipedia-dump');
 	// staging drained
-	expect(await t.run(async (ctx) => (await ctx.db.query('topicsStaging').collect()).length)).toBe(0);
+	expect(await t.run(async (ctx) => (await ctx.db.query('topicsStaging').collect()).length)).toBe(
+		0
+	);
 });
 
 test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
 	const t = convexTest(schema, modules);
 	await t.run(async (ctx) => {
 		const mk = (title: string, slug: string) =>
-			ctx.db.insert('topics', { title, slug, pageviews: 10, cardCount: 0, source: 'wikipedia-top', updatedAt: 1 });
+			ctx.db.insert('topics', {
+				title,
+				slug,
+				pageviews: 10,
+				cardCount: 0,
+				source: 'wikipedia-top',
+				updatedAt: 1
+			});
 		await mk('.xyz', '.xyz');
 		await mk('Deaths in 2026', 'deaths_in_2026');
 		await mk('Cleopatra', 'cleopatra');

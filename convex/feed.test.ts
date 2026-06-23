@@ -102,15 +102,23 @@ test('feed.unseen boosts a followed topic above an equivalent unfollowed card', 
 	const ids = await t.run(async (ctx) => {
 		const mk = (articleTitle: string, shuffleKey: number) =>
 			ctx.db.insert('knowledgeCards', {
-				hook: 'h', body: 'b', format: 'surprise_fact' as const, conceptTags: ['z'],
+				hook: 'h',
+				body: 'b',
+				format: 'surprise_fact' as const,
+				conceptTags: ['z'],
 				source: { articleTitle, articleUrl: 'u', revisionId: null, sourceSpan: 's' },
-				status: 'published' as const, shuffleKey, createdAt: 1
+				status: 'published' as const,
+				shuffleKey,
+				createdAt: 1
 			});
 		return { low: await mk('Low Topic', 0.1), high: await mk('High Topic', 0.9) };
 	});
 	// Without follow, High (shuffle .9) ranks first. Follow Low's topic → it should jump ahead.
 	await t.mutation(api.interests.add, { deviceId, slug: 'low_topic', title: 'Low Topic' });
-	const res = await t.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 10, cursor: null } });
+	const res = await t.query(api.feed.unseen, {
+		deviceId,
+		paginationOpts: { numItems: 10, cursor: null }
+	});
 	expect(res.page[0]._id).toBe(ids.low);
 });
 

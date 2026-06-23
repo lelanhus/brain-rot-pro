@@ -21,7 +21,7 @@ This sub-project ships the catalog, its harvest pipeline, and read queries
 
 The user wants three interlocking capabilities — curate topics for the user,
 auto-discover user interests, and let users search topics — backed by a vast
-topic space available *before* the first production user. Agreed product
+topic space available _before_ the first production user. Agreed product
 decisions that frame this and future sub-projects:
 
 - **Catalog topics, cards on demand.** Pre-load a large topic catalog cheaply;
@@ -39,7 +39,8 @@ decisions that frame this and future sub-projects:
   interests, not to view content.
 
 **Build order (each its own spec → plan → build):**
-1. **Topic Catalog** ← *this spec*
+
+1. **Topic Catalog** ← _this spec_
 2. Catalog-driven generation (rewire warm-ahead + `ensureSupply` to draw from
    the catalog by pageview rank; lazy generation on demand) — the breadth fix.
 3. Interests model + blended feed.
@@ -76,6 +77,7 @@ topics: defineTable({
 ```
 
 Notes:
+
 - **No stored `rank`** — popularity order is read from the `by_pageviews` index
   (descending), avoiding a re-rank of the whole table on every harvest.
 - **`cardCount` denormalized** so `needingCards` (generation priority) is a cheap
@@ -197,7 +199,7 @@ idempotent w.r.t. row identity.
 
 - **Cumulative pageviews double-count across re-harvested days.** If the same
   day is harvested twice (e.g., a manual re-run), that day's views are added
-  again. Acceptable: pageviews is a *relative* popularity signal, not an exact
+  again. Acceptable: pageviews is a _relative_ popularity signal, not an exact
   metric, and ranking is robust to it. If it ever matters, dedupe by recording
   harvested dates — deferred (YAGNI).
 - **Coverage ceiling.** Daily top-1000 over ~1–2 years yields ~100–200k unique
@@ -208,4 +210,7 @@ idempotent w.r.t. row identity.
 - **Backfill duration.** ~365–730 sequential API calls. The bounded
   resumable design spreads this across runs/days; the catalog is usable
   (and grows) from the first run.
+
+```
+
 ```

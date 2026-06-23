@@ -9,6 +9,7 @@
 **Tech Stack:** Convex, TypeScript, Vitest + convex-test.
 
 ## Global Constraints
+
 - Conservative title-shape filter only (no quality classifier). Reject: TLD `^\.[a-z]{2,}$`, "Deaths in …" `^deaths? in`, "YYYY in …" `^\d{3,4}[ _]+in[ _]`. Everything else passes (year-prefix events like "2026 FIFA World Cup" must PASS).
 - Catalog stays the clean source (filter at write + purge); no changes to `topByPageviews`/`search`/`needingCards`.
 - Convex: `internal*` for the purge; explicit checks. After adding functions: `npx convex dev --once`. Tests: `bun run test:convex`. Before commit: `bun run check` + `bunx eslint <files>` (0).
@@ -22,6 +23,7 @@
 - [ ] **Step 1: failing tests**
 
 Append to `convex/topicsLogic.test.ts` (add `isQualityTopic` to the existing `./topicsLogic` import):
+
 ```ts
 describe('isQualityTopic', () => {
 	it('rejects TLDs, Deaths-in, and YYYY-in ranking pages', () => {
@@ -42,12 +44,20 @@ describe('isQualityTopic', () => {
 ```
 
 Append to `convex/topics.test.ts`:
+
 ```ts
 test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
 	const t = convexTest(schema, modules);
 	await t.run(async (ctx) => {
 		const mk = (title: string, slug: string) =>
-			ctx.db.insert('topics', { title, slug, pageviews: 10, cardCount: 0, source: 'wikipedia-top', updatedAt: 1 });
+			ctx.db.insert('topics', {
+				title,
+				slug,
+				pageviews: 10,
+				cardCount: 0,
+				source: 'wikipedia-top',
+				updatedAt: 1
+			});
 		await mk('.xyz', '.xyz');
 		await mk('Deaths in 2026', 'deaths_in_2026');
 		await mk('Cleopatra', 'cleopatra');
@@ -59,11 +69,13 @@ test('purgeLowQuality deletes junk topics and keeps quality ones', async () => {
 	expect(left.map((r) => r.slug).sort()).toEqual(['cleopatra', 'cristiano_ronaldo']);
 });
 ```
+
 (Ensure `internal` is imported in `topics.test.ts` — it is, from earlier tasks.)
 
 - [ ] **Step 2: run → fail** (`npx vitest run --project convex convex/topicsLogic.test.ts convex/topics.test.ts`).
 
 - [ ] **Step 3a: `convex/topicsLogic.ts`** — add the predicate:
+
 ```ts
 const TLD_RE = /^\.[a-z]{2,}$/i;
 const DEATHS_RE = /^deaths?\s+in\b/i;
@@ -84,13 +96,15 @@ export function isQualityTopic(title: string): boolean {
 ```
 
 - [ ] **Step 3b: `convex/topics.ts` harvest gate** — add `isQualityTopic` to the `./topicsLogic` import. In `harvestTopDay`'s loop, change the filter line:
+
 ```ts
 // before:  if (!isRealArticleTitle(a.article)) continue;
 // after:
-			if (!isRealArticleTitle(a.article) || !isQualityTopic(a.article)) continue;
+if (!isRealArticleTitle(a.article) || !isQualityTopic(a.article)) continue;
 ```
 
 - [ ] **Step 3c: `convex/topics.ts` purge** — add:
+
 ```ts
 /** One-time: remove catalog topics whose title fails the quality gate. */
 export const purgeLowQuality = internalMutation({
@@ -108,6 +122,7 @@ export const purgeLowQuality = internalMutation({
 	}
 });
 ```
+
 (`internalMutation` is already imported in `topics.ts`.)
 
 - [ ] **Step 4: regenerate + tests + full suite + checks** — `npx convex dev --once`; `npx vitest run --project convex convex/topicsLogic.test.ts convex/topics.test.ts` (PASS); `bun run test:convex` (full suite green); `bun run check` (0); `bunx eslint convex/topicsLogic.ts convex/topics.ts` (0).
@@ -117,7 +132,9 @@ export const purgeLowQuality = internalMutation({
 ---
 
 ## Post-implementation (controller)
+
 Deploy (`npx convex dev --once`) + push; run `npx convex run topics:purgeLowQuality` to clean the existing catalog; then data-check `topByPageviews` no longer returns TLDs/"Deaths in", and reload onboarding for cleaner suggestions.
 
 ## Coverage boundary
+
 Pure predicate + purge are unit/convex-tested; the live harvest gate is exercised by the existing harvestTopDay test pattern + the post-deploy data check.

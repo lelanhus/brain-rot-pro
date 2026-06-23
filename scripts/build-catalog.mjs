@@ -20,7 +20,9 @@ const DEFAULT_FILES = (() => {
 		const y = d.getUTCFullYear();
 		const m = String(d.getUTCMonth() + 1).padStart(2, '0');
 		const day = String(d.getUTCDate()).padStart(2, '0');
-		urls.push(`https://dumps.wikimedia.org/other/pageviews/${y}/${y}-${m}/pageviews-${y}${m}${day}-120000.gz`);
+		urls.push(
+			`https://dumps.wikimedia.org/other/pageviews/${y}/${y}-${m}/pageviews-${y}${m}${day}-120000.gz`
+		);
 	}
 	return urls;
 })();
@@ -33,9 +35,16 @@ const TOP = Number(arg('--top', '200000'));
 const OUT = arg('--out', 'catalog.jsonl');
 
 async function streamFile(url, counts) {
-	const res = await fetch(url, { headers: { 'User-Agent': 'BrainRotPro/0.1 (leland.husband@gmail.com)' } });
-	if (!res.ok) { console.error(`skip ${url}: ${res.status}`); return; }
-	const rl = createInterface({ input: (await import('node:stream')).Readable.fromWeb(res.body).pipe(createGunzip()) });
+	const res = await fetch(url, {
+		headers: { 'User-Agent': 'BrainRotPro/0.1 (leland.husband@gmail.com)' }
+	});
+	if (!res.ok) {
+		console.error(`skip ${url}: ${res.status}`);
+		return;
+	}
+	const rl = createInterface({
+		input: (await import('node:stream')).Readable.fromWeb(res.body).pipe(createGunzip())
+	});
 	for await (const line of rl) {
 		const p = parsePageviewLine(line);
 		if (p) counts.set(p.title, (counts.get(p.title) ?? 0) + p.views);
@@ -47,9 +56,17 @@ const files = process.argv.includes('--files')
 	? (await import('node:fs')).readFileSync(arg('--files'), 'utf8').split('\n').filter(Boolean)
 	: DEFAULT_FILES;
 const counts = new Map();
-for (const url of files) { try { await streamFile(url, counts); } catch (e) { console.error(`error ${url}: ${e.message}`); } }
+for (const url of files) {
+	try {
+		await streamFile(url, counts);
+	} catch (e) {
+		console.error(`error ${url}: ${e.message}`);
+	}
+}
 
 const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, TOP);
-const jsonl = top.map(([title, pageviews]) => JSON.stringify({ title, slug: toSlug(title), pageviews })).join('\n');
+const jsonl = top
+	.map(([title, pageviews]) => JSON.stringify({ title, slug: toSlug(title), pageviews }))
+	.join('\n');
 writeFileSync(OUT, jsonl);
 console.error(`wrote ${top.length} topics to ${OUT}`);

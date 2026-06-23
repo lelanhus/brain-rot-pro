@@ -192,10 +192,14 @@ describe('engagementWeight (graded dwell)', () => {
 
 describe('meanCompleteDwell', () => {
 	it('averages visibleMs over card_complete events only', () => {
-		expect(meanCompleteDwell([
-			{ type: 'card_complete', visibleMs: 1000 }, { type: 'card_complete', visibleMs: 3000 },
-			{ type: 'card_skip', visibleMs: 100 }, { type: 'save' }
-		])).toBe(2000);
+		expect(
+			meanCompleteDwell([
+				{ type: 'card_complete', visibleMs: 1000 },
+				{ type: 'card_complete', visibleMs: 3000 },
+				{ type: 'card_skip', visibleMs: 100 },
+				{ type: 'save' }
+			])
+		).toBe(2000);
 		expect(meanCompleteDwell([{ type: 'save' }])).toBe(0); // none → 0 (callers treat 0 as "no baseline")
 	});
 });

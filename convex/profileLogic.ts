@@ -164,10 +164,18 @@ export function scoreByTaste(
 			focusConcept: ctx.focusConcept
 		});
 	}
-	if (ctx.interestSlugs !== undefined && card.slug !== undefined && ctx.interestSlugs.has(card.slug)) {
+	if (
+		ctx.interestSlugs !== undefined &&
+		card.slug !== undefined &&
+		ctx.interestSlugs.has(card.slug)
+	) {
 		score += INTEREST_BOOST;
 	}
-	if (ctx.threadEmbedding !== undefined && emb !== undefined && emb.length === ctx.threadEmbedding.length) {
+	if (
+		ctx.threadEmbedding !== undefined &&
+		emb !== undefined &&
+		emb.length === ctx.threadEmbedding.length
+	) {
 		score += THREAD_WEIGHT * cosineSimilarity(ctx.threadEmbedding, emb);
 	}
 	return score;

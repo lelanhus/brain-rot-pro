@@ -22,10 +22,12 @@
 ### Task 1: Cap generated body length
 
 **Files:**
+
 - Modify: `convex/generateLogic.ts` (body schema ~line 35-39; `buildGenerationPrompt` ~line 65-80)
 - Test: `convex/generateLogic.test.ts` (existing `generatedCardSchema` describe block ~line 79)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `generatedCardSchema` now rejects `body.length > 480`. The auto-publish path (`generate.ts`) and the backfill (Task 4) rely on this cap holding.
 
@@ -34,29 +36,29 @@
 Add inside the existing `describe('generatedCardSchema', ...)` block in `convex/generateLogic.test.ts`:
 
 ```ts
-	it('rejects a body longer than the one-screen cap (480)', () => {
-		const card = {
-			hook: 'A valid declarative hook.',
-			body: 'a'.repeat(481),
-			whyItMatters: 'It matters.',
-			format: 'object_story',
-			conceptTags: ['t'],
-			sourceSpan: 'a'.repeat(30)
-		};
-		expect(generatedCardSchema.safeParse(card).success).toBe(false);
-	});
+it('rejects a body longer than the one-screen cap (480)', () => {
+	const card = {
+		hook: 'A valid declarative hook.',
+		body: 'a'.repeat(481),
+		whyItMatters: 'It matters.',
+		format: 'object_story',
+		conceptTags: ['t'],
+		sourceSpan: 'a'.repeat(30)
+	};
+	expect(generatedCardSchema.safeParse(card).success).toBe(false);
+});
 
-	it('accepts a body exactly at the cap (480)', () => {
-		const card = {
-			hook: 'A valid declarative hook.',
-			body: 'a'.repeat(480),
-			whyItMatters: 'It matters.',
-			format: 'object_story',
-			conceptTags: ['t'],
-			sourceSpan: 'a'.repeat(30)
-		};
-		expect(generatedCardSchema.safeParse(card).success).toBe(true);
-	});
+it('accepts a body exactly at the cap (480)', () => {
+	const card = {
+		hook: 'A valid declarative hook.',
+		body: 'a'.repeat(480),
+		whyItMatters: 'It matters.',
+		format: 'object_story',
+		conceptTags: ['t'],
+		sourceSpan: 'a'.repeat(30)
+	};
+	expect(generatedCardSchema.safeParse(card).success).toBe(true);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -99,10 +101,12 @@ git commit -m "feat: cap generated card body at 480 chars for one-screen fit"
 ### Task 2: Make each slot a true one-viewport box
 
 **Files:**
+
 - Modify: `src/app.css` (`:root` token `--fs-hook` ~line 28; `.slot` ~line 165; `.card` ~line 211; `.card-image img` ~line 233; `.body` ~line 303)
 - Test: `e2e/feed.e2e.ts` (add a gated fit test)
 
 **Interfaces:**
+
 - Consumes: capped body from Task 1 (so the clip rarely engages on new cards).
 - Produces: `.slot` never scrolls (`scrollHeight <= clientHeight`).
 
@@ -124,9 +128,11 @@ test.describe('feed (one-screen fit)', () => {
 			await page.setViewportSize({ width: vp.width, height: vp.height });
 			await page.goto('/');
 			await expect(page.getByTestId('feed')).toBeVisible();
-			const overflow = await page.locator('.slot').evaluateAll((slots) =>
-				slots.map((s) => s.scrollHeight - s.clientHeight).filter((d) => d > 1)
-			);
+			const overflow = await page
+				.locator('.slot')
+				.evaluateAll((slots) =>
+					slots.map((s) => s.scrollHeight - s.clientHeight).filter((d) => d > 1)
+				);
 			expect(overflow).toEqual([]);
 		});
 	}
@@ -143,7 +149,7 @@ Expected: FAIL — at least one `.slot` overflows (current `.slot` is `min-heigh
 In `src/app.css` `:root`, change `--fs-hook`:
 
 ```css
-	--fs-hook: clamp(1.6rem, 4.5vw, 2.3rem); /* spec size; was drifted to 3rem */
+--fs-hook: clamp(1.6rem, 4.5vw, 2.3rem); /* spec size; was drifted to 3rem */
 ```
 
 - [ ] **Step 4: Make `.slot` a fixed one-viewport box**
@@ -222,6 +228,7 @@ git commit -m "feat: pin each feed slot to one viewport (no in-card scroll)"
 ### Task 3: Open "why it matters" / "source" as a non-scrolling overlay
 
 **Files:**
+
 - Modify: `src/lib/components/Card.svelte` (the `why`/`source` reveals ~line 59-98)
 - Modify: `src/app.css` (add overlay styles near `.why` ~line 356 and `.source` ~line 485)
 - Test: `e2e/feed.e2e.ts` (extend the fit test to the opened state)
@@ -229,6 +236,7 @@ git commit -m "feat: pin each feed slot to one viewport (no in-card scroll)"
 **Why:** With `.slot { overflow: hidden }` (Task 2), an inline expansion (the current `slide`/`<details>`) would clip the controls below it. An overlay keeps the card layout fixed, so opening a reveal never causes scroll.
 
 **Interfaces:**
+
 - Consumes: `.slot`/`.card` from Task 2.
 - Produces: opening a reveal does not change `.slot` scrollHeight.
 
@@ -261,29 +269,31 @@ Expected: FAIL — the inline `slide` expansion grows the card, so the slot over
 In `src/lib/components/Card.svelte`, replace the inline `{#if expanded}<p class="why" ...>` reveal (and, optionally, fold the `<details class="source">` content into the same panel) with an absolutely-positioned panel. Minimal change for "why it matters":
 
 ```svelte
-	{#if card.whyItMatters}
-		<button
-			type="button"
-			class="why-toggle"
-			class:open={expanded}
-			aria-expanded={expanded}
-			onclick={toggleWhy}
-		>
-			Why it matters
-			<span class="why-caret" aria-hidden="true"></span>
-		</button>
-	{/if}
+{#if card.whyItMatters}
+	<button
+		type="button"
+		class="why-toggle"
+		class:open={expanded}
+		aria-expanded={expanded}
+		onclick={toggleWhy}
+	>
+		Why it matters
+		<span class="why-caret" aria-hidden="true"></span>
+	</button>
+{/if}
 ```
 
 Then, as the LAST child of `<article class="card">` (after `.card-body`), add the overlay:
 
 ```svelte
-	{#if expanded}
-		<div class="reveal-overlay" transition:fade={{ duration: 140 }}>
-			<button type="button" class="reveal-close" onclick={() => (expanded = false)} aria-label="Close">×</button>
-			<p class="why">{card.whyItMatters}</p>
-		</div>
-	{/if}
+{#if expanded}
+	<div class="reveal-overlay" transition:fade={{ duration: 140 }}>
+		<button type="button" class="reveal-close" onclick={() => (expanded = false)} aria-label="Close"
+			>×</button
+		>
+		<p class="why">{card.whyItMatters}</p>
+	</div>
+{/if}
 ```
 
 Add `import { fade } from 'svelte/transition';` and remove the now-unused `slide` import if "why" was its only user.
@@ -339,6 +349,7 @@ git commit -m "feat: show why-it-matters as a non-scrolling overlay"
 ### Task 4: Backfill legacy over-long published cards
 
 **Files:**
+
 - Modify: `convex/generateDb.ts` (add `overlongPublished` internalQuery)
 - Modify: `convex/generate.ts` (add `backfillShortenOverlong` action)
 - Test: `convex/generateDb.test.ts` (create) or add to an existing convex test file for the query
@@ -346,6 +357,7 @@ git commit -m "feat: show why-it-matters as a non-scrolling overlay"
 **Approach:** New cards are already short (Task 1). For each already-published card whose body exceeds the cap, **suppress it then regenerate from its source article** — suppressing first means the fresh (short) card won't be dropped by the publish-time dedup check against the old one. Regeneration reuses the existing `generate.generateFromArticle` action unchanged.
 
 **Interfaces:**
+
 - Consumes: `generateFromArticle` (existing action: `({ articleId }) => { cardId, status, ... }`), the 480 cap from Task 1.
 - Produces: `internal.generateDb.overlongPublished({ cap, limit }) => Array<{ _id: Id<'knowledgeCards'>; articleId: Id<'sourceArticles'> | null }>`.
 
@@ -365,13 +377,24 @@ test('overlongPublished returns only published cards over the cap', async () => 
 	const t = convexTest(schema, modules);
 	const articleId = await t.run(async (ctx) =>
 		ctx.db.insert('sourceArticles', {
-			pageId: 1, title: 'T', url: 'u', revisionId: 1, extract: '', paragraphs: ['p'],
-			categories: [], status: 'fetched', fetchedAt: 0
+			pageId: 1,
+			title: 'T',
+			url: 'u',
+			revisionId: 1,
+			extract: '',
+			paragraphs: ['p'],
+			categories: [],
+			status: 'fetched',
+			fetchedAt: 0
 		})
 	);
 	const base = {
-		hook: 'h', whyItMatters: 'w', format: 'object_story' as const, conceptTags: ['t'],
-		shuffleKey: 0.5, createdAt: 0,
+		hook: 'h',
+		whyItMatters: 'w',
+		format: 'object_story' as const,
+		conceptTags: ['t'],
+		shuffleKey: 0.5,
+		createdAt: 0,
 		source: { articleId, articleTitle: 'T', articleUrl: 'u', sourceSpan: 's' }
 	};
 	await t.run(async (ctx) => {
@@ -434,17 +457,27 @@ In `convex/generate.ts` add (an `action`; `'use node'` is already at the top of 
  */
 export const backfillShortenOverlong = action({
 	args: { cap: v.optional(v.number()), limit: v.optional(v.number()) },
-	handler: async (ctx, args): Promise<{ scanned: number; regenerated: number; suppressedOnly: number }> => {
+	handler: async (
+		ctx,
+		args
+	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number }> => {
 		const cap = args.cap ?? 480;
 		const limit = args.limit ?? 50;
 		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, limit });
 		let regenerated = 0;
 		let suppressedOnly = 0;
 		for (const row of rows) {
-			await ctx.runMutation(internal.generateDb.setCardStatus, { cardId: row._id, status: 'suppressed' });
-			if (!row.articleId) { suppressedOnly++; continue; }
+			await ctx.runMutation(internal.generateDb.setCardStatus, {
+				cardId: row._id,
+				status: 'suppressed'
+			});
+			if (!row.articleId) {
+				suppressedOnly++;
+				continue;
+			}
 			const r = await ctx.runAction(api.generate.generateFromArticle, { articleId: row.articleId });
-			if (r.status === 'published') regenerated++; else suppressedOnly++;
+			if (r.status === 'published') regenerated++;
+			else suppressedOnly++;
 		}
 		return { scanned: rows.length, regenerated, suppressedOnly };
 	}
@@ -485,6 +518,7 @@ bunx convex deploy -y
 ```bash
 npx convex run generate:backfillShortenOverlong '{"limit":100}'
 ```
+
 Re-run until `scanned` is 0 (each run handles up to `limit` cards).
 
 - [ ] **Step 4: Confirm on the live site**

@@ -9,6 +9,7 @@
 **Tech Stack:** SvelteKit/Svelte 5 runes, convex-svelte.
 
 ## Global Constraints
+
 - Reuse `api.topics.topByPageviews` + `api.interests.{add,remove,list}`. No backend changes.
 - One-time per device via `localStorage` `brp:onboarded` (SSR-safe access). Skipping/Start sets the flag; never blocks content.
 - convex-svelte getter-args + 'skip'; deviceId guard on follow toggles; underscores→spaces for display + stored title.
@@ -178,7 +179,9 @@ export function markOnboarded(): void {
 ---
 
 ## Post-implementation (controller)
+
 Deploy + push; browser-test like a human: clear `localStorage['brp:onboarded']`, reload feed → picker appears → tap 2–3 topics (chips activate) → Start reading → dismisses to feed → reload → picker does NOT reappear → picked topics show in /account Interests.
 
 ## Coverage boundary
+
 Svelte UI verified by the controller browser test; topByPageviews/interests already unit-tested (SP1/SP3).

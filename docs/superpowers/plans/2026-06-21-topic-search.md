@@ -9,6 +9,7 @@
 **Tech Stack:** SvelteKit/Svelte 5 runes, convex-svelte.
 
 ## Global Constraints
+
 - Reuse `api.topics.search({query,limit})` and `api.interests.{add,remove,list}`. No new backend.
 - convex-svelte getter-args + `'skip'` pattern; `deviceId` from `getDeviceId` (onMount), guard mutations on it.
 - Display titles with underscores replaced by spaces; store the spaced title in `interests` (slug stays the catalog slug). Follow state from `interests.list` by slug.
@@ -96,7 +97,8 @@
 	.search {
 		max-width: 560px;
 		margin: 0 auto;
-		padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 4rem);
+		padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem
+			calc(env(safe-area-inset-bottom) + 4rem);
 	}
 	.back {
 		color: var(--muted);
@@ -170,7 +172,9 @@
 ---
 
 ## Post-implementation (controller)
+
 Deploy + push; browser-test like a human: tap Explore → type a query (e.g. "Cleopatra") → see results → Follow one → confirm Following state + that it appears in /account Interests.
 
 ## Coverage boundary
+
 Svelte UI verified by the controller browser test (project pattern); the underlying search/interests logic is already unit-tested in SP1/SP3.

@@ -9,6 +9,7 @@
 **Tech Stack:** Node/bun script (zlib gunzip), Convex, Vitest + convex-test.
 
 ## Global Constraints
+
 - Source: `https://dumps.wikimedia.org/other/pageviews/YYYY/YYYY-MM/pageviews-YYYYMMDD-HH0000.gz`, format `domain_code page_title count total_bytes`. Keep `domain_code === 'en'` (verify against a real sample line). Reuse `isRealArticleTitle`/`isQualityTopic`/`toSlug` from `convex/topicsLogic.ts`.
 - **Never `--replace` the live `topics` table.** Merge upserts by slug; existing `cardCount`/`evergreen` are preserved (only `pageviews`/`updatedAt` change on a hit). New rows: `cardCount:0`, `source:'wikipedia-dump'`.
 - Convex: `internal*` privacy, explicit `=== null`. After adding functions: `npx convex dev --once`. Tests: `bun run test:convex`. Before commit: `bun run check` + `bunx eslint <files>` (0).
@@ -20,6 +21,7 @@
 **Files:** Create `convex/dumpParse.ts`, `convex/dumpParse.test.ts`.
 
 - [ ] **Step 1: failing test** — `convex/dumpParse.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { parsePageviewLine } from './dumpParse';
@@ -27,7 +29,10 @@ import { parsePageviewLine } from './dumpParse';
 describe('parsePageviewLine', () => {
 	it('parses an en main-namespace article line', () => {
 		expect(parsePageviewLine('en Cleopatra 540 0')).toEqual({ title: 'Cleopatra', views: 540 });
-		expect(parsePageviewLine('en Marie_Curie 1200 0')).toEqual({ title: 'Marie_Curie', views: 1200 });
+		expect(parsePageviewLine('en Marie_Curie 1200 0')).toEqual({
+			title: 'Marie_Curie',
+			views: 1200
+		});
 	});
 	it('rejects other domains, junk titles, and malformed lines', () => {
 		expect(parsePageviewLine('de Berlin 900 0')).toBeNull(); // not en
@@ -44,6 +49,7 @@ describe('parsePageviewLine', () => {
 - [ ] **Step 2: run → fail.**
 
 - [ ] **Step 3: implement** — `convex/dumpParse.ts`:
+
 ```ts
 import { isRealArticleTitle, isQualityTopic } from './topicsLogic';
 
@@ -76,11 +82,16 @@ export function parsePageviewLine(line: string): { title: string; views: number 
 **Interfaces:** `topicsStaging {title,slug,pageviews}`; `internal.topics.mergeStagingIntoCatalog({batch?})` → `{merged, done}` (drains staging in batches, upserting into `topics`, preserving cardCount/evergreen).
 
 - [ ] **Step 1: failing test** — append `convex/topics.test.ts`:
+
 ```ts
 test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/evergreen', async () => {
 	const t = convexTest(schema, modules);
 	// existing topic with state that MUST be preserved
-	await t.mutation(internal.topics.upsertTopic, { title: 'Cleopatra', pageviews: 100, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Cleopatra',
+		pageviews: 100,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.setEvergreen, { slug: 'cleopatra', evergreen: true });
 	await t.mutation(internal.topics.incrementCardCount, { slug: 'cleopatra' });
 	// staging: one dup (cleopatra) + one new (hannibal)
@@ -100,13 +111,16 @@ test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/e
 	expect(han?.cardCount).toBe(0); // new insert
 	expect(han?.source).toBe('wikipedia-dump');
 	// staging drained
-	expect(await t.run(async (ctx) => (await ctx.db.query('topicsStaging').collect()).length)).toBe(0);
+	expect(await t.run(async (ctx) => (await ctx.db.query('topicsStaging').collect()).length)).toBe(
+		0
+	);
 });
 ```
 
 - [ ] **Step 2: run → fail.**
 
 - [ ] **Step 3a: schema** — add to `convex/schema.ts` `defineSchema`:
+
 ```ts
 	topicsStaging: defineTable({
 		title: v.string(),
@@ -116,6 +130,7 @@ test('mergeStagingIntoCatalog drains staging into topics, preserving cardCount/e
 ```
 
 - [ ] **Step 3b: `convex/topics.ts`** — add (`mergePageviews`/`toSlug` are imported from `./topicsLogic`; add them if not):
+
 ```ts
 /**
  * Drain a batch of `topicsStaging` into `topics`, upserting by slug. Existing
@@ -168,6 +183,7 @@ export const mergeStagingIntoCatalog = internalMutation({
 This is an ops script (not deployed, not unit-tested — it imports the tested `parsePageviewLine`). It must `bun run check`-clean if picked up by tsconfig; if it isn't (it's `.mjs` outside `src`/`convex`), ensure it at least runs without error on `--help`.
 
 - [ ] **Step 1: write the script** — `scripts/build-catalog.mjs`:
+
 ```js
 #!/usr/bin/env bun
 // Build a ranked topic catalog from sampled Wikimedia hourly pageview dumps.
@@ -191,7 +207,9 @@ const DEFAULT_FILES = (() => {
 		const y = d.getUTCFullYear();
 		const m = String(d.getUTCMonth() + 1).padStart(2, '0');
 		const day = String(d.getUTCDate()).padStart(2, '0');
-		urls.push(`https://dumps.wikimedia.org/other/pageviews/${y}/${y}-${m}/pageviews-${y}${m}${day}-120000.gz`);
+		urls.push(
+			`https://dumps.wikimedia.org/other/pageviews/${y}/${y}-${m}/pageviews-${y}${m}${day}-120000.gz`
+		);
 	}
 	return urls;
 })();
@@ -204,9 +222,16 @@ const TOP = Number(arg('--top', '200000'));
 const OUT = arg('--out', 'catalog.jsonl');
 
 async function streamFile(url, counts) {
-	const res = await fetch(url, { headers: { 'User-Agent': 'BrainRotPro/0.1 (leland.husband@gmail.com)' } });
-	if (!res.ok) { console.error(`skip ${url}: ${res.status}`); return; }
-	const rl = createInterface({ input: (await import('node:stream')).Readable.fromWeb(res.body).pipe(createGunzip()) });
+	const res = await fetch(url, {
+		headers: { 'User-Agent': 'BrainRotPro/0.1 (leland.husband@gmail.com)' }
+	});
+	if (!res.ok) {
+		console.error(`skip ${url}: ${res.status}`);
+		return;
+	}
+	const rl = createInterface({
+		input: (await import('node:stream')).Readable.fromWeb(res.body).pipe(createGunzip())
+	});
 	for await (const line of rl) {
 		const p = parsePageviewLine(line);
 		if (p) counts.set(p.title, (counts.get(p.title) ?? 0) + p.views);
@@ -218,10 +243,18 @@ const files = process.argv.includes('--files')
 	? (await import('node:fs')).readFileSync(arg('--files'), 'utf8').split('\n').filter(Boolean)
 	: DEFAULT_FILES;
 const counts = new Map();
-for (const url of files) { try { await streamFile(url, counts); } catch (e) { console.error(`error ${url}: ${e.message}`); } }
+for (const url of files) {
+	try {
+		await streamFile(url, counts);
+	} catch (e) {
+		console.error(`error ${url}: ${e.message}`);
+	}
+}
 
 const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, TOP);
-const jsonl = top.map(([title, pageviews]) => JSON.stringify({ title, slug: toSlug(title), pageviews })).join('\n');
+const jsonl = top
+	.map(([title, pageviews]) => JSON.stringify({ title, slug: toSlug(title), pageviews }))
+	.join('\n');
 writeFileSync(OUT, jsonl);
 console.error(`wrote ${top.length} topics to ${OUT}`);
 ```
@@ -236,7 +269,9 @@ console.error(`wrote ${top.length} topics to ${OUT}`);
 ---
 
 ## Post-implementation (controller)
+
 Run the ETL on a small real sample (e.g. 2–3 recent dump files), `npx convex import --replace --table topicsStaging catalog.jsonl`, then loop `mergeStagingIntoCatalog` until `done`; confirm the catalog jumps in size, stays junk-free, and pre-existing topics keep their cardCount/evergreen. Then widen `--files` for full breadth.
 
 ## Coverage boundary
+
 The live dump download/stream isn't unit-tested (ops); `parsePageviewLine` (the parsing logic) and `mergeStagingIntoCatalog` (the upsert/preserve logic) are. The post-deploy run validates the end-to-end pipeline.

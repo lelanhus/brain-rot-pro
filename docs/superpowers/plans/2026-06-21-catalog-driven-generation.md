@@ -24,10 +24,12 @@
 ### Task 1: `incrementCardCount` (cardCount upkeep)
 
 **Files:**
+
 - Modify: `convex/topics.ts` (append one internalMutation)
 - Test: `convex/topics.test.ts` (append one test)
 
 **Interfaces:**
+
 - Consumes: `topics` table, `by_slug` index.
 - Produces: `internal.topics.incrementCardCount({ slug: string })` → void; `cardCount += 1` on the matching topic, no-op if the slug isn't catalogued.
 
@@ -100,12 +102,14 @@ git commit -m "feat(topics): incrementCardCount for catalog cardCount upkeep"
 ### Task 2: `publishedDelta` + `generateForTopic`
 
 **Files:**
+
 - Modify: `convex/generateLogic.ts` (append pure helper)
 - Test: `convex/generateLogic.test.ts` (append test)
 - Modify: `convex/generationPipeline.ts` (append `generateForTopic`)
 - Test: `convex/generationPipeline.test.ts` (append skip-path test)
 
 **Interfaces:**
+
 - Consumes: `internal.topics.incrementCardCount` (Task 1), `api.topics.bySlug` (returns `Doc<'topics'> | null`), `internal.generationPipeline.ingestAndGenerate` (existing; `{ title, concept? }` → `{ title, status }` where status ∈ `'filtered'|'exists'|'published'|'validation_failed'|'duplicate'`).
 - Produces:
   - `publishedDelta(status: string): number` — `1` iff `status === 'published'`, else `0`.
@@ -152,7 +156,9 @@ test('generateForTopic skips covered or unknown topics without generating', asyn
 	});
 	await t.mutation(internal.topics.incrementCardCount, { slug: 'black_hole' });
 
-	const covered = await t.action(internal.generationPipeline.generateForTopic, { slug: 'black_hole' });
+	const covered = await t.action(internal.generationPipeline.generateForTopic, {
+		slug: 'black_hole'
+	});
 	expect(covered.status).toBe('skipped');
 
 	const unknown = await t.action(internal.generationPipeline.generateForTopic, { slug: 'nope' });
@@ -231,9 +237,11 @@ git commit -m "feat(generation): generateForTopic (idempotent, catalog-driven) +
 ### Task 3: `generateFromCatalog` + `CATALOG_BATCH`
 
 **Files:**
+
 - Modify: `convex/generationPipeline.ts` (append; additive — nothing rewired yet)
 
 **Interfaces:**
+
 - Consumes: `internal.topics.needingCards({ limit })` (returns `Doc<'topics'>[]`, cardCount==0, pageviews desc), `internal.generationPipeline.generateForTopic` (Task 2), the existing module-level `pool`.
 - Produces:
   - `CATALOG_BATCH = 10` (exported const).
@@ -247,10 +255,26 @@ Append to `convex/generationPipeline.test.ts`:
 test('generateFromCatalog enqueues one job per needing-cards topic, popularity-first', async () => {
 	const t = convexTest(schema, modules);
 	// Three topics needing cards + one already covered (must be excluded).
-	await t.mutation(internal.topics.upsertTopic, { title: 'Alpha', pageviews: 300, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Beta', pageviews: 900, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Gamma', pageviews: 600, source: 'wikipedia-top' });
-	await t.mutation(internal.topics.upsertTopic, { title: 'Covered', pageviews: 999, source: 'wikipedia-top' });
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Alpha',
+		pageviews: 300,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Beta',
+		pageviews: 900,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Gamma',
+		pageviews: 600,
+		source: 'wikipedia-top'
+	});
+	await t.mutation(internal.topics.upsertTopic, {
+		title: 'Covered',
+		pageviews: 999,
+		source: 'wikipedia-top'
+	});
 	await t.mutation(internal.topics.incrementCardCount, { slug: 'covered' });
 
 	const res = await t.action(internal.generationPipeline.generateFromCatalog, { count: 10 });
@@ -281,9 +305,13 @@ export const CATALOG_BATCH = 10;
 export const generateFromCatalog = internalAction({
 	args: { count: v.optional(v.number()) },
 	handler: async (ctx, { count }): Promise<{ enqueued: number }> => {
-		const topics = await ctx.runQuery(internal.topics.needingCards, { limit: count ?? CATALOG_BATCH });
+		const topics = await ctx.runQuery(internal.topics.needingCards, {
+			limit: count ?? CATALOG_BATCH
+		});
 		for (const topic of topics) {
-			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, { slug: topic.slug });
+			await pool.enqueueAction(ctx, internal.generationPipeline.generateForTopic, {
+				slug: topic.slug
+			});
 		}
 		return { enqueued: topics.length };
 	}
@@ -309,12 +337,14 @@ git commit -m "feat(generation): generateFromCatalog warm-ahead off the topic ca
 ### Task 4: Cutover + retire the demand path
 
 **Files:**
+
 - Modify: `convex/generationPipeline.ts` (rewire `ensureSupply` + `run`; remove `processDemand`, `SUPPLY_BATCH`, `searchArticleTitles` import, `internal.demand` usage, and stale top-comment)
 - Modify: `convex/crons.ts` (repoint hourly job to `generateFromCatalog`)
 - Delete: `convex/demand.ts`
 - Verify: full `bun run test:convex` + eslint, no dangling references
 
 **Interfaces:**
+
 - Consumes: `generateFromCatalog` + `CATALOG_BATCH` (Task 3).
 - Produces: `ensureSupply({ deviceId })` and `run({ count? })` now drive `generateFromCatalog`; cron `'generate from catalog'` replaces `'generate from demand'`. `processDemand`/`SUPPLY_BATCH`/`demand.ts` no longer exist.
 
@@ -326,7 +356,7 @@ In `ensureSupply`'s handler, replace the supply call:
 // BEFORE:
 //   await ctx.runAction(internal.generationPipeline.processDemand, SUPPLY_BATCH);
 // AFTER:
-		await ctx.runAction(internal.generationPipeline.generateFromCatalog, { count: CATALOG_BATCH });
+await ctx.runAction(internal.generationPipeline.generateFromCatalog, { count: CATALOG_BATCH });
 ```
 
 Replace `run` entirely:

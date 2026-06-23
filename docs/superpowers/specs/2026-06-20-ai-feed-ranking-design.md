@@ -28,8 +28,8 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
   meaningful novelty weight so fresh/off-taste cards keep surfacing.
 - **Taste = weighted positive engagement:** taste vector = recency-favored
   weighted average of the embeddings of cards the device engaged with positively
-  (save > expand/source-open > complete). Negative signals (skip, not_interested)
-  only *exclude* cards (already handled) — they don't reshape the taste vector.
+  (save > expand/source-open > complete). Negative signals (skip, `not_interested`)
+  only _exclude_ cards (already handled) — they don't reshape the taste vector.
   Cold-start (no positively-engaged embedded card) → fall back to concept-affinity.
 - **Approach A (query-side cosine blend):** taste vector lives on `userProfiles`,
   ranking is a pure cosine blend computed in `feed.unseen`. No action / no
@@ -40,6 +40,7 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
 ## Design
 
 ### 1. Taste vector — `userProfiles` + `profile.recompute`
+
 - Add optional `tasteVector: v.optional(v.array(v.float64()))` to `userProfiles`.
 - `recompute` already loads the cards a device referenced (for `conceptWeights`).
   Extend it: accumulate a **weighted, recency-favored average** of the embeddings
@@ -58,10 +59,11 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
   without a deployment; `recompute` just calls it and stores the result.
 
 ### 2. Ranking blend — pure fn in `profileLogic` + `feed.unseen`
+
 - Add `scoreByTaste(card, ctx)` where `ctx = { tasteVector?, weights, shuffleKey, focusConcept? }`:
   - If `tasteVector` is present AND `card.embedding` is present:
     `RELEVANCE_WEIGHT · cosineSimilarity(tasteVector, card.embedding)`
-    `+ WILDCARD_WEIGHT · shuffleKey`  (the discovery slice)
+    `+ WILDCARD_WEIGHT · shuffleKey` (the discovery slice)
     `+ (focusConcept matches ? FOCUS_BOOST : 0)`.
   - Else → fall back to the existing `scoreCard(card.conceptTags, weights, {shuffleKey, focusConcept})`.
   - `RELEVANCE_WEIGHT` is sized so cosine (≈0–1) dominates ordering while
@@ -72,6 +74,7 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
   seen/notInterested exclusion) is unchanged.
 
 ### 3. Cold-start / missing-embedding fallback
+
 - No `tasteVector` (new or low-engagement device) → every candidate falls back to
   `scoreCard`: the feed behaves exactly as today. Never worse than the current
   ranker.
@@ -79,11 +82,13 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
   when a taste vector exists, so un-embedded cards still rank sanely.
 
 ### 4. Discovery slice
+
 - Provided by the retained `WILDCARD_WEIGHT · shuffleKey` term in the blend —
   fresh/off-taste cards keep surfacing, no echo chamber. A stronger "force every
   Nth card off-taste" injector is explicitly **out of scope** (a later refinement).
 
 ## Non-goals
+
 - Convex `vectorSearch`/action-based ranking (approach B) or precomputed per-user
   queues (C) — deferred; the seam is preserved.
 - Negative-signal taste steering (subtracting disliked embeddings) — rejected;
@@ -92,6 +97,7 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
 - Re-embedding cards or changing the embedding model.
 
 ## Testing
+
 - Unit (`profileLogic`): `scoreByTaste` ranks a high-cosine card above a
   low-cosine one; falls back to `scoreCard` when `tasteVector` or `card.embedding`
   is absent; novelty term still breaks ties. `buildTasteVector` weights positives
@@ -103,5 +109,6 @@ existing select→rank seam (`feed.unseen`) with no new infrastructure.
   taste ranks ahead of a far one; still never returns a seen card.
 
 ## Open items
+
 None blocking. `RELEVANCE_WEIGHT` and the recency half-life are tuned empirically
 during implementation against the constants already in `profileLogic`.

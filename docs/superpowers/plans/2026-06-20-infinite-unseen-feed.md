@@ -22,11 +22,13 @@
 ### Task 1: Add `seenCards` table + dual-write on event log
 
 **Files:**
+
 - Modify: `convex/schema.ts` (add `seenCards` table; make `userProfiles.seen` optional)
 - Modify: `convex/events.ts` (upsert seenCards for seen-type events)
 - Test: `convex/events.test.ts`
 
 **Interfaces:**
+
 - Produces: table `seenCards { deviceId: string, cardId: Id<'knowledgeCards'>, seenAt: number }` with indexes `by_device_card` `['deviceId','cardId']` and `by_device` `['deviceId']`. Seen-type events (`card_impression`, `card_complete`, `card_skip`) with a `cardId` create exactly one `seenCards` row per (device, card).
 
 - [ ] **Step 1: Write the failing test**
@@ -89,26 +91,26 @@ In the same file, change `userProfiles.seen` to optional (widen step, so later n
 In `convex/events.ts`, replace the handler body's write section. After the existing `await Promise.all(... insert('events') ...)`, add seen upserts:
 
 ```ts
-		// Record seen (durable, idempotent) for the never-repeat guarantee.
-		const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
-		const seenCardIds = [
-			...new Set(
-				args.events.filter((e) => SEEN_TYPES.has(e.type) && e.cardId).map((e) => e.cardId!)
-			)
-		];
-		await Promise.all(
-			seenCardIds.map(async (cardId) => {
-				const existing = await ctx.db
-					.query('seenCards')
-					.withIndex('by_device_card', (q) =>
-						q.eq('deviceId', args.deviceId).eq('cardId', cardId)
-					)
-					.unique();
-				if (!existing) {
-					await ctx.db.insert('seenCards', { deviceId: args.deviceId, cardId, seenAt: e_ts(args, cardId) });
-				}
-			})
-		);
+// Record seen (durable, idempotent) for the never-repeat guarantee.
+const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
+const seenCardIds = [
+	...new Set(args.events.filter((e) => SEEN_TYPES.has(e.type) && e.cardId).map((e) => e.cardId!))
+];
+await Promise.all(
+	seenCardIds.map(async (cardId) => {
+		const existing = await ctx.db
+			.query('seenCards')
+			.withIndex('by_device_card', (q) => q.eq('deviceId', args.deviceId).eq('cardId', cardId))
+			.unique();
+		if (!existing) {
+			await ctx.db.insert('seenCards', {
+				deviceId: args.deviceId,
+				cardId,
+				seenAt: e_ts(args, cardId)
+			});
+		}
+	})
+);
 ```
 
 Add a small helper above the export (seenAt = the event's ts, fall back to the max ts in the batch):
@@ -136,10 +138,12 @@ git commit -m "feat: durable seenCards table + dual-write on event log"
 ### Task 2: Purge `seenCards` on account deletion
 
 **Files:**
+
 - Modify: `convex/account.ts` (delete seenCards in `deleteData` + its batch helper)
 - Test: `convex/account.test.ts`
 
 **Interfaces:**
+
 - Consumes: `seenCards.by_device` (Task 1).
 - Produces: `account.deleteData` removes all `seenCards` rows for the device.
 
@@ -205,10 +209,12 @@ git commit -m "feat: purge seenCards on account deletion"
 ### Task 3: Migration backfill `userProfiles.seen[]` → `seenCards`
 
 **Files:**
+
 - Create: `convex/seenMigration.ts`
 - Test: `convex/seenMigration.test.ts`
 
 **Interfaces:**
+
 - Consumes: `userProfiles.by_device`, `seenCards.by_device_card`.
 - Produces: `internal.seenMigration.backfillSeen({ limit })` → `{ profilesScanned, rowsInserted }`. Idempotent (skips existing seenCards rows).
 
@@ -228,14 +234,23 @@ test('backfillSeen copies userProfiles.seen into seenCards, idempotently', async
 	const t = convexTest(schema, modules);
 	const cardId = await t.run(async (ctx) =>
 		ctx.db.insert('knowledgeCards', {
-			hook: 'h', body: 'a'.repeat(100), format: 'object_story', conceptTags: ['t'],
+			hook: 'h',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
 			source: { articleTitle: 'T', articleUrl: 'u', sourceSpan: 's' },
-			status: 'published', shuffleKey: 0.5, createdAt: 0
+			status: 'published',
+			shuffleKey: 0.5,
+			createdAt: 0
 		})
 	);
 	await t.run(async (ctx) =>
 		ctx.db.insert('userProfiles', {
-			deviceId: 'd1', conceptWeights: [], seen: [cardId], notInterested: [], updatedAt: 0
+			deviceId: 'd1',
+			conceptWeights: [],
+			seen: [cardId],
+			notInterested: [],
+			updatedAt: 0
 		})
 	);
 
@@ -245,7 +260,10 @@ test('backfillSeen copies userProfiles.seen into seenCards, idempotently', async
 	expect(r2.rowsInserted).toBe(0); // idempotent
 
 	const rows = await t.run(async (ctx) =>
-		ctx.db.query('seenCards').withIndex('by_device', (q) => q.eq('deviceId', 'd1')).collect()
+		ctx.db
+			.query('seenCards')
+			.withIndex('by_device', (q) => q.eq('deviceId', 'd1'))
+			.collect()
 	);
 	expect(rows).toHaveLength(1);
 	expect(rows[0].cardId).toBe(cardId);
@@ -308,12 +326,14 @@ git commit -m "feat: migration backfill userProfiles.seen -> seenCards"
 ### Task 4: Unseen feed query (paginate + exclude) + remove SEEN_PENALTY
 
 **Files:**
+
 - Modify: `convex/profileLogic.ts` (drop `SEEN_PENALTY` from `scoreCard`)
 - Modify: `convex/profileLogic.test.ts` (update scoreCard tests)
 - Modify: `convex/feed.ts` (replace `personal` with paginated `unseen`)
 - Test: `convex/feed.test.ts`
 
 **Interfaces:**
+
 - Consumes: `seenCards.by_device_card`, `userProfiles.by_device`, `knowledgeCards.by_status_shuffle`.
 - Produces: `api.feed.unseen({ deviceId, paginationOpts, focusConcept? })` → a Convex paginated result whose `page` contains only cards NOT in `seenCards` and NOT in `notInterested`, ranked by `scoreCard`. `scoreCard` no longer takes/uses `seen`.
 
@@ -357,17 +377,21 @@ test('feed.unseen excludes seen + not-interested, ranks the rest', async () => {
 	await t.mutation(api.seed.seed, {});
 	const deviceId = 'reader';
 	const first = await t.query(api.feed.unseen, {
-		deviceId, paginationOpts: { numItems: 3, cursor: null }
+		deviceId,
+		paginationOpts: { numItems: 3, cursor: null }
 	});
 	expect(first.page.length).toBeGreaterThan(0);
 	const firstId = first.page[0]._id;
 
 	// Mark the first card seen, then it must never appear again.
 	await t.mutation(api.events.log, {
-		deviceId, sessionId: 's', events: [{ type: 'card_complete', cardId: firstId, ts: 1 }]
+		deviceId,
+		sessionId: 's',
+		events: [{ type: 'card_complete', cardId: firstId, ts: 1 }]
 	});
 	const after = await t.query(api.feed.unseen, {
-		deviceId, paginationOpts: { numItems: 50, cursor: null }
+		deviceId,
+		paginationOpts: { numItems: 50, cursor: null }
 	});
 	expect(after.page.map((c) => c._id)).not.toContain(firstId);
 });
@@ -433,8 +457,14 @@ export const unseen = query({
 
 		unseenCards.sort(
 			(a, b) =>
-				scoreCard(b.conceptTags, weights, { shuffleKey: b.shuffleKey, focusConcept: args.focusConcept }) -
-				scoreCard(a.conceptTags, weights, { shuffleKey: a.shuffleKey, focusConcept: args.focusConcept })
+				scoreCard(b.conceptTags, weights, {
+					shuffleKey: b.shuffleKey,
+					focusConcept: args.focusConcept
+				}) -
+				scoreCard(a.conceptTags, weights, {
+					shuffleKey: a.shuffleKey,
+					focusConcept: args.focusConcept
+				})
 		);
 
 		return { ...page, page: unseenCards };
@@ -458,11 +488,13 @@ git commit -m "feat: unseen feed (paginate + hard-exclude seen); drop seen penal
 ### Task 5: Client consumes the paginated unseen feed
 
 **Files:**
+
 - Modify: `src/routes/+page.ts` (SSR-load the unseen feed)
 - Modify: `src/routes/+page.svelte` (use the paginated unseen query; remove personal/base split)
 - Test: manual + `bun run check` / `bun run test:component`
 
 **Interfaces:**
+
 - Consumes: `api.feed.unseen` (Task 4).
 
 - [ ] **Step 1: SSR-load unseen**
@@ -474,11 +506,7 @@ import { convexLoadPaginated } from 'convex-svelte/sveltekit';
 import { api } from '$convex/_generated/api';
 
 export const load = async () => ({
-	feed: await convexLoadPaginated(
-		api.feed.unseen,
-		{ deviceId: '' },
-		{ initialNumItems: 8 }
-	)
+	feed: await convexLoadPaginated(api.feed.unseen, { deviceId: '' }, { initialNumItems: 8 })
 });
 ```
 
@@ -503,12 +531,14 @@ git commit -m "feat: client consumes paginated unseen feed"
 ### Task 6: Running-low trigger + faster generation
 
 **Files:**
+
 - Modify: `convex/generationPipeline.ts` (public `ensureSupply` action, throttled)
 - Modify: `convex/crons.ts` (increase cadence; fix stale comment)
 - Modify: `src/routes/+page.svelte` (call `ensureSupply` as the feed nears its end)
 - Test: `convex/generationPipeline.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: `internal.generationPipeline.processDemand` (existing), `internal.demand.topConcepts`.
 - Produces: `api.generationPipeline.ensureSupply({ deviceId })` → `{ triggered: boolean }`. Throttled so concurrent/rapid calls don't enqueue repeatedly.
 
@@ -518,7 +548,11 @@ Create `convex/generationPipeline.test.ts`. Since `processDemand` makes network 
 
 ```ts
 /** True if enough time passed since the last supply trigger to trigger again. */
-export function supplyThrottleOk(lastTriggeredAt: number | undefined, now: number, cooldownMs = 60_000): boolean {
+export function supplyThrottleOk(
+	lastTriggeredAt: number | undefined,
+	now: number,
+	cooldownMs = 60_000
+): boolean {
 	return lastTriggeredAt === undefined || now - lastTriggeredAt >= cooldownMs;
 }
 ```
@@ -554,14 +588,21 @@ Add an internal mutation + the public action in `generationPipeline.ts`:
 export const readSupplyState = internalQuery({
 	args: {},
 	handler: async (ctx) =>
-		(await ctx.db.query('supplyState').withIndex('by_key', (q) => q.eq('key', 'global')).unique())
-			?.lastTriggeredAt
+		(
+			await ctx.db
+				.query('supplyState')
+				.withIndex('by_key', (q) => q.eq('key', 'global'))
+				.unique()
+		)?.lastTriggeredAt
 });
 
 export const markSupplyTriggered = internalMutation({
 	args: { now: v.number() },
 	handler: async (ctx, { now }) => {
-		const row = await ctx.db.query('supplyState').withIndex('by_key', (q) => q.eq('key', 'global')).unique();
+		const row = await ctx.db
+			.query('supplyState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
 		if (row) await ctx.db.patch(row._id, { lastTriggeredAt: now });
 		else await ctx.db.insert('supplyState', { key: 'global', lastTriggeredAt: now });
 	}
@@ -617,11 +658,13 @@ git commit -m "feat: running-low supply trigger + faster generation cadence"
 ### Task 7: Narrow — stop building/using `userProfiles.seen`
 
 **Files:**
+
 - Modify: `convex/profile.ts` (recompute no longer accumulates/writes `seen`)
 - Modify: `convex/profile.ts` return validator + any test asserting `seen`
 - Test: `convex/events.test.ts` or wherever recompute is asserted
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `profile.recompute` returns `{ concepts, notInterested }` (no `seen`); `userProfiles` docs no longer get a `seen` array written (the field stays optional/unused in the schema; full removal is a later field-clear migration).
 
@@ -658,6 +701,7 @@ Run: `bun run check` (0 errors); `bun run test:unit`; `bun run test:convex`; `bu
 git push origin main          # Vercel auto-deploys the frontend
 bunx convex dev --once        # pushes backend to the LIVE dev deployment (adept-spoonbill-177)
 ```
+
 (Do NOT use `convex deploy` — that targets the unused prod deployment.)
 
 - [ ] **Step 3: Run the seen migration on the live deployment**
@@ -665,6 +709,7 @@ bunx convex dev --once        # pushes backend to the LIVE dev deployment (adept
 ```bash
 npx convex run seenMigration:backfillSeen '{"limit":500}'
 ```
+
 Re-run until `profilesScanned` is 0. (No `--prod`.)
 
 - [ ] **Step 4: Confirm on the live site**

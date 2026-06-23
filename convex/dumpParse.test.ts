@@ -4,7 +4,10 @@ import { parsePageviewLine } from './dumpParse';
 describe('parsePageviewLine', () => {
 	it('parses an en main-namespace article line', () => {
 		expect(parsePageviewLine('en Cleopatra 540 0')).toEqual({ title: 'Cleopatra', views: 540 });
-		expect(parsePageviewLine('en Marie_Curie 1200 0')).toEqual({ title: 'Marie_Curie', views: 1200 });
+		expect(parsePageviewLine('en Marie_Curie 1200 0')).toEqual({
+			title: 'Marie_Curie',
+			views: 1200
+		});
 	});
 	it('rejects other domains, junk titles, and malformed lines', () => {
 		expect(parsePageviewLine('de Berlin 900 0')).toBeNull(); // not en

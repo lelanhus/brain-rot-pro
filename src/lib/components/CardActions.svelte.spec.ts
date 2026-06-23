@@ -9,7 +9,13 @@ import '../../app.css';
 test('fires save and not-interested handlers; reflects saved state in the label', async () => {
 	const onSave = vi.fn();
 	const onNotInterested = vi.fn();
-	render(CardActions, { saved: false, onSave, following: false, onFollow: vi.fn(), onNotInterested });
+	render(CardActions, {
+		saved: false,
+		onSave,
+		following: false,
+		onFollow: vi.fn(),
+		onNotInterested
+	});
 
 	const save = page.getByRole('button', { name: 'Save' });
 	await expect.element(save).toBeInTheDocument();
@@ -22,7 +28,13 @@ test('fires save and not-interested handlers; reflects saved state in the label'
 });
 
 test('shows a saved label when saved', async () => {
-	render(CardActions, { saved: true, onSave: () => {}, following: false, onFollow: () => {}, onNotInterested: () => {} });
+	render(CardActions, {
+		saved: true,
+		onSave: () => {},
+		following: false,
+		onFollow: () => {},
+		onNotInterested: () => {}
+	});
 	await expect.element(page.getByRole('button', { name: /Saved/ })).toBeInTheDocument();
 });
 
@@ -30,7 +42,13 @@ test('shows a saved label when saved', async () => {
 // without ballooning so large they overlap the card text on a phone — the bug
 // this guards. Sizing is viewport-driven (smaller on phones), so check both.
 test('action buttons are a ≥44px tap target and shrink on phone widths', async () => {
-	render(CardActions, { saved: false, onSave: () => {}, following: false, onFollow: () => {}, onNotInterested: () => {} });
+	render(CardActions, {
+		saved: false,
+		onSave: () => {},
+		following: false,
+		onFollow: () => {},
+		onNotInterested: () => {}
+	});
 	const save = page.getByRole('button', { name: 'Save' }).element() as HTMLElement;
 
 	await page.viewport(1280, 800);

@@ -51,8 +51,13 @@
 		onclick={onFollow}
 	>
 		<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
-			<path d="M12 21s-7-4.35-9.5-8.5C1 9 3 5 6.5 5 9 5 12 8 12 8s3-3 5.5-3C21 5 23 9 21.5 12.5 19 16.65 12 21 12 21z"
-				fill={following ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+			<path
+				d="M12 21s-7-4.35-9.5-8.5C1 9 3 5 6.5 5 9 5 12 8 12 8s3-3 5.5-3C21 5 23 9 21.5 12.5 19 16.65 12 21 12 21z"
+				fill={following ? 'currentColor' : 'none'}
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linejoin="round"
+			/>
 		</svg>
 		<span class="vh">{following ? 'Following topic' : 'Follow topic'}</span>
 	</button>

@@ -73,12 +73,34 @@ export const unseen = query({
 		unseenCards.sort(
 			(a, b) =>
 				scoreByTaste(
-					{ conceptTags: b.conceptTags, embedding: b.embedding, slug: toSlug(b.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: b.shuffleKey, focusConcept: args.focusConcept, interestSlugs, threadEmbedding }
+					{
+						conceptTags: b.conceptTags,
+						embedding: b.embedding,
+						slug: toSlug(b.source.articleTitle)
+					},
+					{
+						tasteVector,
+						weights,
+						shuffleKey: b.shuffleKey,
+						focusConcept: args.focusConcept,
+						interestSlugs,
+						threadEmbedding
+					}
 				) -
 				scoreByTaste(
-					{ conceptTags: a.conceptTags, embedding: a.embedding, slug: toSlug(a.source.articleTitle) },
-					{ tasteVector, weights, shuffleKey: a.shuffleKey, focusConcept: args.focusConcept, interestSlugs, threadEmbedding }
+					{
+						conceptTags: a.conceptTags,
+						embedding: a.embedding,
+						slug: toSlug(a.source.articleTitle)
+					},
+					{
+						tasteVector,
+						weights,
+						shuffleKey: a.shuffleKey,
+						focusConcept: args.focusConcept,
+						interestSlugs,
+						threadEmbedding
+					}
 				)
 		);
 

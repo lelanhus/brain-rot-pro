@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isRealArticleTitle, toSlug, mergePageviews, isQualityTopic, evergreenFromStatus } from './topicsLogic';
+import {
+	isRealArticleTitle,
+	toSlug,
+	mergePageviews,
+	isQualityTopic,
+	evergreenFromStatus
+} from './topicsLogic';
 
 describe('isRealArticleTitle', () => {
 	it('accepts real articles (underscored or spaced)', () => {

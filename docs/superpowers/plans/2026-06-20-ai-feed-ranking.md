@@ -24,10 +24,12 @@
 ### Task 1: `buildTasteVector` pure helper + constants
 
 **Files:**
+
 - Modify: `convex/profileLogic.ts` (add constants + `buildTasteVector`)
 - Test: `convex/profileLogic.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `EVENT_DELTA` (in `profileLogic.ts`).
 - Produces: `buildTasteVector(events, embeddingByCard, now) => number[] | undefined` and `export const TASTE_HALFLIFE_MS`.
 
@@ -142,11 +144,13 @@ git commit -m "feat: buildTasteVector — recency-weighted taste embedding"
 ### Task 2: Store `tasteVector` on the profile (schema + recompute)
 
 **Files:**
+
 - Modify: `convex/schema.ts` (add `userProfiles.tasteVector`)
 - Modify: `convex/profile.ts` (`recompute` builds + stores it)
 - Test: `convex/profile` coverage — add to an existing convex test file or create `convex/profile.test.ts`
 
 **Interfaces:**
+
 - Consumes: `buildTasteVector` (Task 1).
 - Produces: `userProfiles.tasteVector?: number[]`; `recompute` writes it (or omits at cold-start).
 
@@ -167,18 +171,30 @@ test('recompute stores a tasteVector from positively-engaged embedded cards', as
 	const deviceId = 'taste-dev';
 	const cardId = await t.run(async (ctx) =>
 		ctx.db.insert('knowledgeCards', {
-			hook: 'h', body: 'a'.repeat(100), format: 'object_story', conceptTags: ['t'],
+			hook: 'h',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
 			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
-			status: 'published', shuffleKey: 0.5, createdAt: 0,
-			embedding: Array(1536).fill(0).map((_, i) => (i === 0 ? 1 : 0))
+			status: 'published',
+			shuffleKey: 0.5,
+			createdAt: 0,
+			embedding: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 0 ? 1 : 0))
 		})
 	);
 	await t.mutation(api.events.log, {
-		deviceId, sessionId: 's', events: [{ type: 'save', cardId, ts: 1 }]
+		deviceId,
+		sessionId: 's',
+		events: [{ type: 'save', cardId, ts: 1 }]
 	});
 	await t.mutation(api.profile.recompute, { deviceId });
 	const profile = await t.run(async (ctx) =>
-		ctx.db.query('userProfiles').withIndex('by_device', (q) => q.eq('deviceId', deviceId)).unique()
+		ctx.db
+			.query('userProfiles')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.unique()
 	);
 	expect(profile?.tasteVector).toBeDefined();
 	expect(profile?.tasteVector?.length).toBe(1536);
@@ -189,7 +205,10 @@ test('recompute omits tasteVector at cold-start (no embedded positive engagement
 	const deviceId = 'cold-dev';
 	await t.mutation(api.profile.recompute, { deviceId });
 	const profile = await t.run(async (ctx) =>
-		ctx.db.query('userProfiles').withIndex('by_device', (q) => q.eq('deviceId', deviceId)).unique()
+		ctx.db
+			.query('userProfiles')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.unique()
 	);
 	expect(profile?.tasteVector).toBeUndefined();
 });
@@ -217,43 +236,43 @@ In `convex/schema.ts`, in `userProfiles`, add after `notInterested`:
 In `convex/profile.ts`: import `buildTasteVector` (`import { accumulateWeights, buildTasteVector } from './profileLogic';`). The handler already fetches `cards`; build an embedding map and call the helper, then store conditionally. Replace the profile-write section:
 
 ```ts
-		const tagsByCard: Record<string, string[]> = {};
-		const embeddingByCard: Record<string, number[] | undefined> = {};
-		for (const card of cards) {
-			if (card) {
-				tagsByCard[card._id] = card.conceptTags;
-				embeddingByCard[card._id] = card.embedding;
-			}
-		}
+const tagsByCard: Record<string, string[]> = {};
+const embeddingByCard: Record<string, number[] | undefined> = {};
+for (const card of cards) {
+	if (card) {
+		tagsByCard[card._id] = card.conceptTags;
+		embeddingByCard[card._id] = card.embedding;
+	}
+}
 
-		const weights = accumulateWeights(events, tagsByCard);
-		const notInterested = new Set<Id<'knowledgeCards'>>();
-		for (const e of events) {
-			if (e.cardId === undefined || e.cardId === null) continue;
-			if (e.type === 'not_interested') notInterested.add(e.cardId);
-		}
-		const tasteVector = buildTasteVector(events, embeddingByCard, Date.now());
+const weights = accumulateWeights(events, tagsByCard);
+const notInterested = new Set<Id<'knowledgeCards'>>();
+for (const e of events) {
+	if (e.cardId === undefined || e.cardId === null) continue;
+	if (e.type === 'not_interested') notInterested.add(e.cardId);
+}
+const tasteVector = buildTasteVector(events, embeddingByCard, Date.now());
 
-		const profile = {
-			deviceId: args.deviceId,
-			conceptWeights: Object.entries(weights).map(([concept, weight]) => ({ concept, weight })),
-			notInterested: [...notInterested],
-			updatedAt: Date.now()
-		};
+const profile = {
+	deviceId: args.deviceId,
+	conceptWeights: Object.entries(weights).map(([concept, weight]) => ({ concept, weight })),
+	notInterested: [...notInterested],
+	updatedAt: Date.now()
+};
 
-		const existing = await ctx.db
-			.query('userProfiles')
-			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
-			.unique();
-		if (existing) {
-			// patch with tasteVector set-or-cleared (Convex removes a field set to undefined).
-			await ctx.db.patch(existing._id, { ...profile, tasteVector });
-		} else {
-			await ctx.db.insert(
-				'userProfiles',
-				tasteVector !== undefined ? { ...profile, tasteVector } : profile
-			);
-		}
+const existing = await ctx.db
+	.query('userProfiles')
+	.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
+	.unique();
+if (existing) {
+	// patch with tasteVector set-or-cleared (Convex removes a field set to undefined).
+	await ctx.db.patch(existing._id, { ...profile, tasteVector });
+} else {
+	await ctx.db.insert(
+		'userProfiles',
+		tasteVector !== undefined ? { ...profile, tasteVector } : profile
+	);
+}
 ```
 
 (Keep the existing `return { concepts, notInterested }`.)
@@ -274,10 +293,12 @@ git commit -m "feat: store per-user tasteVector in recompute"
 ### Task 3: `scoreByTaste` pure ranker
 
 **Files:**
+
 - Modify: `convex/profileLogic.ts` (add `RELEVANCE_WEIGHT` + `scoreByTaste`)
 - Test: `convex/profileLogic.test.ts`
 
 **Interfaces:**
+
 - Consumes: `cosineSimilarity` (from `./embedLogic`), existing `scoreCard`, `WILDCARD_WEIGHT`, `FOCUS_BOOST`.
 - Produces: `scoreByTaste(card, ctx) => number` where `card = { conceptTags: string[]; embedding?: number[] }`, `ctx = { tasteVector?: number[]; weights: Record<string, number>; shuffleKey: number; focusConcept?: string | null }`.
 
@@ -395,10 +416,12 @@ git commit -m "feat: scoreByTaste — cosine+novelty ranker with concept-affinit
 ### Task 4: Rank `feed.unseen` by taste
 
 **Files:**
+
 - Modify: `convex/feed.ts` (use `scoreByTaste` + `profile.tasteVector`)
 - Test: `convex/feed.test.ts`
 
 **Interfaces:**
+
 - Consumes: `scoreByTaste` (Task 3), `userProfiles.tasteVector` (Task 2).
 
 - [ ] **Step 1: Write the failing test**
@@ -411,29 +434,49 @@ test('feed.unseen ranks an on-taste card ahead of an off-taste one', async () =>
 	const deviceId = 'rank-dev';
 	const near = await t.run(async (ctx) =>
 		ctx.db.insert('knowledgeCards', {
-			hook: 'near', body: 'a'.repeat(100), format: 'object_story', conceptTags: ['t'],
+			hook: 'near',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
 			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
-			status: 'published', shuffleKey: 0.1, createdAt: 0,
-			embedding: Array(1536).fill(0).map((_, i) => (i === 0 ? 1 : 0))
+			status: 'published',
+			shuffleKey: 0.1,
+			createdAt: 0,
+			embedding: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 0 ? 1 : 0))
 		})
 	);
 	const far = await t.run(async (ctx) =>
 		ctx.db.insert('knowledgeCards', {
-			hook: 'far', body: 'a'.repeat(100), format: 'object_story', conceptTags: ['t'],
+			hook: 'far',
+			body: 'a'.repeat(100),
+			format: 'object_story',
+			conceptTags: ['t'],
 			source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
-			status: 'published', shuffleKey: 0.9, createdAt: 0,
-			embedding: Array(1536).fill(0).map((_, i) => (i === 1 ? 1 : 0))
+			status: 'published',
+			shuffleKey: 0.9,
+			createdAt: 0,
+			embedding: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 1 ? 1 : 0))
 		})
 	);
 	// taste = the 'near' embedding direction
 	await t.run(async (ctx) =>
 		ctx.db.insert('userProfiles', {
-			deviceId, conceptWeights: [], notInterested: [], updatedAt: 0,
-			tasteVector: Array(1536).fill(0).map((_, i) => (i === 0 ? 1 : 0))
+			deviceId,
+			conceptWeights: [],
+			notInterested: [],
+			updatedAt: 0,
+			tasteVector: Array(1536)
+				.fill(0)
+				.map((_, i) => (i === 0 ? 1 : 0))
 		})
 	);
 	const res = await t.query(api.feed.unseen, {
-		deviceId, paginationOpts: { numItems: 50, cursor: null }
+		deviceId,
+		paginationOpts: { numItems: 50, cursor: null }
 	});
 	const ids = res.page.map((c) => c._id);
 	expect(ids.indexOf(near)).toBeLessThan(ids.indexOf(far)); // on-taste first despite higher far shuffleKey
@@ -452,22 +495,22 @@ Expected: FAIL — current ranking uses `scoreCard` (ignores embedding), so the 
 In `convex/feed.ts`: change the import `import { scoreCard } from './profileLogic';` to `import { scoreByTaste } from './profileLogic';`. Read the taste vector and rank with it. Replace the sort block:
 
 ```ts
-		const tasteVector = profile?.tasteVector;
-		unseenCards.sort(
-			(a, b) =>
-				scoreByTaste(b, {
-					tasteVector,
-					weights,
-					shuffleKey: b.shuffleKey,
-					focusConcept: args.focusConcept
-				}) -
-				scoreByTaste(a, {
-					tasteVector,
-					weights,
-					shuffleKey: a.shuffleKey,
-					focusConcept: args.focusConcept
-				})
-		);
+const tasteVector = profile?.tasteVector;
+unseenCards.sort(
+	(a, b) =>
+		scoreByTaste(b, {
+			tasteVector,
+			weights,
+			shuffleKey: b.shuffleKey,
+			focusConcept: args.focusConcept
+		}) -
+		scoreByTaste(a, {
+			tasteVector,
+			weights,
+			shuffleKey: a.shuffleKey,
+			focusConcept: args.focusConcept
+		})
+);
 ```
 
 Update the file's top doc comment to say ranking is taste-aware (cosine + novelty) with concept-affinity fallback.
@@ -498,14 +541,17 @@ Run: `bun run check` (0 errors); `bun run test:unit`; `bun run test:convex`; `bu
 ```bash
 bunx convex dev --once   # pushes to the LIVE dev deployment (adept-spoonbill-177)
 ```
+
 (No frontend change in this feature; nothing to push for Vercel. If `bun run check`/codegen changed `convex/_generated`, commit it and `git push origin main`.)
 
 - [ ] **Step 3: Recompute profiles so taste vectors populate**
 
 Taste vectors are built on `recompute` (runs on session start). To populate immediately for existing devices, recompute is per-device; the live site re-runs it on next visit. Optionally spot-check one device:
+
 ```bash
 npx convex run profile:recompute '{"deviceId":"<deviceId>"}'
 ```
+
 then confirm its profile has a `tasteVector` via `npx convex run feed:unseen '{"deviceId":"<id>","paginationOpts":{"numItems":5,"cursor":null}}'` (no `--prod`).
 
 - [ ] **Step 4: Confirm on the live site**

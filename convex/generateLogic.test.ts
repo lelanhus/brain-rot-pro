@@ -30,15 +30,18 @@ describe('buildGenerationPrompt', () => {
 		});
 		expect(base).not.toContain('DISTINCT');
 
-		const withEmpty = buildGenerationPrompt({ title: 'Roman concrete', paragraphs: ['Para one.'] }, []);
+		const withEmpty = buildGenerationPrompt(
+			{ title: 'Roman concrete', paragraphs: ['Para one.'] },
+			[]
+		);
 		expect(withEmpty).not.toContain('DISTINCT');
 	});
 
 	it('includes already-covered hooks in the avoid-hooks line', () => {
-		const prompt = buildGenerationPrompt(
-			{ title: 'Roman concrete', paragraphs: ['Para one.'] },
-			['Romans used volcanic ash', 'It hardened underwater']
-		);
+		const prompt = buildGenerationPrompt({ title: 'Roman concrete', paragraphs: ['Para one.'] }, [
+			'Romans used volcanic ash',
+			'It hardened underwater'
+		]);
 		expect(prompt).toContain('DISTINCT');
 		expect(prompt).toContain('Romans used volcanic ash');
 		expect(prompt).toContain('It hardened underwater');
