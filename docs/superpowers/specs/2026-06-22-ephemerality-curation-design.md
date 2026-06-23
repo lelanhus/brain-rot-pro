@@ -12,7 +12,7 @@ The feed is tonally split: delightful evergreen facts (wombat cube poop, Chernob
 
 ## Decisions (YAGNI)
 
-- **Ephemerality = recency, measured from Wikidata temporal claims + a title fast-path.** Parse `point in time` (P585), `start time` (P580), `inception` (P571) → extract years. A topic is ephemeral if any temporal-anchor year is within `nowYear − windowYears`, **or** its title matches an ephemeral pattern (`^List of `, or a 4-digit year token that itself falls inside the same `[nowYear − windowYears, nowYear]` window — derived from `nowYear`, not hardcoded). `windowYears = 2` (blocks 2025–2026). Keeps WWI (1914), Chernobyl (1986), Dreadnought (1906).
+- **Ephemerality = recency, measured from Wikidata temporal claims + a title fast-path.** Parse `point in time` (P585), `start time` (P580), `inception` (P571) → extract years. A topic is ephemeral if any temporal-anchor year is within `nowYear − windowYears`, **or** its title contains a 4-digit year token that itself falls inside the same `[nowYear − windowYears, nowYear]` window (derived from `nowYear`, not hardcoded). (We deliberately avoid a blanket `^List of ` rule — it would false-positive evergreen lists like "List of chemical elements"; "List of attacks during the 2026 Iran war" is caught by its year token instead.) `windowYears = 2` (blocks 2025–2026). Keeps WWI (1914), Chernobyl (1986), Dreadnought (1906).
 - **Ephemeral beats allow.** Folded into `decideArticleStatus` ahead of the allowlist return, reusing the existing "block wins over allow" precedence. Result is the existing `filtered_out` status → existing `evergreen: false` flag → never generated, and auto-excluded from cold-start default order. **No changes to `generationPipeline` or `crons`.**
 - **`nowYear` is injected from the action layer.** No `Date` in pure logic (ADR-007 determinism discipline — same rule as `shuffleKey`). `windowYears` is a constant (`EPHEMERAL_WINDOW_YEARS = 2`), not a stored config.
 - **Fail-open on absence.** Missing/failed Wikidata temporal data does **not** block (avoid over-blocking); the title fast-path still applies. Consistent with "Wikidata leads, heuristic catches the tail."
@@ -32,7 +32,7 @@ The feed is tonally split: delightful evergreen facts (wombat cube poop, Chernob
 - `convex/curation.ts` (**new**): retire-existing pass.
   - `auditEphemeralPublished` (internalAction) — over `published` cards, group by distinct source topic; title fast-path pre-filter; re-fetch Wikidata per remaining distinct topic; run `isEphemeral`. Returns `{ scanned, distinctTopics, wouldSuppress, samples: Array<{cardId, title, reason}> }`. **Mutates nothing.**
   - `suppressEphemeralPublished` (internalAction) — same scan with `{ apply: true }`; flips matched cards `published → suppressed` via an internal mutation; returns the same report plus `suppressed: count`. Bounded per run; logs each decision. Un-suppress is the existing inverse.
-  - Surfaced in `/admin` behind the existing admin token (read-only audit + an explicit apply action).
+  - Exposed as a public `action` runnable via `npx convex run` (matching the existing `ingest.ingestTitles` dev-tooling precedent) — appropriate for an occasional maintenance sweep, far less surface than a new admin route.
 
 ## Data flow
 
