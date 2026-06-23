@@ -21,6 +21,7 @@ import type * as aiKey from "../aiKey.js";
 import type * as auth from "../auth.js";
 import type * as cards from "../cards.js";
 import type * as crons from "../crons.js";
+import type * as curation from "../curation.js";
 import type * as discovery from "../discovery.js";
 import type * as discoveryLogic from "../discoveryLogic.js";
 import type * as dumpParse from "../dumpParse.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   cards: typeof cards;
   crons: typeof crons;
+  curation: typeof curation;
   discovery: typeof discovery;
   discoveryLogic: typeof discoveryLogic;
   dumpParse: typeof dumpParse;

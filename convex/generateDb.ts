@@ -45,16 +45,16 @@ export const cardHooksForArticle = internalQuery({
 	}
 });
 
-/** Published cards whose body exceeds the one-screen cap — the shorten work-list. */
+/** Published cards whose body OR hook exceeds its one-screen cap — the shorten work-list. */
 export const overlongPublished = internalQuery({
-	args: { cap: v.number(), limit: v.number() },
-	handler: async (ctx, { cap, limit }) => {
+	args: { cap: v.number(), hookCap: v.number(), limit: v.number() },
+	handler: async (ctx, { cap, hookCap, limit }) => {
 		const cards = await ctx.db
 			.query('knowledgeCards')
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
 			.collect();
 		return cards
-			.filter((c) => c.body.length > cap)
+			.filter((c) => c.body.length > cap || c.hook.length > hookCap)
 			.slice(0, limit)
 			.map((c) => ({ _id: c._id, articleId: c.generation?.sourceArticleId ?? null }));
 	}

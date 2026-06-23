@@ -33,7 +33,16 @@ export const suppressCards = internalMutation({
  */
 export const auditEphemeralPublished = action({
 	args: { apply: v.optional(v.boolean()) },
-	handler: async (ctx, { apply }) => {
+	handler: async (
+		ctx,
+		{ apply }
+	): Promise<{
+		scanned: number;
+		distinctTopics: number;
+		wouldSuppress: number;
+		applied: number;
+		samples: Array<{ title: string; count: number }>;
+	}> => {
 		const sources = await ctx.runQuery(internal.curation.listPublishedSources, {});
 		const byTitle = new Map<string, Id<'knowledgeCards'>[]>();
 		for (const { cardId, title } of sources) {

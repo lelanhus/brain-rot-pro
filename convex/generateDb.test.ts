@@ -54,9 +54,71 @@ test('overlongPublished returns only published cards over the cap', async () => 
 		});
 	});
 
-	const rows = await t.query(internal.generateDb.overlongPublished, { cap: 480, limit: 50 });
+	const rows = await t.query(internal.generateDb.overlongPublished, {
+		cap: 480,
+		hookCap: 90,
+		limit: 50
+	});
 	expect(rows).toHaveLength(1);
 	expect(rows[0].articleId).toBe(articleId);
+});
+
+test('overlongPublished also matches cards whose hook exceeds the hook cap', async () => {
+	const t = convexTest(schema, modules);
+	const articleId = await t.run(async (ctx) =>
+		ctx.db.insert('sourceArticles', {
+			pageId: 9,
+			title: 'T',
+			url: 'u',
+			revisionId: 1,
+			extract: '',
+			paragraphs: ['p'],
+			categories: [],
+			status: 'fetched',
+			fetchedAt: 0
+		})
+	);
+	const base = {
+		body: 'short body',
+		whyItMatters: 'w',
+		format: 'object_story' as const,
+		conceptTags: ['t'],
+		shuffleKey: 0.5,
+		createdAt: 0,
+		source: { articleTitle: 'T', articleUrl: 'u', revisionId: 1 as number | null, sourceSpan: 's' },
+		generation: {
+			generationModel: 'gm',
+			validationModel: 'vm',
+			supportScore: 0.9,
+			promptVersion: '1',
+			sourceArticleId: articleId,
+			generatedAt: 0
+		}
+	};
+	await t.run(async (ctx) => {
+		// (a) long hook + short body → matched
+		await ctx.db.insert('knowledgeCards', {
+			...base,
+			hook: 'h'.repeat(150),
+			status: 'published'
+		});
+		// (b) short hook + long body → matched
+		await ctx.db.insert('knowledgeCards', {
+			...base,
+			hook: 'short',
+			body: 'a'.repeat(600),
+			status: 'published'
+		});
+		// (c) both short → not matched
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'short', status: 'published' });
+	});
+
+	const rows = await t.query(internal.generateDb.overlongPublished, {
+		cap: 480,
+		hookCap: 90,
+		limit: 50
+	});
+	expect(rows).toHaveLength(2);
 });
 
 test('cardHooksForArticle returns hooks of published cards for the article', async () => {

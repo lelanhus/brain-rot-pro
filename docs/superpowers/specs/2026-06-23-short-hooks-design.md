@@ -20,7 +20,7 @@ This is sub-project 3 of "content & feel." Scope: hook length only.
 - **Enforce by generating short, not by truncating.** A hook is one complete sentence — trimming it would break it (unlike the body, which `clampBody` trims at a sentence boundary). So: schema `.max(HOOK_MAX_CHARS)` as the hard ceiling + an explicit prompt rule for one short line. An occasional model overrun fails schema validation and the existing pipeline retries / records `validation_failed` — better no card than a long one.
 - **Backfill by reusing the proven regenerate flow — no new LLM pipeline.** The existing `generate.backfillShortenOverlong` already suppresses an oversized published card and regenerates a fresh one from its source article via `generateFromArticle` (which now produces a short hook), going through the same auto-publish bar (grounded + cross-model validated ≥ threshold) and re-embedding. Extend its work-list (`generateDb.overlongPublished`) to also match over-long _hooks_, and pass a `hookCap`.
 - **Regeneration may surface a different fact/angle** than the original long-hook card (the existing body backfill already behaves this way — it uses `avoidHooks` and picks the best-supported paragraph). Accepted; preserving the exact original fact would require a separate hook-only LLM pipeline (rejected as more work for little gain).
-- **Reversible-ish:** the backfill suppresses originals (status flip, reversible) before regenerating; a failed regeneration leaves the original suppressed (same as the existing body backfill — its known behavior).
+- **Lossless:** the backfill suppresses an original only while regenerating (so the fresh card isn't deduped against it), and **restores it to `published` if no valid short replacement is produced** (validation_failed / duplicate / error). Hand-seeded cards (no source article) are skipped entirely. So a card is removed only when a real short replacement takes its place. (This improves on the existing body backfill, which left such cards suppressed.)
 - **CSS line-clamp:5 stays** (sub-project 2's safety net); capped hooks never reach it. Out of scope.
 
 ## Components
@@ -47,14 +47,15 @@ Backfill (existing, run via `npx convex run`):
     → overlongPublished(body.length>cap OR hook.length>hookCap)
     → for each: setCardStatus(suppressed) → generateFromArticle(articleId)
        → fresh short-hook card → validate ≥ threshold → published + embedded
-    → report { scanned, regenerated, suppressedOnly, failed }
+       (restore the original to published if regeneration doesn't publish — lossless)
+    → report { scanned, regenerated, keptUnchanged, errored }
 ```
 
 ## Error handling / edge cases
 
 - Model returns a hook > 90: schema validation fails; existing pipeline retries / marks `validation_failed` (no long hook ships).
-- Backfill card has no source `articleId` (hand-seeded): existing behavior — suppressed only, counted in `suppressedOnly` (no regeneration possible). Same as today's body backfill.
-- Regeneration fails validation: original stays suppressed, counted in `failed`/`suppressedOnly` — known existing behavior, not introduced here.
+- Backfill card has no source `articleId` (hand-seeded): skipped untouched (left `published`), counted in `keptUnchanged` — never removed.
+- Regeneration fails validation / returns duplicate: original restored to `published`, counted in `keptUnchanged` (it keeps its long hook but stays in the feed). An exception restores it too, counted in `errored`. No card is lost.
 - A card over-long on BOTH body and hook: matched once by the OR filter, regenerated once. No double-processing.
 
 ## Testing
