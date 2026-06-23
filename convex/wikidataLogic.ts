@@ -17,6 +17,9 @@
 
 import { isEvergreenArticle } from './ingestUtils';
 
+/** Recency window: a topic is ephemeral if anchored within the last N years. */
+export const EPHEMERAL_WINDOW_YEARS = 2;
+
 /** `instance of` (P31). */
 export const HUMAN = 'Q5';
 
@@ -94,6 +97,30 @@ export type TopicVerdict = { verdict: 'allow' | 'block' | 'unknown'; reason: str
 const hits = (ids: string[], set: Set<string>) => ids.filter((id) => set.has(id));
 
 /**
+ * Recency gate orthogonal to topic *type*: a topic is ephemeral when a Wikidata
+ * temporal anchor (point in time / start time / inception) — or a 4-digit year
+ * token in its title — falls inside [nowYear - windowYears, nowYear]. `nowYear`
+ * is injected (no Date in pure logic, ADR-007). Fail-open: empty temporalYears
+ * and a yearless title → not ephemeral.
+ */
+export function isEphemeral(
+	args: { temporalYears: number[]; title: string },
+	nowYear: number,
+	windowYears: number = EPHEMERAL_WINDOW_YEARS
+): { ephemeral: boolean; reason: string } {
+	const minYear = nowYear - windowYears;
+	const inWindow = (y: number) => Number.isFinite(y) && y >= minYear && y <= nowYear;
+	for (const y of args.temporalYears) {
+		if (inWindow(y)) return { ephemeral: true, reason: `recent: ${y}` };
+	}
+	for (const tok of args.title.match(/\b\d{4}\b/g) ?? []) {
+		const y = Number(tok);
+		if (inWindow(y)) return { ephemeral: true, reason: `title-year: ${y}` };
+	}
+	return { ephemeral: false, reason: '' };
+}
+
+/**
  * Classify a topic from its Wikidata claims. Block wins over allow (so a film
  * directed by a scientist is still a film). People are judged by occupation;
  * anything we don't recognize is `unknown` for the caller to fall back on.
@@ -127,10 +154,25 @@ export type ArticleStatus = 'fetched' | 'filtered_out';
  * category heuristic. So the allowlist *leads* and the heuristic catches the
  * long tail — strictly better than the heuristic alone.
  */
-export function decideArticleStatus(args: { verdict: TopicVerdict | null; categories: string[] }): {
+export function decideArticleStatus(args: {
+	verdict: TopicVerdict | null;
+	categories: string[];
+	title?: string;
+	temporalYears?: number[];
+	nowYear?: number;
+	windowYears?: number;
+}): {
 	status: ArticleStatus;
 	basis: string;
 } {
+	if (args.nowYear !== undefined) {
+		const eph = isEphemeral(
+			{ temporalYears: args.temporalYears ?? [], title: args.title ?? '' },
+			args.nowYear,
+			args.windowYears
+		);
+		if (eph.ephemeral) return { status: 'filtered_out', basis: `ephemeral: ${eph.reason}` };
+	}
 	const v = args.verdict;
 	if (v?.verdict === 'allow') return { status: 'fetched', basis: `wikidata: ${v.reason}` };
 	if (v?.verdict === 'block') return { status: 'filtered_out', basis: `wikidata: ${v.reason}` };

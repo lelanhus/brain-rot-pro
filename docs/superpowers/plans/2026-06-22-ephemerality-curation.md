@@ -23,10 +23,12 @@
 ### Task 1: Pure ephemerality logic in `wikidataLogic.ts`
 
 **Files:**
+
 - Modify: `convex/wikidataLogic.ts` (add `EPHEMERAL_WINDOW_YEARS`, `isEphemeral`; extend `decideArticleStatus`)
 - Test: `convex/wikidataLogic.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `TopicVerdict`, `decideArticleStatus` from this file.
 - Produces:
   - `EPHEMERAL_WINDOW_YEARS: number` (= 2)
@@ -179,10 +181,12 @@ git commit -m "feat(curation): pure ephemerality gate (recency beats allowlist)"
 ### Task 2: Parse temporal claims and thread recency through ingest
 
 **Files:**
+
 - Modify: `convex/ingest.ts` (`fetchWikidataClaims` → add `temporalYears`; `classifyTitle` → return `ephemeral` + pass recency; `ingestTitles` + `ingestOne` → pass recency to `decideArticleStatus`)
 - Test: `convex/ingest.test.ts`
 
 **Interfaces:**
+
 - Consumes: `isEphemeral`/`decideArticleStatus` (Task 1).
 - Produces:
   - `fetchWikidataClaims(qid)` now resolves `(TopicClaims & { image?: string; temporalYears: number[] }) | null`.
@@ -216,7 +220,12 @@ test('classifyTitle marks a recent-event topic ephemeral (and not evergreen)', a
 				json: async () => ({
 					query: {
 						pages: [
-							{ pageid: 1, title: '2026 Iran war', categories: [], pageprops: { wikibase_item: 'Q1' } }
+							{
+								pageid: 1,
+								title: '2026 Iran war',
+								categories: [],
+								pageprops: { wikibase_item: 'Q1' }
+							}
 						]
 					}
 				})
@@ -241,24 +250,22 @@ Expected: FAIL — `classifyTitle` currently returns `{ evergreen: true }` (war 
 (3a) In `fetchWikidataClaims`, add a year extractor and include `temporalYears` in the return. Insert before the `return` and update the return object:
 
 ```ts
-	const years = (prop: string): number[] =>
-		(claims[prop] ?? [])
-			.map((c) => c.mainsnak?.datavalue?.value)
-			.map((val) =>
-				val && typeof val === 'object' && 'time' in val
-					? (val as { time?: string }).time
-					: undefined
-			)
-			.map((time) => (typeof time === 'string' ? Number(time.replace(/^[+-]/, '').slice(0, 4)) : NaN))
-			.filter((y) => Number.isFinite(y));
-	const temporalYears = [...years('P585'), ...years('P580'), ...years('P571')];
-	return {
-		instanceOf: ids('P31'),
-		subclassOf: ids('P279'),
-		occupations: ids('P106'),
-		image,
-		temporalYears
-	};
+const years = (prop: string): number[] =>
+	(claims[prop] ?? [])
+		.map((c) => c.mainsnak?.datavalue?.value)
+		.map((val) =>
+			val && typeof val === 'object' && 'time' in val ? (val as { time?: string }).time : undefined
+		)
+		.map((time) => (typeof time === 'string' ? Number(time.replace(/^[+-]/, '').slice(0, 4)) : NaN))
+		.filter((y) => Number.isFinite(y));
+const temporalYears = [...years('P585'), ...years('P580'), ...years('P571')];
+return {
+	instanceOf: ids('P31'),
+	subclassOf: ids('P279'),
+	occupations: ids('P106'),
+	image,
+	temporalYears
+};
 ```
 
 Also widen the function's return type annotation:
@@ -272,16 +279,16 @@ async function fetchWikidataClaims(
 (3b) In `classifyTitle`, compute recency and return `ephemeral`. Replace the two lines that build `verdict` and call `decideArticleStatus`/return with:
 
 ```ts
-			const verdict = claims !== null ? classifyTopic(claims) : null;
-			const nowYear = new Date().getUTCFullYear();
-			const { status, basis } = decideArticleStatus({
-				verdict,
-				categories,
-				title,
-				temporalYears: claims?.temporalYears ?? [],
-				nowYear
-			});
-			return { evergreen: status === 'fetched', ephemeral: basis.startsWith('ephemeral') };
+const verdict = claims !== null ? classifyTopic(claims) : null;
+const nowYear = new Date().getUTCFullYear();
+const { status, basis } = decideArticleStatus({
+	verdict,
+	categories,
+	title,
+	temporalYears: claims?.temporalYears ?? [],
+	nowYear
+});
+return { evergreen: status === 'fetched', ephemeral: basis.startsWith('ephemeral') };
 ```
 
 And update its return-type annotation:
@@ -293,25 +300,25 @@ And update its return-type annotation:
 (3c) In `ingestTitles`, pass recency to `decideArticleStatus`. Replace the `const { status, basis } = decideArticleStatus({ verdict, categories });` line with:
 
 ```ts
-				const { status, basis } = decideArticleStatus({
-					verdict,
-					categories,
-					title: page.title,
-					temporalYears: claims?.temporalYears ?? [],
-					nowYear: new Date().getUTCFullYear()
-				});
+const { status, basis } = decideArticleStatus({
+	verdict,
+	categories,
+	title: page.title,
+	temporalYears: claims?.temporalYears ?? [],
+	nowYear: new Date().getUTCFullYear()
+});
 ```
 
 (3d) In `ingestOne`, replace `const { status } = decideArticleStatus({ verdict, categories });` with:
 
 ```ts
-		const { status } = decideArticleStatus({
-			verdict,
-			categories,
-			title: page.title,
-			temporalYears: claims?.temporalYears ?? [],
-			nowYear: new Date().getUTCFullYear()
-		});
+const { status } = decideArticleStatus({
+	verdict,
+	categories,
+	title: page.title,
+	temporalYears: claims?.temporalYears ?? [],
+	nowYear: new Date().getUTCFullYear()
+});
 ```
 
 - [ ] **Step 4: Run the test (and the existing ingest/topics suites) to verify they pass**
@@ -331,10 +338,12 @@ git commit -m "feat(curation): parse Wikidata temporal claims; thread recency in
 ### Task 3: Reversible retire pass for already-published cards (`convex/curation.ts`)
 
 **Files:**
+
 - Create: `convex/curation.ts`
 - Test: `convex/curation.test.ts`
 
 **Interfaces:**
+
 - Consumes: `internal.ingest.classifyTitle` (returns `{ evergreen, ephemeral } | null`, Task 2); the `knowledgeCards` table (`status`, `source.articleTitle`); the existing `suppressed` card status.
 - Produces:
   - `listPublishedSources` internalQuery — `{}` → `Array<{ cardId: Id<'knowledgeCards'>; title: string }>` for every `published` card.
@@ -388,7 +397,9 @@ describe('auditEphemeralPublished', () => {
 			'fetch',
 			vi.fn(async (url: string, init?: unknown) => {
 				const body = String((init as { body?: string } | undefined)?.body ?? url);
-				const isEphemeral = body.includes(encodeURIComponent(ephemeralTitle)) || url.includes(encodeURIComponent(ephemeralTitle));
+				const isEphemeral =
+					body.includes(encodeURIComponent(ephemeralTitle)) ||
+					url.includes(encodeURIComponent(ephemeralTitle));
 				if (url.includes('wikidata.org')) {
 					return {
 						ok: true,
@@ -400,7 +411,11 @@ describe('auditEphemeralPublished', () => {
 										P585: [
 											{
 												mainsnak: {
-													datavalue: { value: { time: isEphemeral ? '+2026-01-01T00:00:00Z' : '+1986-01-01T00:00:00Z' } }
+													datavalue: {
+														value: {
+															time: isEphemeral ? '+2026-01-01T00:00:00Z' : '+1986-01-01T00:00:00Z'
+														}
+													}
 												}
 											}
 										]
@@ -414,7 +429,9 @@ describe('auditEphemeralPublished', () => {
 				return {
 					ok: true,
 					json: async () => ({
-						query: { pages: [{ pageid: 1, title, categories: [], pageprops: { wikibase_item: 'Q1' } }] }
+						query: {
+							pages: [{ pageid: 1, title, categories: [], pageprops: { wikibase_item: 'Q1' } }]
+						}
 					})
 				} as unknown as Response;
 			})
@@ -583,6 +600,7 @@ git commit -m "chore(curation): regen api types after curation module" || echo "
 ## Self-Review
 
 **Spec coverage:**
+
 - Recency dimension (Wikidata P585/P580/P571 + title token) → Task 1 (`isEphemeral`) + Task 2 (parsing). ✅
 - Ephemeral beats allow, folded into `decideArticleStatus` → Task 1. ✅
 - Flows through existing `evergreen` flag → Task 2 (`classifyTitle` returns `evergreen` derived from status; `classifyTopTopics` already calls `setEvergreen`). ✅
