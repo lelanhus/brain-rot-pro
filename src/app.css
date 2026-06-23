@@ -228,6 +228,10 @@ body {
 
 .card-body > * {
 	margin: 0;
+	/* Under one-screen height pressure only .body may shrink/clip (it re-sets
+	   flex-shrink:1 below). Without this, every child shrinks and the hook's
+	   line-clamp overflow:hidden collapses it to nothing. */
+	flex-shrink: 0;
 }
 
 /* Free-licensed Commons lead image with inline attribution (ADR-005). */
