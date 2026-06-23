@@ -37,7 +37,9 @@ export const generatedCardSchema = z.object({
 		.string()
 		.min(8)
 		.max(HOOK_MAX_CHARS)
-		.describe('One short, scroll-stopping line (≤~80 chars); a poster headline, declarative, not clickbait.'),
+		.describe(
+			'One short, scroll-stopping line (≤~80 chars); a poster headline, declarative, not clickbait.'
+		),
 	body: z
 		.string()
 		.min(80)

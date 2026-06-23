@@ -190,13 +190,17 @@ export const generateFromArticle = action({
 });
 
 /**
- * One-time: shorten legacy published cards whose body exceeds the one-screen cap.
+ * One-time: shorten legacy published cards whose body OR hook exceeds its one-screen cap.
  * Suppress the old card first (so the fresh short card isn't dropped by the
  * publish-time dedup), then regenerate from its source article.
  *   npx convex run generate:backfillShortenOverlong '{"limit":50}'
  */
 export const backfillShortenOverlong = action({
-	args: { cap: v.optional(v.number()), hookCap: v.optional(v.number()), limit: v.optional(v.number()) },
+	args: {
+		cap: v.optional(v.number()),
+		hookCap: v.optional(v.number()),
+		limit: v.optional(v.number())
+	},
 	handler: async (
 		ctx,
 		args
