@@ -210,7 +210,9 @@ async function fetchWikidataClaims(
 					? (val as { time?: string }).time
 					: undefined
 			)
-			.map((time) => (typeof time === 'string' ? Number(time.replace(/^[+-]/, '').slice(0, 4)) : NaN))
+			.map((time) =>
+				typeof time === 'string' ? Number(time.replace(/^[+-]/, '').slice(0, 4)) : NaN
+			)
 			.filter((y) => Number.isFinite(y));
 	const temporalYears = [...years('P585'), ...years('P580'), ...years('P571')];
 	return {

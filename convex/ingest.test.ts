@@ -167,7 +167,12 @@ test('classifyTitle marks a recent-event topic ephemeral (and not evergreen)', a
 				json: async () => ({
 					query: {
 						pages: [
-							{ pageid: 1, title: '2026 Iran war', categories: [], pageprops: { wikibase_item: 'Q1' } }
+							{
+								pageid: 1,
+								title: '2026 Iran war',
+								categories: [],
+								pageprops: { wikibase_item: 'Q1' }
+							}
 						]
 					}
 				})

@@ -6,7 +6,7 @@
 
 The feed is tonally split: delightful evergreen facts (wombat cube poop, Chernobyl was a safety test, HMS Dreadnought, Einstein dodging the draft) interleaved with grim/ephemeral current-events news ("2026 Iran war", "List of attacks during the 2026 Iran war", the "6-7" meme). That fights the "calm, delightful, one-more-idea" product principle — most acutely at **cold start**, where a brand-new user with no profile sees the global default order before personalization can adapt.
 
-**Framing (agreed):** this is a **supply + freshness** problem, **not** editorial filtering. We do **not** add global topic blocklists — per-user taste (taste vector, dwell weighting, `not_interested`) already buries content a user dislikes, and a global "no politics/no grim" filter would wrongly stop a military-history fan from ever seeing Dreadnought. Personalization only *re-ranks the pool that exists*; it cannot (a) create cards never generated, (b) know a card is now out of date, or (c) fix the unpersonalized cold-start order. Those three are what we fix here.
+**Framing (agreed):** this is a **supply + freshness** problem, **not** editorial filtering. We do **not** add global topic blocklists — per-user taste (taste vector, dwell weighting, `not_interested`) already buries content a user dislikes, and a global "no politics/no grim" filter would wrongly stop a military-history fan from ever seeing Dreadnought. Personalization only _re-ranks the pool that exists_; it cannot (a) create cards never generated, (b) know a card is now out of date, or (c) fix the unpersonalized cold-start order. Those three are what we fix here.
 
 **Root cause:** the catalog→generation machinery is already correct in shape (catalog accumulates pageviews; generation selects topics where `evergreen !== false`; cold-start default order is `by_pageviews` filtered the same way). The single gap is that `classifyTitle` → `classifyTopic` → `decideArticleStatus` judges topic **type** but not **recency**. "2026 Iran war" is `instance of` war → allowlisted → `evergreen: true` → eligible. We add the missing **ephemerality dimension** and let it flow through the existing `evergreen` flag.
 
@@ -16,7 +16,7 @@ The feed is tonally split: delightful evergreen facts (wombat cube poop, Chernob
 - **Ephemeral beats allow.** Folded into `decideArticleStatus` ahead of the allowlist return, reusing the existing "block wins over allow" precedence. Result is the existing `filtered_out` status → existing `evergreen: false` flag → never generated, and auto-excluded from cold-start default order. **No changes to `generationPipeline` or `crons`.**
 - **`nowYear` is injected from the action layer.** No `Date` in pure logic (ADR-007 determinism discipline — same rule as `shuffleKey`). `windowYears` is a constant (`EPHEMERAL_WINDOW_YEARS = 2`), not a stored config.
 - **Fail-open on absence.** Missing/failed Wikidata temporal data does **not** block (avoid over-blocking); the title fast-path still applies. Consistent with "Wikidata leads, heuristic catches the tail."
-- **Retire existing published cards, reversibly.** Stale news *decays into being wrong* (a frozen "running attack tally" is misinformation within weeks), so ephemeral cards should leave the published pool, not just sink. Reuse the existing **`suppressed`** status (the feed serves only `published`; un-suppress restores). **Dry-run by default**, conservative, auditable.
+- **Retire existing published cards, reversibly.** Stale news _decays into being wrong_ (a frozen "running attack tally" is misinformation within weeks), so ephemeral cards should leave the published pool, not just sink. Reuse the existing **`suppressed`** status (the feed serves only `published`; un-suppress restores). **Dry-run by default**, conservative, auditable.
 - **Scope boundary.** This catches ephemeral **events/news**. It does **not** catch trending-**people** trivia whose facts are old (Biden's 1968 grades, Khamenei's 1981 injury) — those are not ephemeral and not low-quality-by-rule, so per the supply-vs-taste line they're left to personalization. Catching trending-people spikes is **deferred Approach B** (`daysSeen` sustained-popularity tracking), explicitly out of scope.
 
 ## Components
@@ -66,5 +66,5 @@ retire (admin):
 
 ## Out of scope (future)
 
-- **Approach B** — `daysSeen` sustained-popularity tracking to catch trending-*people* spikes (Biden/Khamenei/Fuentes-style), as a reinforcement on top of this.
+- **Approach B** — `daysSeen` sustained-popularity tracking to catch trending-_people_ spikes (Biden/Khamenei/Fuentes-style), as a reinforcement on top of this.
 - Visual-feel polish — the **second** sub-project of "content & feel" (its own spec).

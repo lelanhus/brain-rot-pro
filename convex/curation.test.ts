@@ -11,7 +11,12 @@ const baseCard = {
 	body: 'b',
 	format: 'surprise_fact' as const,
 	conceptTags: ['t'],
-	source: { articleTitle: 'X', articleUrl: 'https://en.wikipedia.org/wiki/X', revisionId: null, sourceSpan: 's' },
+	source: {
+		articleTitle: 'X',
+		articleUrl: 'https://en.wikipedia.org/wiki/X',
+		revisionId: null,
+		sourceSpan: 's'
+	},
 	shuffleKey: 0.5,
 	createdAt: 0
 };
@@ -44,7 +49,9 @@ describe('auditEphemeralPublished', () => {
 			'fetch',
 			vi.fn(async (url: string, init?: unknown) => {
 				const body = String((init as { body?: string } | undefined)?.body ?? url);
-				const isEphemeral = body.includes(encodeURIComponent(ephemeralTitle)) || url.includes(encodeURIComponent(ephemeralTitle));
+				const isEphemeral =
+					body.includes(encodeURIComponent(ephemeralTitle)) ||
+					url.includes(encodeURIComponent(ephemeralTitle));
 				if (url.includes('wikidata.org')) {
 					return {
 						ok: true,
@@ -56,7 +63,11 @@ describe('auditEphemeralPublished', () => {
 										P585: [
 											{
 												mainsnak: {
-													datavalue: { value: { time: isEphemeral ? '+2026-01-01T00:00:00Z' : '+1986-01-01T00:00:00Z' } }
+													datavalue: {
+														value: {
+															time: isEphemeral ? '+2026-01-01T00:00:00Z' : '+1986-01-01T00:00:00Z'
+														}
+													}
 												}
 											}
 										]
@@ -70,7 +81,9 @@ describe('auditEphemeralPublished', () => {
 				return {
 					ok: true,
 					json: async () => ({
-						query: { pages: [{ pageid: 1, title, categories: [], pageprops: { wikibase_item: 'Q1' } }] }
+						query: {
+							pages: [{ pageid: 1, title, categories: [], pageprops: { wikibase_item: 'Q1' } }]
+						}
 					})
 				} as unknown as Response;
 			})
