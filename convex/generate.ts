@@ -191,8 +191,10 @@ export const generateFromArticle = action({
 
 /**
  * One-time: shorten legacy published cards whose body OR hook exceeds its one-screen cap.
- * Suppress the old card first (so the fresh short card isn't dropped by the
- * publish-time dedup), then regenerate from its source article.
+ * Lossless: suppresses an oversized card only while regenerating from its source
+ * article, and RESTORES it if no valid short replacement publishes (so a failed
+ * regeneration never removes a card). Hand-seeded cards (no source article) are
+ * left untouched.
  *   npx convex run generate:backfillShortenOverlong '{"limit":50}'
  */
 export const backfillShortenOverlong = action({
@@ -204,35 +206,50 @@ export const backfillShortenOverlong = action({
 	handler: async (
 		ctx,
 		args
-	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number; failed: number }> => {
+	): Promise<{ scanned: number; regenerated: number; keptUnchanged: number; errored: number }> => {
 		const cap = args.cap ?? 480;
 		const hookCap = args.hookCap ?? HOOK_MAX_CHARS;
 		const limit = args.limit ?? 50;
 		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, hookCap, limit });
 		let regenerated = 0;
-		let suppressedOnly = 0;
-		let failed = 0;
+		let keptUnchanged = 0; // left published as-is (no source article, or no valid short replacement)
+		let errored = 0; // regeneration threw; original restored
 		for (const row of rows) {
+			// Hand-seeded cards have no source article to regenerate from — never remove them.
+			if (row.articleId === null) {
+				keptUnchanged++;
+				continue;
+			}
+			// Suppress first so the fresh card isn't dropped as a near-duplicate of this original.
 			await ctx.runMutation(internal.generateDb.setCardStatus, {
 				cardId: row._id,
 				status: 'suppressed'
 			});
-			if (row.articleId === null) {
-				suppressedOnly++;
-				continue;
-			}
 			try {
 				const r = await ctx.runAction(api.generate.generateFromArticle, {
 					articleId: row.articleId
 				});
-				if (r.status === 'published') regenerated++;
-				else suppressedOnly++;
+				if (r.status === 'published') {
+					regenerated++;
+				} else {
+					// No valid short replacement (validation_failed / duplicate) → restore the
+					// original so no card is lost (it keeps its long hook, but stays in the feed).
+					await ctx.runMutation(internal.generateDb.setCardStatus, {
+						cardId: row._id,
+						status: 'published'
+					});
+					keptUnchanged++;
+				}
 			} catch {
-				// Card is already suppressed; a failed regeneration just leaves it suppressed.
-				failed++;
+				// Regeneration errored → restore the original.
+				await ctx.runMutation(internal.generateDb.setCardStatus, {
+					cardId: row._id,
+					status: 'published'
+				});
+				errored++;
 			}
 		}
-		return { scanned: rows.length, regenerated, suppressedOnly, failed };
+		return { scanned: rows.length, regenerated, keptUnchanged, errored };
 	}
 });
 
