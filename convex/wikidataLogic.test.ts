@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { classifyTopic, decideArticleStatus, HUMAN } from './wikidataLogic';
+import {
+	classifyTopic,
+	decideArticleStatus,
+	isEphemeral,
+	EPHEMERAL_WINDOW_YEARS,
+	HUMAN
+} from './wikidataLogic';
 
 describe('classifyTopic', () => {
 	it('allows evergreen classes (species, element, language)', () => {
@@ -62,5 +68,56 @@ describe('decideArticleStatus', () => {
 		expect(decideArticleStatus({ verdict: null, categories: ['English footballers'] }).status).toBe(
 			'filtered_out'
 		);
+	});
+});
+
+describe('isEphemeral', () => {
+	const now = 2026;
+	it('flags a temporal anchor inside the window', () => {
+		expect(isEphemeral({ temporalYears: [2026], title: 'X' }, now).ephemeral).toBe(true);
+		expect(isEphemeral({ temporalYears: [2024], title: 'X' }, now).ephemeral).toBe(true); // window=2
+	});
+	it('keeps old temporal anchors (WWI, Chernobyl, Dreadnought)', () => {
+		expect(isEphemeral({ temporalYears: [1914], title: 'World War I' }, now).ephemeral).toBe(false);
+		expect(isEphemeral({ temporalYears: [1986], title: 'Chernobyl disaster' }, now).ephemeral).toBe(
+			false
+		);
+		expect(isEphemeral({ temporalYears: [1906], title: 'Dreadnought' }, now).ephemeral).toBe(false);
+	});
+	it('flags a recent-year token in the title (no temporal data needed)', () => {
+		expect(
+			isEphemeral({ temporalYears: [], title: 'List of attacks during the 2026 Iran war' }, now)
+				.ephemeral
+		).toBe(true);
+		expect(isEphemeral({ temporalYears: [], title: '2026 Iran war' }, now).ephemeral).toBe(true);
+	});
+	it('does not flag evergreen topics with no recent signal', () => {
+		expect(isEphemeral({ temporalYears: [], title: 'Wombat' }, now).ephemeral).toBe(false);
+		expect(
+			isEphemeral({ temporalYears: [], title: 'List of chemical elements' }, now).ephemeral
+		).toBe(false);
+	});
+	it('uses EPHEMERAL_WINDOW_YEARS = 2', () => {
+		expect(EPHEMERAL_WINDOW_YEARS).toBe(2);
+	});
+});
+
+describe('decideArticleStatus recency', () => {
+	it('ephemeral beats an allowlist allow', () => {
+		const verdict = classifyTopic({ instanceOf: ['Q198'] }); // war → allow
+		expect(verdict.verdict).toBe('allow');
+		const r = decideArticleStatus({
+			verdict,
+			categories: [],
+			title: '2026 Iran war',
+			temporalYears: [2026],
+			nowYear: 2026
+		});
+		expect(r.status).toBe('filtered_out');
+		expect(r.basis.startsWith('ephemeral')).toBe(true);
+	});
+	it('is unchanged when nowYear is omitted (back-compat)', () => {
+		const verdict = classifyTopic({ instanceOf: ['Q198'] });
+		expect(decideArticleStatus({ verdict, categories: [] }).status).toBe('fetched');
 	});
 });
