@@ -21,9 +21,9 @@ Body length is **not** the main culprit: bodies are generation-capped at `BODY_M
 
 - **Height-bounded flex column with a deliberate yield order.** The card fills exactly one screen and gives up space in this order: **image shrinks → hook clamps → body clips (with fade + read-more) → explore controls stay pinned.** Order is the whole trick.
 - **`.slot`: `min-height: 100dvh` → `height: 100dvh`.** `.card` becomes `display:flex; flex-direction:column; height:100%; min-height:0`. Existing slot padding already reserves the top inset + bottom `--action-zone` + safe-area, so "fill the card" == "fill one screen."
-- **Image yields first.** `.card-image`: `flex:0 1 auto; min-height:0; max-height: clamp(120px, 24dvh, 30dvh)`; `img { height:100%; object-fit:cover }`.
+- **Image yields first — but the attribution caption never clips.** Pin the figure (`.card-image { flex:0 0 auto }`) and cap the `<img>` with a viewport-responsive clamp (`.card-image img { max-height: clamp(110px, 22dvh, 24dvh) }`). The `dvh` makes the image give up height on short viewports while the CC-license caption (ADR-005) below it stays visible. (Shrinking the figure itself would risk clipping that caption, so we cap the image, not the figure.)
 - **Hook line-clamp safety net.** `-webkit-line-clamp: 5` (with `display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden`). Full hook text stays in the DOM with a `title` attribute for a11y/hover. The real fix (shorter hooks at generation) is out of scope.
-- **Body is the flexible region.** `.body { flex:1 1 auto; min-height:0; overflow:hidden }` + a bottom **fade mask** (`mask-image: linear-gradient(...)`) applied only when clipped, so truncation reads as "more below," not a hard cut.
+- **Body is the flexible region.** `.body { flex:0 1 auto; min-height:0; overflow:hidden }` (`flex-grow:0` so short cards keep their existing whitespace rather than stretching; `flex-shrink:1` lets a long body clip) + a bottom **fade mask** (`mask-image: linear-gradient(...)`) applied only when clipped, so truncation reads as "more below," not a hard cut.
 - **Explore controls pinned.** why/source toggles + `.chips` + `.more` become `flex:0 0 auto` at the column bottom (above the action zone) so they're always on-screen — today they fall below the fold on long cards.
 - **"Read more" only when actually clipped (progressive enhancement).** A minimal `ResizeObserver` in `Card.svelte` sets a `clipped` flag when the body's `scrollHeight > clientHeight`. When set, a "Read more" button appears and opens the **full body in the existing `.reveal-overlay`** by extending `reveal` from `'why' | 'source' | null` to also accept `'body'`. With no JS, the body just clamps with the fade and the full text remains reachable via Source / the `/c/[id]` page.
 - **No new motion.** Fade mask is static; line-clamp + overlay are motion-free; existing `prefers-reduced-motion` block is untouched. "Read more" is a real `<button>` in tab order.
@@ -33,10 +33,10 @@ Body length is **not** the main culprit: bodies are generation-capped at `BODY_M
 - `src/app.css`:
   - `.slot`: `min-height: 100dvh` → `height: 100dvh` (keep padding, snap, touch-action).
   - `.card`: add `display:flex; flex-direction:column; height:100%; min-height:0` (keep `max-width`, positioning context).
-  - `.card-body`: add `flex:1 1 auto; min-height:0` (it is already `display:flex; flex-direction:column`). This is the sibling of `.card-image` inside `.card`, so the flex chain is `.card` (col, 100%) → [`.card-image` 0 1, `.card-body` 1 1] → [tag 0 0, hook clamp, `.body` 1 1, chips/controls 0 0]. Without this, `.body`'s `flex:1 1` has no flexible parent to grow within.
-  - `.card-image`: `flex:0 1 auto; min-height:0; max-height: clamp(120px, 24dvh, 30dvh)`; ensure `.card-image img { height:100%; object-fit:cover }` (already `object-fit:cover`).
+  - `.card-body`: add `flex:1 1 auto; min-height:0` (it is already `display:flex; flex-direction:column`). This is the sibling of `.card-image` inside `.card`, so the flex chain is `.card` (col, 100%) → [`.card-image` 0 0, `.card-body` 1 1] → [tag 0 0, hook clamp, `.body` 0 1, chips/controls 0 0]. Without this, `.body`'s shrink has no bounded parent to shrink within.
+  - `.card-image`: `flex:0 0 auto` (pin — never clip the caption); `.card-image img`: `max-height: clamp(110px, 22dvh, 24dvh)` (already `object-fit:cover`).
   - `.hook`: add `display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:5; overflow:hidden` (keep type styling).
-  - `.body`: add `flex:1 1 auto; min-height:0; overflow:hidden`; add `.body[data-clipped='true'] { mask-image: linear-gradient(to bottom, #000 78%, transparent) }` (and `-webkit-mask-image`).
+  - `.body`: add `flex:0 1 auto; min-height:0; overflow:hidden`; add `.body[data-clipped='true'] { mask-image: linear-gradient(to bottom, #000 78%, transparent) }` (and `-webkit-mask-image`).
   - `.read-more`: a quiet text affordance matching `.why-toggle` (accent-free, `--fs-meta`, 44px target), shown only when clipped.
   - Reduced-motion: confirm no change needed (mask is static).
 - `src/lib/components/Card.svelte`:
