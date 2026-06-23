@@ -6,6 +6,7 @@ import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { generateObject, embed } from 'ai';
 import {
+	HOOK_MAX_CHARS,
 	PROMPT_VERSION,
 	buildGenerationPrompt,
 	buildValidationPrompt,
@@ -195,14 +196,15 @@ export const generateFromArticle = action({
  *   npx convex run generate:backfillShortenOverlong '{"limit":50}'
  */
 export const backfillShortenOverlong = action({
-	args: { cap: v.optional(v.number()), limit: v.optional(v.number()) },
+	args: { cap: v.optional(v.number()), hookCap: v.optional(v.number()), limit: v.optional(v.number()) },
 	handler: async (
 		ctx,
 		args
 	): Promise<{ scanned: number; regenerated: number; suppressedOnly: number; failed: number }> => {
 		const cap = args.cap ?? 480;
+		const hookCap = args.hookCap ?? HOOK_MAX_CHARS;
 		const limit = args.limit ?? 50;
-		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, limit });
+		const rows = await ctx.runQuery(internal.generateDb.overlongPublished, { cap, hookCap, limit });
 		let regenerated = 0;
 		let suppressedOnly = 0;
 		let failed = 0;
