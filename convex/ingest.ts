@@ -183,7 +183,7 @@ async function fetchBestImage(
  */
 async function fetchWikidataClaims(
 	qid: string
-): Promise<(TopicClaims & { image?: string }) | null> {
+): Promise<(TopicClaims & { image?: string; temporalYears: number[] }) | null> {
 	const params = new URLSearchParams({
 		action: 'wbgetentities',
 		format: 'json',
@@ -202,7 +202,24 @@ async function fetchWikidataClaims(
 			.filter((v): v is string => !!v);
 	const p18 = claims['P18']?.[0]?.mainsnak?.datavalue?.value;
 	const image = typeof p18 === 'string' ? p18 : undefined;
-	return { instanceOf: ids('P31'), subclassOf: ids('P279'), occupations: ids('P106'), image };
+	const years = (prop: string): number[] =>
+		(claims[prop] ?? [])
+			.map((c) => c.mainsnak?.datavalue?.value)
+			.map((val) =>
+				val && typeof val === 'object' && 'time' in val
+					? (val as { time?: string }).time
+					: undefined
+			)
+			.map((time) => (typeof time === 'string' ? Number(time.replace(/^[+-]/, '').slice(0, 4)) : NaN))
+			.filter((y) => Number.isFinite(y));
+	const temporalYears = [...years('P585'), ...years('P580'), ...years('P571')];
+	return {
+		instanceOf: ids('P31'),
+		subclassOf: ids('P279'),
+		occupations: ids('P106'),
+		image,
+		temporalYears
+	};
 }
 
 /**
@@ -217,7 +234,7 @@ async function fetchWikidataClaims(
  */
 export const classifyTitle = internalAction({
 	args: { title: v.string() },
-	handler: async (_ctx, { title }): Promise<{ evergreen: boolean } | null> => {
+	handler: async (_ctx, { title }): Promise<{ evergreen: boolean; ephemeral: boolean } | null> => {
 		const params = new URLSearchParams({
 			action: 'query',
 			format: 'json',
@@ -236,8 +253,15 @@ export const classifyTitle = internalAction({
 		const qid = page.pageprops?.wikibase_item;
 		const claims = qid !== undefined ? await fetchWikidataClaims(qid) : null;
 		const verdict = claims !== null ? classifyTopic(claims) : null;
-		const { status } = decideArticleStatus({ verdict, categories });
-		return { evergreen: status === 'fetched' };
+		const nowYear = new Date().getUTCFullYear();
+		const { status, basis } = decideArticleStatus({
+			verdict,
+			categories,
+			title,
+			temporalYears: claims?.temporalYears ?? [],
+			nowYear
+		});
+		return { evergreen: status === 'fetched', ephemeral: basis.startsWith('ephemeral') };
 	}
 });
 
@@ -275,7 +299,13 @@ export const ingestTitles = action({
 				const qid = page.pageprops?.wikibase_item;
 				const claims = qid ? await fetchWikidataClaims(qid) : null;
 				const verdict = claims ? classifyTopic(claims) : null;
-				const { status, basis } = decideArticleStatus({ verdict, categories });
+				const { status, basis } = decideArticleStatus({
+					verdict,
+					categories,
+					title: page.title,
+					temporalYears: claims?.temporalYears ?? [],
+					nowYear: new Date().getUTCFullYear()
+				});
 				decisions.push({ title: page.title, status, basis });
 				const accepted = status === 'fetched';
 				// Only spend the image request on articles we'd actually generate from.
@@ -325,7 +355,13 @@ export const ingestOne = internalAction({
 		const qid = page.pageprops?.wikibase_item;
 		const claims = qid ? await fetchWikidataClaims(qid) : null;
 		const verdict = claims ? classifyTopic(claims) : null;
-		const { status } = decideArticleStatus({ verdict, categories });
+		const { status } = decideArticleStatus({
+			verdict,
+			categories,
+			title: page.title,
+			temporalYears: claims?.temporalYears ?? [],
+			nowYear: new Date().getUTCFullYear()
+		});
 		const accepted = status === 'fetched';
 		const leadImage = accepted ? await fetchBestImage(page, claims?.image) : null;
 		const articleId = await ctx.runMutation(internal.ingest.upsertArticle, {

@@ -74,7 +74,7 @@ test('classifyTitle returns {evergreen:false} for a film (Wikidata Q11424 block)
 	);
 
 	const result = await t.action(internal.ingest.classifyTitle, { title: 'Inception' });
-	expect(result).toEqual({ evergreen: false });
+	expect(result).toEqual({ evergreen: false, ephemeral: false });
 
 	vi.unstubAllGlobals();
 });
@@ -105,7 +105,7 @@ test('classifyTitle returns {evergreen:true} for an evergreen taxon (Wikidata Q1
 	);
 
 	const result = await t.action(internal.ingest.classifyTitle, { title: 'Octopus' });
-	expect(result).toEqual({ evergreen: true });
+	expect(result).toEqual({ evergreen: true, ephemeral: false });
 
 	vi.unstubAllGlobals();
 });
@@ -134,6 +134,49 @@ test('classifyTitle returns null for a missing/unresolvable page', async () => {
 
 	const result = await t.action(internal.ingest.classifyTitle, { title: 'Nonexistent Page XYZ' });
 	expect(result).toBeNull();
+
+	vi.unstubAllGlobals();
+});
+
+// ---------------------------------------------------------------------------
+// classifyTitle — recent-event topic (ephemeral) → ephemeral:true, evergreen:false
+// ---------------------------------------------------------------------------
+
+test('classifyTitle marks a recent-event topic ephemeral (and not evergreen)', async () => {
+	const t = convexTest(schema, modules);
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (url: string) => {
+			if (url.includes('wikidata.org')) {
+				return {
+					ok: true,
+					json: async () => ({
+						entities: {
+							Q1: {
+								claims: {
+									P31: [{ mainsnak: { datavalue: { value: { id: 'Q198' } } } }], // war → allow
+									P585: [{ mainsnak: { datavalue: { value: { time: '+2026-06-01T00:00:00Z' } } } }]
+								}
+							}
+						}
+					})
+				} as unknown as Response;
+			}
+			return {
+				ok: true,
+				json: async () => ({
+					query: {
+						pages: [
+							{ pageid: 1, title: '2026 Iran war', categories: [], pageprops: { wikibase_item: 'Q1' } }
+						]
+					}
+				})
+			} as unknown as Response;
+		})
+	);
+
+	const res = await t.action(internal.ingest.classifyTitle, { title: '2026 Iran war' });
+	expect(res).toEqual({ evergreen: false, ephemeral: true });
 
 	vi.unstubAllGlobals();
 });
