@@ -162,7 +162,7 @@ body {
    true one-screen-fit layout needs a compaction pass — see design notes). */
 .slot {
 	position: relative;
-	min-height: 100dvh;
+	height: 100dvh;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -210,6 +210,10 @@ body {
 	position: relative; /* positioning context for .reveal-overlay */
 	width: 100%;
 	max-width: 640px;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 }
 
 /* Vertical rhythm via per-element margins (proximity: tight within a group,
@@ -218,21 +222,28 @@ body {
 .card-body {
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
 }
 
 .card-body > * {
 	margin: 0;
+	/* Under one-screen height pressure only .body may shrink/clip (it re-sets
+	   flex-shrink:1 below). Without this, every child shrinks and the hook's
+	   line-clamp overflow:hidden collapses it to nothing. */
+	flex-shrink: 0;
 }
 
 /* Free-licensed Commons lead image with inline attribution (ADR-005). */
 .card-image {
+	flex: 0 0 auto; /* never shrink the figure — its caption is the required license attribution (ADR-005) */
 	margin: 0 0 1.25rem;
 }
 
 .card-image img {
 	display: block;
 	width: 100%;
-	max-height: 24dvh; /* keep the image compact so hook + body fit one screen */
+	max-height: clamp(110px, 22dvh, 24dvh);
 	object-fit: cover;
 	border-radius: var(--radius);
 	background: var(--surface-2);
@@ -294,6 +305,10 @@ body {
 	font-weight: 800;
 	letter-spacing: -0.022em;
 	text-wrap: balance;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 5;
+	overflow: hidden;
 }
 
 /* Body — the main reading text, so legibility wins: 18px, a comfortable 1.6 leading,
@@ -308,6 +323,16 @@ body {
 	line-height: 1.6;
 	color: var(--text-2);
 	text-wrap: pretty;
+	flex: 0 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* Fade the bottom edge only when the body is actually clipped, so truncation
+   reads as "more below" — set by Card.svelte's ResizeObserver via data-clipped. */
+.body[data-clipped='true'] {
+	-webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+	mask-image: linear-gradient(to bottom, #000 78%, transparent);
 }
 
 /* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding
@@ -349,6 +374,28 @@ body {
 
 .why-toggle.open .why-caret {
 	transform: rotate(90deg);
+}
+
+/* "Read more" — quiet text affordance matching .why-toggle, shown only when the
+   body is clipped. No accent fill, 44px target. */
+.read-more {
+	align-self: flex-start;
+	margin-top: var(--space-2);
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	font: inherit;
+	font-size: var(--fs-meta);
+	color: var(--text-2);
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	transition: color var(--dur-fast) var(--ease);
+}
+
+.read-more:hover {
+	color: var(--text);
 }
 
 /* "Why it matters" — prose to read, not metadata, so it earns 15px and a readable
@@ -401,6 +448,15 @@ body {
 
 .reveal-overlay a {
 	color: var(--accent);
+}
+
+/* Full body text when "Read more" opens it in the reveal overlay. */
+.body-full {
+	max-width: var(--measure);
+	margin: var(--space-3) 0 0;
+	font-size: var(--fs-body);
+	line-height: 1.6;
+	color: var(--text-2);
 }
 
 /* Explore cluster (chips + "more") detaches from the reading column with a true

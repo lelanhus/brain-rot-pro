@@ -154,3 +154,37 @@ test('opening one panel closes the other (only one overlay at a time)', async ()
 	expect(expands).toBe(1);
 	expect(sourceFires).toBe(1);
 });
+
+test('hook carries its full text as a title attribute (for the clamped case)', async () => {
+	render(Card, { card: sample });
+	await expect
+		.element(page.getByRole('heading', { name: sample.hook }))
+		.toHaveAttribute('title', sample.hook);
+});
+
+test('no "Read more" when the body fits', async () => {
+	render(Card, { card: sample });
+	await expect.element(page.getByRole('button', { name: /read more/i })).not.toBeInTheDocument();
+});
+
+test('shows "Read more" when the body is clipped and opens the full body overlay, firing onExpand once', async () => {
+	let expands = 0;
+	const longBody =
+		'This is a deliberately long body sentence used to force clipping in the test harness. '.repeat(
+			8
+		);
+	const longCard = { ...sample, body: longBody } as unknown as Doc<'knowledgeCards'>;
+	render(Card, { card: longCard, onExpand: () => (expands += 1) });
+
+	// Force the body's box smaller than its content so the ResizeObserver marks it clipped.
+	const bodyEl = document.querySelector('.body') as HTMLElement;
+	bodyEl.style.height = '24px';
+
+	const btn = page.getByRole('button', { name: /read more/i });
+	await expect.element(btn).toBeVisible();
+	await btn.click();
+
+	// Full body opens in the reveal overlay (Close button confirms the panel rendered).
+	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
+	expect(expands).toBe(1);
+});
