@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	BODY_MAX_CHARS,
+	HOOK_MAX_CHARS,
 	buildGenerationPrompt,
 	clampBody,
 	decidePublish,
@@ -242,6 +243,41 @@ describe('shouldKeepFilling', () => {
 		const budget = fillBudget(1, 3); // needed 2, maxAttempts 4
 		expect(shouldKeepFilling(0, 0, budget)).toBe(true); // start: owe 2
 		expect(shouldKeepFilling(1, 2, budget)).toBe(true); // published 1, owe 1 more
-		expect(shouldKeepFilling(2, 3, budget)).toBe(false); // published 2 == needed → done at TARGET
+		expect(shouldKeepFilling(2, 3, budget)).toBe(false); // published 2 == needed — done at TARGET
+	});
+});
+
+describe('hook length', () => {
+	it('HOOK_MAX_CHARS is 90', () => {
+		expect(HOOK_MAX_CHARS).toBe(90);
+	});
+
+	it('generatedCardSchema rejects a hook over the cap', () => {
+		const card = {
+			hook: 'x'.repeat(200),
+			body: 'a'.repeat(120),
+			whyItMatters: 'because',
+			format: 'object_story',
+			conceptTags: ['t'],
+			sourceSpan: 'a verbatim source span of sufficient length'
+		};
+		expect(generatedCardSchema.safeParse(card).success).toBe(false);
+	});
+
+	it('generatedCardSchema accepts a card with a short hook', () => {
+		const card = {
+			hook: 'Wombats produce cube-shaped poop, the only animal that does.',
+			body: 'a'.repeat(120),
+			whyItMatters: 'because',
+			format: 'object_story',
+			conceptTags: ['t'],
+			sourceSpan: 'a verbatim source span of sufficient length'
+		};
+		expect(generatedCardSchema.safeParse(card).success).toBe(true);
+	});
+
+	it('buildGenerationPrompt instructs a short one-line hook', () => {
+		const prompt = buildGenerationPrompt({ title: 'T', paragraphs: ['Para one.'] });
+		expect(prompt).toMatch(/one short line/i);
 	});
 });

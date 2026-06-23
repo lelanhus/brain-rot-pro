@@ -15,6 +15,9 @@ export const PROMPT_VERSION = 'gen-v1';
 /** Single source of truth for the one-screen body cap. */
 export const BODY_MAX_CHARS = 480;
 
+/** Single source of truth for the one-screen hook cap (a 2–3 line poster). */
+export const HOOK_MAX_CHARS = 90;
+
 // `satisfies` makes this fail to compile if a value drifts from the schema's
 // cardFormat union — one guarded source for the format list.
 export const CARD_FORMATS = [
@@ -33,8 +36,8 @@ export const generatedCardSchema = z.object({
 	hook: z
 		.string()
 		.min(8)
-		.max(180)
-		.describe('One scroll-stopping sentence; declarative, not clickbait.'),
+		.max(HOOK_MAX_CHARS)
+		.describe('One short, scroll-stopping line (≤~80 chars); a poster headline, declarative, not clickbait.'),
 	body: z
 		.string()
 		.min(80)
@@ -87,6 +90,7 @@ export function buildGenerationPrompt(
 		'- The claim MUST be fully supported by the source paragraphs below. Do not add facts that are not present.',
 		'- Choose the single paragraph that best supports your card and copy it VERBATIM into `sourceSpan`.',
 		'- The hook must be specific and true — never sensationalized or misleading.',
+		'- The hook is ONE short line — at most ~80 characters (~12 words). A poster headline, not a sentence of context.',
 		'- Keep the body to ONE tight paragraph: at most 3–4 short sentences (~80 words). Brevity is the format — a card is read in one screen, never scrolled.',
 		`- Set \`format\` to exactly one of: ${CARD_FORMATS.join(', ')}.`,
 		...avoidSection,
