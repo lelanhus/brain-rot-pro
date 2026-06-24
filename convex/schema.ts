@@ -70,7 +70,14 @@ export const image = v.object({
 	author: v.string(),
 	licenseShortName: v.string(),
 	licenseUrl: v.string(),
-	attribution: v.string()
+	attribution: v.string(),
+	// Legibility level for the full-bleed face (redesign §6). Computed at ingest
+	// from a luminance sample of the top strip + bottom third; absent → treat as
+	// 'medium' at render time (safe default). 'heavy' triggers the frosted plate.
+	scrim: v.optional(v.union(v.literal('light'), v.literal('medium'), v.literal('heavy'))),
+	// Optional dominant DARK color (e.g. '#1a2433') to tint the gradient so the
+	// scrim reads as part of the photo rather than a flat black bar.
+	dominantColor: v.optional(v.string())
 });
 
 /** Generation provenance (design doc §9.3): present on AI-generated cards. */
