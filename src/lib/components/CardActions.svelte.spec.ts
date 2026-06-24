@@ -6,59 +6,58 @@ import CardActions from './CardActions.svelte';
 // only), so pull it in to assert the rendered tap-target dimensions.
 import '../../app.css';
 
-test('fires save and not-interested handlers; reflects saved state in the label', async () => {
+const noop = () => {};
+const base = {
+	liked: false,
+	onLike: noop,
+	disliked: false,
+	onDislike: noop,
+	saved: false,
+	onSave: noop
+};
+
+test('renders like, dislike, save and share, and fires each handler', async () => {
+	const onLike = vi.fn();
+	const onDislike = vi.fn();
 	const onSave = vi.fn();
-	const onNotInterested = vi.fn();
-	render(CardActions, {
-		saved: false,
-		onSave,
-		following: false,
-		onFollow: vi.fn(),
-		onNotInterested
-	});
+	const onShare = vi.fn();
+	render(CardActions, { ...base, onLike, onDislike, onSave, onShare });
 
-	const save = page.getByRole('button', { name: 'Save' });
-	await expect.element(save).toBeInTheDocument();
-	await save.click();
+	await page.getByRole('button', { name: 'Like' }).click();
+	expect(onLike).toHaveBeenCalledOnce();
+	await page.getByRole('button', { name: 'Not interested' }).click();
+	expect(onDislike).toHaveBeenCalledOnce();
+	await page.getByRole('button', { name: 'Save' }).click();
 	expect(onSave).toHaveBeenCalledOnce();
-
-	const notInterested = page.getByRole('button', { name: 'Not interested' });
-	await notInterested.click();
-	expect(onNotInterested).toHaveBeenCalledOnce();
+	await page.getByRole('button', { name: 'Share' }).click();
+	expect(onShare).toHaveBeenCalledOnce();
 });
 
-test('shows a saved label when saved', async () => {
-	render(CardActions, {
-		saved: true,
-		onSave: () => {},
-		following: false,
-		onFollow: () => {},
-		onNotInterested: () => {}
-	});
-	await expect.element(page.getByRole('button', { name: /Saved/ })).toBeInTheDocument();
+test('reflects liked / disliked / saved state via aria-pressed and labels', async () => {
+	render(CardActions, { ...base, liked: true, disliked: false, saved: true });
+	await expect
+		.element(page.getByRole('button', { name: /Liked/ }))
+		.toHaveAttribute('aria-pressed', 'true');
+	await expect
+		.element(page.getByRole('button', { name: /Saved/ }))
+		.toHaveAttribute('aria-pressed', 'true');
+	await expect
+		.element(page.getByRole('button', { name: 'Not interested' }))
+		.toHaveAttribute('aria-pressed', 'false');
 });
 
 // The floating buttons must stay a comfortable tap target (ui-ux.md §4: ≥44px)
-// without ballooning so large they overlap the card text on a phone — the bug
-// this guards. Sizing is viewport-driven (smaller on phones), so check both.
+// without ballooning so large they overlap the card text on a phone.
 test('action buttons are a ≥44px tap target and shrink on phone widths', async () => {
-	render(CardActions, {
-		saved: false,
-		onSave: () => {},
-		following: false,
-		onFollow: () => {},
-		onNotInterested: () => {}
-	});
-	const save = page.getByRole('button', { name: 'Save' }).element() as HTMLElement;
+	render(CardActions, base);
+	const like = page.getByRole('button', { name: 'Like' }).element() as HTMLElement;
 
 	await page.viewport(1280, 800);
-	const desktop = save.getBoundingClientRect();
-	expect(desktop.width).toBe(56);
+	expect(like.getBoundingClientRect().width).toBe(56);
 
 	await page.viewport(390, 844); // iPhone-class phone
-	const phone = save.getBoundingClientRect();
+	const phone = like.getBoundingClientRect();
 	expect(phone.width).toBe(48);
-	// Never below the accessibility floor, on any screen.
 	expect(phone.width).toBeGreaterThanOrEqual(44);
 	expect(phone.width).toBe(phone.height); // square target
 });

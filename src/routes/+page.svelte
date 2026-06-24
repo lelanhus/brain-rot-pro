@@ -12,7 +12,6 @@
 	import AdNetworkSlot from '$lib/components/AdNetworkSlot.svelte';
 	import CardActions from '$lib/components/CardActions.svelte';
 	import { dwell } from '$lib/actions/dwell';
-	import { swipeActions } from '$lib/actions/swipeActions';
 	import { formatName } from '$lib/cards';
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
@@ -34,6 +33,11 @@
 	let deviceId = $state('');
 	let showOnboarding = $state(false);
 	const notInterested = new SvelteSet<string>();
+	// Taste signal (redesign §5): like (double-tap / rail) and dislike (rail) are
+	// mutually exclusive + reversible. Session-local optimistic state; the durable
+	// signal is the like/dislike event the server folds into personalization.
+	const likedIds = new SvelteSet<string>();
+	const dislikedIds = new SvelteSet<string>();
 	// Seeded from a shared/deep-linked ?focus= (e.g. a concept chip tapped on
 	// /saved); read once from SvelteKit's reactive page state, not window.location.
 	let focusConcept = $state<string | null>(page.url.searchParams.get('focus'));
@@ -306,11 +310,38 @@
 	// two cards in one gesture. Swallow a repeat within the cooldown window.
 	const allowDismiss = cooldownGate(350);
 
-	function handleNotInterested(card: Doc<'knowledgeCards'>) {
-		if (!allowDismiss()) return;
-		notInterested.add(card._id); // optimistic hide; recompute makes it durable
-		track('not_interested', { cardId: card._id });
+	// Like — soft positive taste signal. Reversible, mutually exclusive with
+	// dislike, and does NOT advance the feed (redesign §5).
+	function handleLike(card: Doc<'knowledgeCards'>) {
+		if (!deviceId) return;
+		if (likedIds.has(card._id)) {
+			likedIds.delete(card._id); // tapping again un-likes
+		} else {
+			likedIds.add(card._id);
+			dislikedIds.delete(card._id);
+			notInterested.delete(card._id);
+			track('like', { cardId: card._id });
+		}
 		scheduleAdapt();
+	}
+
+	// Dislike — soft negative; absorbs the old "not interested" (redesign §5). It
+	// hides the card optimistically AND advances to the next one.
+	function handleDislike(card: Doc<'knowledgeCards'>) {
+		if (!allowDismiss()) return;
+		if (dislikedIds.has(card._id)) {
+			// Reversible: a second tap clears the dislike and keeps the card.
+			dislikedIds.delete(card._id);
+			notInterested.delete(card._id);
+			scheduleAdapt();
+			return;
+		}
+		dislikedIds.add(card._id);
+		likedIds.delete(card._id);
+		notInterested.add(card._id); // optimistic hide; recompute makes it durable
+		track('dislike', { cardId: card._id });
+		scheduleAdapt();
+		scrollByViewport(1); // dislike advances; like does not
 	}
 
 	// Tapping a concept chip focuses the feed on that concept: matching cards float
@@ -393,7 +424,7 @@
 			case 'X':
 				if (active) {
 					e.preventDefault();
-					handleNotInterested(active);
+					handleDislike(active);
 				}
 				break;
 			case 'Escape':
@@ -550,17 +581,12 @@
 						onActive: (id) => (activeCardId = id),
 						onComplete: (id) => handleComplete(id)
 					}}
-					use:swipeActions={{
-						onSave: () => {
-							if (online) void handleSave(card);
-						},
-						onDismiss: () => {
-							if (online) handleNotInterested(card);
-						}
-					}}
 				>
 					<Card
 						{card}
+						following={followedSlugs.has(toSlug(card.source.articleTitle))}
+						onLike={online ? () => handleLike(card) : undefined}
+						onFollow={online ? () => toggleFollow(card) : undefined}
 						onSource={() => track('source_open', { cardId: card._id })}
 						onRelated={online ? (tag) => handleRelated(card, tag) : undefined}
 						onMore={online ? () => handleMore(card) : undefined}
@@ -611,11 +637,12 @@
      placement on every screen size, regardless of card content height. -->
 {#if activeCard && visibleResults.length > 0 && online}
 	<CardActions
+		liked={likedIds.has(activeCard._id)}
+		onLike={() => handleLike(activeCard)}
+		disliked={dislikedIds.has(activeCard._id)}
+		onDislike={() => handleDislike(activeCard)}
 		saved={savedSet.has(activeCard._id)}
 		onSave={() => handleSave(activeCard)}
-		following={followedSlugs.has(toSlug(activeCard.source.articleTitle))}
-		onFollow={() => toggleFollow(activeCard)}
-		onNotInterested={() => handleNotInterested(activeCard)}
 		onShare={() => handleShare(activeCard)}
 	/>
 {/if}
