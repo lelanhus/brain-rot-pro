@@ -17,6 +17,7 @@
 	import { getDeviceId } from '$lib/identity';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
+	import { mergeStableOrder } from '$lib/feedOrder';
 	import { injectSponsored, type SlotMode } from '$lib/sponsored';
 	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { persistCards, readCards } from '$lib/offlineFeed';
@@ -126,11 +127,60 @@
 		if (online && liveCards.length > 0) void persistCards($state.snapshot(liveCards));
 	});
 
+	// ── Stable display order (stops the feed from scrolling itself) ────────────
+	// The live paginated query carries no keepPreviousData, so ANY ranking change
+	// — taste recompute, focus concept, or connected-wander threading — RESETS it
+	// to a fresh first page of `initialNumItems`. Left raw, re-ranking the cards
+	// already under the reader yanks a new card into the viewport; it dwell-
+	// completes, which threads again and re-ranks again: a loop that scrolls the
+	// feed on its own (and drains the unseen pool, repeatedly tripping generation).
+	// We keep a frozen, append-only display order so a PASSIVE re-rank only changes
+	// which cards appear next — never where the reader already is. Explicit
+	// re-ranks (a new device identity, or a focus-concept jump where floating
+	// matches to the top IS the intent) adopt the incoming order wholesale.
+	const cardStore = new SvelteMap<string, Doc<'knowledgeCards'>>();
+	let displayIds = $state<string[]>([]);
+	let prevKey: string | undefined = undefined; // non-reactive: last explicit-rerank key
+	let rebuild = true; // adopt incoming wholesale on the next settled page
+	function sameOrder(a: readonly string[], b: readonly string[]): boolean {
+		if (a.length !== b.length) return false;
+		for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+		return true;
+	}
+	$effect(() => {
+		const incoming = sourceCards;
+		const loadingFirst = liveFeed.status === 'LoadingFirstPage';
+		// Only deviceId + focusConcept are *explicit* re-ranks; threadFromCardId is
+		// deliberately excluded so threading never rebuilds the visible order.
+		const key = `${deviceId}|${focusConcept ?? ''}`;
+		if (key !== prevKey) {
+			prevKey = key;
+			rebuild = true;
+			cardStore.clear();
+		}
+		for (const c of incoming) cardStore.set(c._id, c);
+		const incomingIds = incoming.map((c) => c._id);
+		// A rebuild waits for the refetched page to actually land — the reset blanks
+		// the live results for a tick first — so we don't lock in stale order.
+		if (rebuild && (loadingFirst || incomingIds.length === 0)) {
+			if (!sameOrder(displayIds, incomingIds)) displayIds = incomingIds;
+			return;
+		}
+		const next = mergeStableOrder(rebuild ? [] : displayIds, incomingIds, rebuild);
+		rebuild = false;
+		if (!sameOrder(displayIds, next)) displayIds = next;
+	});
+	const orderedCards = $derived(
+		displayIds
+			.map((id) => cardStore.get(id))
+			.filter((c): c is Doc<'knowledgeCards'> => c !== undefined)
+	);
+
 	// `notInterested` is an in-memory optimistic hide for the gap before
 	// recompute() rewrites the profile (the server is the durable source —
 	// feed.unseen hard-excludes notInterested server-side).
 	const visibleResults = $derived(
-		weaveFeed(sourceCards, injectedAfter).filter((c) => !notInterested.has(c._id))
+		weaveFeed(orderedCards, injectedAfter).filter((c) => !notInterested.has(c._id))
 	);
 
 	// Monetization (ADR-008): sponsored "Go deeper" slots woven into the feed at a
@@ -476,9 +526,9 @@
 			<h2>Something went wrong</h2>
 			<p>{liveFeed.error.message}</p>
 		</section>
-	{:else if liveFeed.isLoading && liveCards.length === 0}
+	{:else if liveFeed.isLoading && orderedCards.length === 0}
 		<section class="state">Loading…</section>
-	{:else if liveCards.length === 0}
+	{:else if orderedCards.length === 0}
 		<section class="state">
 			<h2>You're all caught up</h2>
 			<p>Fresh cards are on the way — check back in a moment.</p>
