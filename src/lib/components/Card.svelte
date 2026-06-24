@@ -1,13 +1,17 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
-	import { fade } from 'svelte/transition';
+	import { fly } from 'svelte/transition';
 	import { formatName } from '$lib/cards';
 
-	// Card is pure content. Save/dismiss live in a single viewport-fixed action
-	// bar (rendered by the feed page, wired to the active card) so the controls
-	// sit in the same thumb-zone spot on every screen size — see +page.svelte.
+	// Full-bleed image poster (redesign §3). The face shows kicker → hook → teaser
+	// → payoff over a layered scrim with ZERO taps; a single tap opens the depth
+	// sheet ("page 2"); a double-tap likes. Like/dislike/save/share also live on the
+	// page-level rail (CardActions), wired by +page.svelte to the active card.
 	let {
 		card,
+		following = false,
+		onLike,
+		onFollow,
 		onSource,
 		onRelated,
 		onMore,
@@ -15,6 +19,9 @@
 		onExpand
 	}: {
 		card: Doc<'knowledgeCards'>;
+		following?: boolean;
+		onLike?: () => void;
+		onFollow?: () => void;
 		onSource?: () => void;
 		onRelated?: (tag: string) => void;
 		onMore?: () => void;
@@ -22,123 +29,147 @@
 		onExpand?: () => void;
 	} = $props();
 
-	// "Why it matters" and "Source" each open a non-scrolling overlay anchored to
-	// the card. Only one panel is open at a time; `reveal` tracks which (or null).
-	// Overlays avoid flow-height changes that would break the slot's overflow:hidden.
-	let reveal = $state<'why' | 'source' | 'body' | null>(null);
-	function toggleWhy() {
-		if (reveal !== 'why') onExpand?.(); // count the first reveal as a deepening signal
-		reveal = reveal === 'why' ? null : 'why';
+	// The depth sheet slides up over the lower card; it is position:absolute so it
+	// never grows the slot's flow height (snap integrity, redesign global constraint).
+	let open = $state(false);
+	// Transient heart-burst on a like (double-tap or rail), cleared by a timer.
+	let burst = $state(false);
+	let burstTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function toggleSheet() {
+		if (!open) onExpand?.(); // opening the sheet IS the "go deeper" signal (redesign §5)
+		open = !open;
 	}
-	function toggleSource() {
-		if (reveal !== 'source') onSource?.(); // fire once when source is first opened
-		reveal = reveal === 'source' ? null : 'source';
+
+	function like() {
+		onLike?.();
+		burst = true;
+		if (burstTimer) clearTimeout(burstTimer);
+		burstTimer = setTimeout(() => (burst = false), 600);
 	}
-	// "Read more": the body clips when it can't fit the one-screen card. A
-	// ResizeObserver flags that so the affordance appears only when needed; the
-	// full body then opens in the same reveal overlay as why/source.
-	let bodyEl = $state<HTMLParagraphElement | undefined>(undefined);
-	let clipped = $state(false);
-	$effect(() => {
-		const el = bodyEl;
-		if (el === undefined || typeof ResizeObserver === 'undefined') return;
-		const measure = () => {
-			clipped = el.scrollHeight > el.clientHeight + 1;
-		};
-		const ro = new ResizeObserver(measure);
-		ro.observe(el);
-		measure();
-		return () => ro.disconnect();
-	});
-	function toggleBody() {
-		if (reveal !== 'body') onExpand?.(); // first open of the full body is a deepening signal
-		reveal = reveal === 'body' ? null : 'body';
+
+	// Tap vs double-tap disambiguation (redesign §8): a single tap toggles the sheet,
+	// a double-tap likes. A short timer holds the single-tap so a double-tap can
+	// cancel it — that ~230ms is the cost of keeping single-tap free for open/close.
+	const DOUBLE_TAP_MS = 230;
+	let tapTimer: ReturnType<typeof setTimeout> | null = null;
+	function onFaceActivate() {
+		if (tapTimer) {
+			clearTimeout(tapTimer);
+			tapTimer = null;
+			like(); // second tap within the window → like, and DON'T open the sheet
+			return;
+		}
+		tapTimer = setTimeout(() => {
+			tapTimer = null;
+			toggleSheet();
+		}, DOUBLE_TAP_MS);
 	}
+
+	const scrim = $derived(card.image?.scrim ?? 'medium');
 </script>
 
-<article class="card">
-	{#if card.image}
-		<figure class="card-image">
-			<!-- Free-licensed Commons asset; attribution is shown below (ADR-005). -->
-			<img src={card.image.thumbnailUrl} alt={card.hook} loading="lazy" />
-			<figcaption>
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external Commons link -->
-				<a href={card.image.commonsUrl} target="_blank" rel="noreferrer noopener"
-					>{card.image.author}</a
-				>
-				·
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external license deed -->
-				<a href={card.image.licenseUrl} target="_blank" rel="noreferrer noopener"
-					>{card.image.licenseShortName}</a
-				>
-			</figcaption>
-		</figure>
-	{/if}
-	<div class="card-body">
-		<span class="tag">{formatName(card.format)}</span>
-
-		<h2 class="hook" title={card.hook}>{card.hook}</h2>
-		<p class="body" bind:this={bodyEl} data-clipped={clipped}>{card.body}</p>
-
-		{#if clipped}
-			<button type="button" class="read-more" onclick={toggleBody}>Read more</button>
+<!-- The card-level tap is a pointer convenience; the keyboard-accessible open/close
+     control is the .open-depth button in the caption, and Like has its rail button. -->
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events -->
+<article class="card" onclick={onFaceActivate} ondblclick={(e) => e.preventDefault()}>
+	<div class="card-face" data-scrim={scrim}>
+		{#if card.image}
+			<!-- Free-licensed Commons asset; attribution lives in the depth sheet (ADR-005). -->
+			<img class="face-img" src={card.image.thumbnailUrl} alt={card.hook} loading="lazy" />
 		{/if}
+		<div class="scrim" aria-hidden="true"></div>
+		<div class="scrim-top" aria-hidden="true"></div>
 
-		{#if card.whyItMatters}
+		<div class="face-caption">
+			<span class="kicker">{formatName(card.format)}</span>
+			<h2 class="hook" title={card.hook}>{card.hook}</h2>
+			<p class="teaser">{card.body}</p>
+			{#if card.whyItMatters}
+				<p class="payoff">{card.whyItMatters}</p>
+			{/if}
+			<div class="face-foot">
+				<span class="page-dots" aria-hidden="true">
+					<span class="dot" class:active={!open}></span>
+					<span class="dot" class:active={open}></span>
+				</span>
+				<button
+					type="button"
+					class="open-depth"
+					aria-expanded={open}
+					onclick={(e) => {
+						e.stopPropagation();
+						toggleSheet();
+					}}
+				>
+					{open ? 'Close' : 'Tap to read'}
+				</button>
+			</div>
+		</div>
+
+		{#if burst}
+			<span class="heart-burst" aria-hidden="true">♥</span>
+		{/if}
+	</div>
+
+	{#if open}
+		<!-- Taps inside the sheet must not bubble to the card's open/close handler. -->
+		<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+		<section
+			class="depth-sheet"
+			transition:fly={{ y: 24, duration: 200 }}
+			onclick={(e) => e.stopPropagation()}
+		>
 			<button
 				type="button"
-				class="why-toggle"
-				class:open={reveal === 'why'}
-				aria-expanded={reveal === 'why'}
-				onclick={toggleWhy}
-			>
-				Why it matters
-				<span class="why-caret" aria-hidden="true"></span>
-			</button>
-		{/if}
+				class="sheet-grip"
+				aria-label="Close details"
+				onclick={() => (open = false)}
+			></button>
 
-		<div class="chips">
-			{#each card.conceptTags as tag (tag)}
-				<button type="button" class="chip" onclick={() => onRelated?.(tag)}>{tag}</button>
-			{/each}
-		</div>
+			<p class="body-full">{card.body}</p>
 
-		{#if onMore}
-			<button type="button" class="more" onclick={onMore} disabled={moreLoading}>
-				{moreLoading ? 'Finding…' : 'More like this →'}
-			</button>
-		{/if}
+			<div class="topic-row">
+				<span class="topic-name">{card.source.articleTitle}</span>
+				<button
+					type="button"
+					class="follow"
+					class:active={following}
+					aria-pressed={following}
+					onclick={onFollow}
+				>
+					{following ? 'Following' : '＋ Follow'}
+				</button>
+			</div>
 
-		<button
-			type="button"
-			class="why-toggle source-toggle"
-			class:open={reveal === 'source'}
-			aria-expanded={reveal === 'source'}
-			onclick={toggleSource}
-		>
-			Source
-			<span class="why-caret" aria-hidden="true"></span>
-		</button>
-	</div>
-	<!-- Overlay: floats over the lower card area so opening it never changes the
-	     card's flow height (the slot's overflow:hidden stays undisturbed). -->
-	{#if reveal !== null}
-		<div class="reveal-overlay" transition:fade={{ duration: 140 }}>
-			<button type="button" class="reveal-close" onclick={() => (reveal = null)} aria-label="Close"
-				>×</button
-			>
-			{#if reveal === 'why'}
-				<p class="why">{card.whyItMatters}</p>
-			{:else if reveal === 'body'}
-				<p class="body-full">{card.body}</p>
-			{:else}
+			{#if card.conceptTags.length > 0}
+				<div class="chips">
+					{#each card.conceptTags as tag (tag)}
+						<button type="button" class="chip" onclick={() => onRelated?.(tag)}>{tag}</button>
+					{/each}
+				</div>
+			{/if}
+
+			{#if onMore}
+				<button type="button" class="more" onclick={onMore} disabled={moreLoading}>
+					{moreLoading ? 'Finding…' : 'More like this →'}
+				</button>
+			{/if}
+
+			<div class="source">
 				<blockquote>{card.source.sourceSpan}</blockquote>
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external source link, not an internal route -->
-				<a href={card.source.articleUrl} target="_blank" rel="noreferrer noopener">
+				<!-- eslint-disable svelte/no-navigation-without-resolve -- external source link, not an internal route -->
+				<a
+					href={card.source.articleUrl}
+					target="_blank"
+					rel="noreferrer noopener"
+					onclick={onSource}
+				>
 					{card.source.articleTitle} — Wikipedia
 				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
-			{/if}
-		</div>
+			</div>
+		</section>
 	{/if}
 </article>

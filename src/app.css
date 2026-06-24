@@ -172,306 +172,304 @@ body {
 	   padding reserves the fixed action-bar strip so content never hides under it. */
 	padding: clamp(var(--space-5), 9vh, 6rem) var(--slot-pad-right)
 		calc(var(--action-zone) + env(safe-area-inset-bottom)) var(--space-5);
-	/* Browser owns vertical scroll; horizontal-dominant gestures go to swipeActions
-	   (so swipe-to-act never fights the feed's vertical scroll). */
+	/* Browser owns vertical scroll. The horizontal axis is deliberately free — no
+	   swipe-to-act — so pan-y keeps gestures from drifting off the vertical feed
+	   (redesign §4: single-tap=open, double-tap=like, horizontal unused). */
 	touch-action: pan-y;
 }
 
-/* Directional swipe hint — a calm edge glow that grows with the gesture
-   (green = save on the right, red = dismiss on the left). */
-.slot::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	opacity: 0;
-	transition: opacity var(--dur-fast) var(--ease);
-}
-
-.slot[data-swipe='save']::after {
-	opacity: calc(var(--swipe-progress, 0) * 0.4);
-	background: radial-gradient(
-		120% 80% at 100% 50%,
-		color-mix(in srgb, var(--positive) 28%, transparent),
-		transparent 55%
-	);
-}
-
-.slot[data-swipe='dismiss']::after {
-	opacity: calc(var(--swipe-progress, 0) * 0.4);
-	background: radial-gradient(
-		120% 80% at 0% 50%,
-		color-mix(in srgb, var(--negative) 28%, transparent),
-		transparent 55%
-	);
-}
-
 .card {
-	position: relative; /* positioning context for .reveal-overlay */
+	position: relative; /* positioning context for the depth sheet + heart burst */
 	width: 100%;
 	max-width: 640px;
 	height: 100%;
-	display: flex;
-	flex-direction: column;
-	min-height: 0;
 }
 
-/* Vertical rhythm via per-element margins (proximity: tight within a group,
-   loose between groups; web-design 03/06). No card border — the viewport edge
-   and the whitespace are the boundary (Gestalt closure). */
-.card-body {
-	display: flex;
-	flex-direction: column;
-	flex: 1 1 auto;
-	min-height: 0;
-}
-
-.card-body > * {
-	margin: 0;
-	/* Under one-screen height pressure only .body may shrink/clip (it re-sets
-	   flex-shrink:1 below). Without this, every child shrinks and the hook's
-	   line-clamp overflow:hidden collapses it to nothing. */
-	flex-shrink: 0;
-}
-
-/* Free-licensed Commons lead image with inline attribution (ADR-005). */
-.card-image {
-	flex: 0 0 auto; /* never shrink the figure — its caption is the required license attribution (ADR-005) */
-	margin: 0 0 1.25rem;
-}
-
-.card-image img {
-	display: block;
+/* ──────────────────────────────────────────────────────────────────────────
+   Full-bleed image face (redesign §3a). The image is the background; the
+   caption (kicker → hook → teaser → payoff) sits bottom-left over a layered,
+   image-independent legibility scrim (§6). Theme-INDEPENDENT: white-on-scrim
+   in both light and dark — only the depth sheet follows the app theme.
+   ────────────────────────────────────────────────────────────────────────── */
+.card-face {
+	position: relative;
+	height: 100%;
 	width: 100%;
-	max-height: clamp(110px, 22dvh, 24dvh);
-	object-fit: cover;
+	overflow: hidden;
 	border-radius: var(--radius);
-	background: var(--surface-2);
+	background: var(--surface-2); /* graceful fill behind a slow/absent image */
+	isolation: isolate;
 }
 
-.card-image figcaption {
-	margin-top: 0.4rem;
-	font-size: 0.72rem;
-	color: var(--muted);
+.face-img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
 }
 
-.card-image figcaption a {
-	color: var(--muted);
-	text-decoration: underline;
-	text-underline-offset: 2px;
+/* (1) flat darken caps maximum brightness; (2) bottom-heavy directional scrim
+   behind the caption. The level scales with the per-card data-scrim (§6). */
+.scrim {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to top, rgba(0, 0, 0, 0.86) 0%, rgba(0, 0, 0, 0.34) 46%, transparent 64%),
+		rgba(0, 0, 0, 0.28);
 }
 
-.card-image figcaption a:hover {
-	color: var(--text-2);
+/* Lighter top scrim — protects the feed's fixed top chrome reading over the
+   image (the §6 weak point: a bright top strip washing out the controls). */
+.scrim-top {
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 24%;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.42), transparent);
 }
 
-/* Format tag — an editorial kicker, not a competing pill. Accent-coloured per
-   ui-ux.md §2, but low-mass (12px) so the hook still wins the squint test: it's
-   the single sparing spark of brand colour at the top of each card. */
-.tag {
-	align-self: flex-start;
-	display: inline-flex;
-	align-items: center;
+.card-face[data-scrim='medium'] .scrim {
+	background:
+		linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.46) 50%, transparent 70%),
+		rgba(0, 0, 0, 0.4);
+}
+
+.card-face[data-scrim='heavy'] .scrim {
+	background:
+		linear-gradient(
+			to top,
+			rgba(0, 0, 0, 0.94) 0%,
+			rgba(0, 0, 0, 0.62) 55%,
+			rgba(0, 0, 0, 0.32) 80%
+		),
+		rgba(0, 0, 0, 0.5);
+}
+
+.face-caption {
+	position: absolute;
+	inset: auto 0 0 0;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
 	gap: var(--space-2);
+	padding: var(--space-5);
+	/* Reserve the bottom strip so the caption clears the fixed action rail + hint. */
+	padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+	color: #fff;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); /* (3) glyph-edge insurance */
+}
+
+/* (5) Frosted-plate escape hatch — only for a pathological (heavy) image. */
+.card-face[data-scrim='heavy'] .face-caption {
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.22) 72%, transparent);
+	backdrop-filter: blur(2px);
+}
+
+/* Kicker dropped to MUTED — the accent moves to the payoff (§3a, decision 6). */
+.kicker {
 	font-size: var(--fs-tag);
 	font-weight: 600;
 	line-height: 1.4;
 	letter-spacing: var(--tracking-tag);
 	text-transform: uppercase;
-	color: var(--accent);
+	color: rgba(255, 255, 255, 0.72);
 }
 
-/* The editorial mark: a short accent bar anchoring each kicker. Gives every card a
-   confident "start here" with structure, not a pill — the design's one bit of joy
-   that's there before you even interact. */
-.tag::before {
-	content: '';
-	width: 3px;
-	height: 0.95em;
-	border-radius: 1px;
-	background: var(--accent);
-}
-
-/* The scroll-stopper — set like a poster, not a big paragraph: the heaviest grade
-   the system stack ships (800, not faux-bold), display leading (1.05), optical
-   tightening that scales with size, and a short ~22ch measure so it lands in 2–3
-   punchy lines. Balanced wrap kills orphans. This is the hero; everything else
-   recedes from it. */
 .hook {
-	margin-top: var(--space-3);
+	margin: 0;
 	max-width: 22ch;
 	font-size: var(--fs-hook);
 	line-height: 1.05;
 	font-weight: 800;
 	letter-spacing: -0.022em;
 	text-wrap: balance;
+	color: #fff;
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 5;
+	-webkit-line-clamp: 4;
 	overflow: hidden;
 }
 
-/* Body — the main reading text, so legibility wins: 18px, a comfortable 1.6 leading,
-   ~58ch measure (the readability sweet spot), on the lifted body tier. The generous
-   sink below the hook is set here. flex:1 1 auto + min-height:0 makes the body the
-   flexible region that absorbs/clips slack; overflow:hidden is the safety net for any
-   legacy >480-char body (new bodies are capped by Task 1 and won't clip). */
-.body {
-	margin-top: var(--space-6);
-	max-width: 58ch;
+/* Teaser = the body's opening, clamped to two lines on the face; the full body
+   lives in the depth sheet. */
+.teaser {
+	margin: 0;
+	max-width: 48ch;
+	font-size: var(--fs-body);
+	line-height: 1.45;
+	color: rgba(255, 255, 255, 0.92);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+/* The payoff — the single warm accent moment per card (§3a). */
+.payoff {
+	margin: var(--space-2) 0 0;
+	max-width: 46ch;
+	padding-inline-start: var(--space-3);
+	border-inline-start: 3px solid var(--accent);
+	font-size: var(--fs-why);
+	line-height: 1.4;
+	font-weight: 600;
+	color: #fff;
+}
+
+.face-foot {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	margin-top: var(--space-2);
+}
+
+.page-dots {
+	display: inline-flex;
+	gap: var(--space-2);
+}
+
+.dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.4);
+	transition: background var(--dur-fast) var(--ease);
+}
+
+.dot.active {
+	background: #fff;
+}
+
+.open-depth {
+	min-height: 44px;
+	font: inherit;
+	font-size: var(--fs-meta);
+	color: rgba(255, 255, 255, 0.85);
+	background: none;
+	border: 0;
+	padding: var(--space-2) 0;
+	cursor: pointer;
+}
+
+.open-depth:hover {
+	color: #fff;
+}
+
+/* Heart burst on a like (double-tap or rail) — reduced-motion zeroes it below. */
+.heart-burst {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: grid;
+	place-items: center;
+	font-size: 6rem;
+	color: var(--negative);
+	pointer-events: none;
+	animation: heart-burst 600ms var(--ease-spring);
+}
+
+@keyframes heart-burst {
+	0% {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+	30% {
+		transform: scale(1.1);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1.25);
+		opacity: 0;
+	}
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Depth sheet ("page 2", §3c). position:absolute so it never grows the slot's
+   flow height — opening it can't scroll the feed (snap integrity). This is the
+   ONLY theme-aware surface on the card; it reads --bg/--surface/--text.
+   ────────────────────────────────────────────────────────────────────────── */
+.depth-sheet {
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0;
+	z-index: 4;
+	max-height: 84%;
+	overflow-y: auto;
+	padding: var(--space-5);
+	padding-bottom: calc(var(--action-zone) * 0.55 + env(safe-area-inset-bottom));
+	background: var(--surface);
+	color: var(--text-2);
+	border-top: 1px solid var(--border);
+	border-radius: var(--radius) var(--radius) 0 0;
+	box-shadow: 0 -8px 24px rgb(0 0 0 / 0.35);
+}
+
+.sheet-grip {
+	display: block;
+	width: 36px;
+	height: 4px;
+	margin: 0 auto var(--space-4);
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: var(--border);
+	cursor: pointer;
+}
+
+.body-full {
+	margin: 0;
+	max-width: 60ch;
 	font-size: var(--fs-body);
 	line-height: 1.6;
 	color: var(--text-2);
 	text-wrap: pretty;
-	flex: 0 1 auto;
-	min-height: 0;
-	overflow: hidden;
 }
 
-/* Fade the bottom edge only when the body is actually clipped, so truncation
-   reads as "more below" — set by Card.svelte's ResizeObserver via data-clipped. */
-.body[data-clipped='true'] {
-	-webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
-	mask-image: linear-gradient(to bottom, #000 78%, transparent);
-}
-
-/* "Why it matters": a quiet, collapsed affordance. 44px tap target via padding
-   even though the text is small (web-design 05). */
-/* Bound tight to the body it expands (proximity), and lifted to the body tier at
-   rest so it reads as an invitation to go deeper — not fine print. */
-.why-toggle {
-	align-self: flex-start;
-	margin-top: var(--space-2);
-	display: inline-flex;
+.topic-row {
+	display: flex;
 	align-items: center;
-	gap: var(--space-2);
-	min-height: 44px;
-	font: inherit;
-	font-size: var(--fs-meta);
-	letter-spacing: 0.01em;
-	color: var(--text-2);
-	background: none;
-	border: 0;
-	padding: 0;
-	cursor: pointer;
-	transition: color var(--dur-fast) var(--ease);
+	justify-content: space-between;
+	gap: var(--space-3);
+	margin-top: var(--space-5);
 }
 
-.why-toggle:hover,
-.why-toggle.open {
+.topic-name {
+	font-size: var(--fs-meta);
+	font-weight: 600;
 	color: var(--text);
 }
 
-/* Caret rotates from ▸ to ▾ when open. */
-.why-caret {
-	width: 0;
-	height: 0;
-	border-left: 4px solid currentColor;
-	border-top: 3.5px solid transparent;
-	border-bottom: 3.5px solid transparent;
-	transition: transform var(--dur-fast) var(--ease);
-}
-
-.why-toggle.open .why-caret {
-	transform: rotate(90deg);
-}
-
-/* "Read more" — quiet text affordance matching .why-toggle, shown only when the
-   body is clipped. No accent fill, 44px target. */
-.read-more {
-	align-self: flex-start;
-	margin-top: var(--space-2);
-	min-height: 44px;
-	display: inline-flex;
-	align-items: center;
+.follow {
+	min-height: 36px;
+	padding: 0 var(--space-3);
 	font: inherit;
 	font-size: var(--fs-meta);
-	color: var(--text-2);
-	background: none;
-	border: 0;
-	padding: 0;
-	cursor: pointer;
-	transition: color var(--dur-fast) var(--ease);
-}
-
-.read-more:hover {
-	color: var(--text);
-}
-
-/* "Why it matters" — prose to read, not metadata, so it earns 15px and a readable
-   leading. No border rule: the dimmer tier + the slide-in already mark it as an
-   aside (whitespace and colour do the separating, not ink). */
-.why {
-	max-width: var(--measure);
-	font-size: var(--fs-why);
-	line-height: 1.55;
-	color: var(--muted);
-}
-
-/* Reveal panel: floats over the lower card area so opening it never changes the
-   card's flow height (and thus never causes the slot to scroll). Content here is
-   short (whyItMatters ≤ 360 chars), so it fits without internal scroll. */
-.reveal-overlay {
-	position: absolute;
-	inset-inline: 0;
-	bottom: 0;
-	z-index: 2;
-	padding: var(--space-4);
-	background: color-mix(in srgb, var(--surface) 92%, transparent);
-	backdrop-filter: blur(6px);
-	border-top: 1px solid var(--border);
-	border-radius: var(--radius) var(--radius) 0 0;
-	/* Cap panel height; scrolls internally only in the rare case content exceeds
-	   the cap (whyItMatters is schema-capped at 360 chars, so this almost never
-	   engages). Does not affect slot no-scroll — overlay is position:absolute. */
-	max-height: 60%;
-	overflow-y: auto;
-}
-.reveal-close {
-	float: right;
-	font: inherit;
-	font-size: 1.2rem;
-	line-height: 1;
-	color: var(--muted);
-	background: none;
-	border: none;
-	cursor: pointer;
-}
-
-/* Source content inside the overlay. */
-.reveal-overlay blockquote {
-	max-width: var(--measure);
-	margin: var(--space-3) 0;
-	font-style: italic;
-	color: var(--text-2);
-}
-
-.reveal-overlay a {
+	font-weight: 600;
 	color: var(--accent);
+	background: none;
+	border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition:
+		color var(--dur-fast) var(--ease),
+		background var(--dur-fast) var(--ease);
 }
 
-/* Full body text when "Read more" opens it in the reveal overlay. */
-.body-full {
-	max-width: var(--measure);
-	margin: var(--space-3) 0 0;
-	font-size: var(--fs-body);
-	line-height: 1.6;
-	color: var(--text-2);
+.follow.active {
+	color: var(--bg);
+	background: var(--accent);
+	border-color: var(--accent);
 }
 
-/* Explore cluster (chips + "more") detaches from the reading column with a true
-   section gap so proximity — not a divider — tells the eye it's a new zone. */
+/* Concept chips — relocated into the sheet (de-busies the face, §3c). Still
+   re-rank the feed via onRelated. Words with a small dot, not filled boxes. */
 .chips {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-3) var(--space-4);
-	margin-top: var(--space-7);
+	margin-top: var(--space-5);
 }
 
-/* Concept tags as words, not boxes — a tiny warm dot marks each as a tappable
-   "pivot the feed here" without the mass of a filled chip or the empty-input look
-   of an outline. The lowest-ink way to keep discovery present but quiet (Ma). 44px
-   tap target preserved via vertical padding. */
 .chip {
 	display: inline-flex;
 	align-items: center;
@@ -489,18 +487,13 @@ body {
 		transform var(--dur-fast) var(--ease-spring);
 }
 
-/* Dot is neutral at rest so the warm accent stays "one spark per card" (the kicker);
-   it warms to ember only when the concept is touched — turning the tag-line into a
-   live, tappable thing on interaction rather than four competing accents at rest. */
 .chip::before {
 	content: '';
 	width: 5px;
 	height: 5px;
 	border-radius: 50%;
 	background: var(--muted);
-	transition:
-		background var(--dur-fast) var(--ease),
-		opacity var(--dur-fast) var(--ease);
+	transition: background var(--dur-fast) var(--ease);
 }
 
 .chip:hover {
@@ -511,20 +504,12 @@ body {
 	background: var(--accent);
 }
 
-/* Tactile, springy press feedback (the only "hover" a touch screen gets; web-design 05). */
 .chip:active {
 	transform: scale(0.96);
 	color: var(--text);
 }
 
-.why-toggle:active {
-	transform: scale(0.98);
-}
-
-/* "More like this": dive into the semantic rabbit hole. A quiet text affordance
-   (accent text + arrow, no fill, no border) sitting tight under the chips as part
-   of the same explore group — so the format-tag stays the card's single accent
-   *fill* and nothing out-shouts the hook. */
+/* "More like this": the semantic dive, also relocated into the sheet (§5). */
 .more {
 	align-self: flex-start;
 	display: inline-flex;
@@ -558,17 +543,22 @@ body {
 	cursor: default;
 }
 
-/* Source toggle — same visual style as "why it matters" but floats off into its own
-   zone with a full section gap above (48px) and a closing breath below. Now renders
-   as an overlay button (not a <details>); the source content opens in .reveal-overlay. */
-.source-toggle {
-	margin-top: var(--space-7);
-	margin-bottom: var(--space-6);
+/* Source — the relocated attribution (ADR-005): quote, Wikipedia link, license. */
+.source {
+	margin-top: var(--space-6);
 }
 
-/* License — genuine fine print; demoted to 11px so it reads as legal metadata, not
-   content (rebuilds hierarchy below the body without adding chrome). Used inside
-   the .reveal-overlay when the source panel is open. */
+.depth-sheet blockquote {
+	max-width: var(--measure);
+	margin: 0 0 var(--space-3);
+	font-style: italic;
+	color: var(--text-2);
+}
+
+.depth-sheet a {
+	color: var(--accent);
+}
+
 .license {
 	margin: var(--space-2) 0 0;
 	font-size: 0.6875rem;
@@ -613,8 +603,8 @@ body {
 		border-color var(--dur-fast) var(--ease);
 }
 
-/* Dismiss and Share are recessive (dim icon); Save carries full weight (Von Restorff). */
-.action.dismiss,
+/* Dislike and Share are recessive (dim icon) at rest; Like and Save carry weight. */
+.action.dislike,
 .action.share {
 	color: var(--muted);
 }
@@ -627,15 +617,28 @@ body {
 	transform: scale(0.9);
 }
 
-.action.active {
+/* Like fills warm-red (loved), Save green (kept), Dislike a quiet neutral press —
+   each state legible on its own, no two the same colour. */
+.action.like.active {
+	color: var(--negative);
+	border-color: color-mix(in srgb, var(--negative) 55%, var(--border));
+	background: color-mix(in srgb, var(--negative) 12%, var(--surface));
+}
+
+.action.save.active {
 	color: var(--positive);
 	border-color: color-mix(in srgb, var(--positive) 55%, var(--border));
 	background: color-mix(in srgb, var(--positive) 12%, var(--surface));
 }
 
-/* A calm confirmation settle on save — NOT a slot-machine overshoot (ui-ux.md §4;
-   a 1.28 spring pop was explicitly rejected before). The real reward is the
-   bookmark *filling in* (see Card markup) — a legible state change, not a flash. */
+.action.dislike.active {
+	color: var(--text);
+	border-color: var(--muted);
+	background: var(--surface-2);
+}
+
+/* A calm confirmation settle when a state turns on — NOT a slot-machine overshoot
+   (ui-ux.md §4). The real reward is the icon *filling in* — a legible state change. */
 .action.active svg {
 	animation: save-pulse var(--dur) var(--ease);
 }

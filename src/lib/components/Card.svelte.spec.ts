@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import Card from './Card.svelte';
 import type { Doc } from '$convex/_generated/dataModel';
@@ -27,164 +27,93 @@ const sample = {
 	createdAt: 0
 } as unknown as Doc<'knowledgeCards'>;
 
-test('renders the hook and body, and reveals a source link', async () => {
-	render(Card, { card: sample });
-	await expect.element(page.getByRole('heading', { name: sample.hook })).toBeInTheDocument();
-	await expect.element(page.getByText(sample.body)).toBeInTheDocument();
+const withImage = {
+	...sample,
+	image: {
+		thumbnailUrl: 'https://upload.wikimedia.org/thumb.jpg',
+		commonsUrl: 'https://commons.wikimedia.org/wiki/File:Oxford.jpg',
+		author: 'Jane Doe',
+		licenseShortName: 'CC BY-SA 4.0',
+		licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+		attribution: 'Jane Doe, CC BY-SA 4.0, via Wikimedia Commons'
+	}
+} as unknown as Doc<'knowledgeCards'>;
 
-	// The source link lives behind a toggle button; opening it should reveal it in the overlay.
-	const sourceToggle = page.getByRole('button', { name: /source/i });
-	await sourceToggle.click();
-	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
+test('renders a full-bleed image as the card face when present', async () => {
+	render(Card, { card: withImage });
+	await expect.element(page.getByRole('img', { name: sample.hook })).toBeInTheDocument();
 });
 
-test('omits the image figure when the card has none', async () => {
+test('omits the image element when the card has none', async () => {
 	render(Card, { card: sample });
 	await expect.element(page.getByRole('img')).not.toBeInTheDocument();
 });
 
-test('shows "More like this" only when a handler is wired, and fires it', async () => {
-	render(Card, { card: sample });
-	await expect
-		.element(page.getByRole('button', { name: /More like this/ }))
-		.not.toBeInTheDocument();
-
-	let dived = false;
-	render(Card, { card: sample, onMore: () => (dived = true) });
-	const button = page.getByRole('button', { name: /More like this/ });
-	await expect.element(button).toBeVisible();
-	await button.click();
-	expect(dived).toBe(true);
-});
-
-test('renders a free-licensed image with attribution when present', async () => {
-	const withImage = {
-		...sample,
-		image: {
-			thumbnailUrl: 'https://upload.wikimedia.org/thumb.jpg',
-			commonsUrl: 'https://commons.wikimedia.org/wiki/File:Oxford.jpg',
-			author: 'Jane Doe',
-			licenseShortName: 'CC BY-SA 4.0',
-			licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-			attribution: 'Jane Doe, CC BY-SA 4.0, via Wikimedia Commons'
-		}
-	} as unknown as Doc<'knowledgeCards'>;
+test('the hook and the "why it matters" payoff are legible on the face with zero taps', async () => {
 	render(Card, { card: withImage });
-	await expect.element(page.getByRole('img', { name: sample.hook })).toBeInTheDocument();
-	await expect.element(page.getByRole('link', { name: 'Jane Doe' })).toBeVisible();
-	await expect.element(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toBeVisible();
+	await expect.element(page.getByRole('heading', { name: sample.hook })).toBeVisible();
+	await expect.element(page.getByText(WHY)).toBeVisible(); // payoff is on the face now
 });
 
-test('keeps "why it matters" collapsed until the toggle reveals it in the overlay, firing card_expand once', async () => {
+test('reflects the stored scrim level on the face for the legibility stack', async () => {
+	const heavy = {
+		...withImage,
+		image: { ...withImage.image, scrim: 'heavy' }
+	} as unknown as Doc<'knowledgeCards'>;
+	render(Card, { card: heavy });
+	const face = document.querySelector('.card-face') as HTMLElement;
+	expect(face.getAttribute('data-scrim')).toBe('heavy');
+});
+
+test('defaults to the medium scrim when the level is unknown', async () => {
+	render(Card, { card: withImage }); // no scrim field
+	const face = document.querySelector('.card-face') as HTMLElement;
+	expect(face.getAttribute('data-scrim')).toBe('medium');
+});
+
+test('single tap opens the depth sheet (source + body) and fires onExpand once; grip closes it', async () => {
 	let expands = 0;
-	render(Card, { card: sample, onExpand: () => (expands += 1) });
+	render(Card, { card: withImage, onExpand: () => (expands += 1) });
 
-	// Hidden by default so it doesn't compete with the hook (ui-ux.md §3).
-	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
-
-	const toggle = page.getByRole('button', { name: /why it matters/i });
-	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
-	await toggle.click();
-
-	// The text now appears inside the overlay panel (not inline in the card flow).
-	// The overlay's close button confirms the panel is rendered (not just the text).
-	await expect.element(page.getByText(WHY)).toBeVisible();
-	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
-	await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
-	expect(expands).toBe(1);
-
-	// Collapsing again hides the overlay without re-firing the deepening signal.
-	await toggle.click();
-	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
-	await expect.element(page.getByRole('button', { name: 'Close' })).not.toBeInTheDocument();
-	expect(expands).toBe(1);
-});
-
-test('source toggle opens an overlay with blockquote/link/license and fires onSource once', async () => {
-	let sourceFires = 0;
-	render(Card, { card: sample, onSource: () => (sourceFires += 1) });
-
-	// Source content hidden by default.
+	// Sheet content (the source quote/link) is absent until opened.
 	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
 
-	const toggle = page.getByRole('button', { name: /source/i });
-	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
-	await toggle.click();
-
-	// Panel opens with source content, close button, aria-expanded true.
+	await page.getByRole('article').click(); // single tap anywhere on the card
 	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
 	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
-	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
-	await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
-	expect(sourceFires).toBe(1);
+	expect(expands).toBe(1);
 
-	// Close button hides the overlay; onSource does not fire again.
-	await page.getByRole('button', { name: 'Close' }).click();
+	await page.getByRole('button', { name: 'Close details' }).click(); // grip
 	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
-	expect(sourceFires).toBe(1);
+	expect(expands).toBe(1); // closing does not re-fire the deepening signal
 });
 
-test('opening one panel closes the other (only one overlay at a time)', async () => {
-	let expands = 0;
-	let sourceFires = 0;
-	render(Card, {
-		card: sample,
-		onExpand: () => (expands += 1),
-		onSource: () => (sourceFires += 1)
-	});
+test('concept chips live in the sheet and re-rank via onRelated without closing it', async () => {
+	const tags: string[] = [];
+	render(Card, { card: withImage, onRelated: (t: string) => tags.push(t) });
 
-	const whyToggle = page.getByRole('button', { name: /why it matters/i });
-	const sourceToggle = page.getByRole('button', { name: /source/i });
-
-	// Open "why it matters".
-	await whyToggle.click();
-	await expect.element(page.getByText(WHY)).toBeVisible();
-	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
-	await expect.element(whyToggle).toHaveAttribute('aria-expanded', 'true');
-	await expect.element(sourceToggle).toHaveAttribute('aria-expanded', 'false');
-
-	// Open "source" — why panel must disappear.
-	await sourceToggle.click();
+	await page.getByRole('article').click();
 	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
-	await expect.element(page.getByText(WHY)).not.toBeInTheDocument();
-	await expect.element(sourceToggle).toHaveAttribute('aria-expanded', 'true');
-	await expect.element(whyToggle).toHaveAttribute('aria-expanded', 'false');
-
-	// Each handler fired exactly once.
-	expect(expands).toBe(1);
-	expect(sourceFires).toBe(1);
+	await page.getByRole('button', { name: 'Oxford' }).click(); // a conceptTag chip
+	expect(tags).toEqual(['Oxford']);
+	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible(); // chip tap did NOT close the sheet
 });
 
-test('hook carries its full text as a title attribute (for the clamped case)', async () => {
-	render(Card, { card: sample });
-	await expect
-		.element(page.getByRole('heading', { name: sample.hook }))
-		.toHaveAttribute('title', sample.hook);
+test('the Topic + Follow row lives in the sheet and toggles follow', async () => {
+	const onFollow = vi.fn();
+	render(Card, { card: withImage, following: false, onFollow });
+	await page.getByRole('article').click();
+	await page.getByRole('button', { name: /follow/i }).click();
+	expect(onFollow).toHaveBeenCalledOnce();
 });
 
-test('no "Read more" when the body fits', async () => {
-	render(Card, { card: sample });
-	await expect.element(page.getByRole('button', { name: /read more/i })).not.toBeInTheDocument();
-});
-
-test('shows "Read more" when the body is clipped and opens the full body overlay, firing onExpand once', async () => {
+test('double-tap likes without opening the sheet', async () => {
+	let likes = 0;
 	let expands = 0;
-	const longBody =
-		'This is a deliberately long body sentence used to force clipping in the test harness. '.repeat(
-			8
-		);
-	const longCard = { ...sample, body: longBody } as unknown as Doc<'knowledgeCards'>;
-	render(Card, { card: longCard, onExpand: () => (expands += 1) });
+	render(Card, { card: withImage, onLike: () => (likes += 1), onExpand: () => (expands += 1) });
 
-	// Force the body's box smaller than its content so the ResizeObserver marks it clipped.
-	const bodyEl = document.querySelector('.body') as HTMLElement;
-	bodyEl.style.height = '24px';
-
-	const btn = page.getByRole('button', { name: /read more/i });
-	await expect.element(btn).toBeVisible();
-	await btn.click();
-
-	// Full body opens in the reveal overlay (Close button confirms the panel rendered).
-	await expect.element(page.getByRole('button', { name: 'Close' })).toBeVisible();
-	expect(expands).toBe(1);
+	await page.getByRole('article').dblClick();
+	expect(likes).toBe(1);
+	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument(); // sheet stayed closed
+	expect(expands).toBe(0);
 });
