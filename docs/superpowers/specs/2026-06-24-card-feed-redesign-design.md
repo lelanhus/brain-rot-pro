@@ -8,11 +8,11 @@
 
 ## 1. Problem
 
-The feed is a one-card-per-viewport snap feed (brain-rot format), but it's a *depth* product wearing an *anti-depth* interface. Concretely:
+The feed is a one-card-per-viewport snap feed (brain-rot format), but it's a _depth_ product wearing an _anti-depth_ interface. Concretely:
 
-- **The payoff is hidden.** "Why it matters" (the single most valuable sentence) and the full body live behind tap-to-open overlays. The feed's muscle memory is *scroll, don't tap*, so those taps almost never happen — the best content is invisible.
+- **The payoff is hidden.** "Why it matters" (the single most valuable sentence) and the full body live behind tap-to-open overlays. The feed's muscle memory is _scroll, don't tap_, so those taps almost never happen — the best content is invisible.
 - **"Read more" is self-inflicted.** The body is clipped only because the card is forced to fit one screen, then re-offered as a tap.
-- **The chips are busy.** Up to four concept tags (each a dot + word) sit *in the middle of the reading column* — navigation masquerading as content, competing with the actual words.
+- **The chips are busy.** Up to four concept tags (each a dot + word) sit _in the middle of the reading column_ — navigation masquerading as content, competing with the actual words.
 - **Three competing explore affordances** crowd every card: chip re-rank, "More like this," and "Source."
 
 The cosmetics are downstream of the structure. The fix is to restructure the card around how the feed is actually used: a glanceable face, depth one deliberate move away, and signal collection that feels native.
@@ -20,6 +20,7 @@ The cosmetics are downstream of the structure. The fix is to restructure the car
 ## 2. Goals / Non-goals
 
 **Goals**
+
 - The core idea (hook + the "why") is legible at a glance with **zero taps**.
 - Depth (full body, source, related concepts) is reachable with **one feed-native gesture**.
 - Collect **explicit taste signal** (like / dislike) with minimal friction.
@@ -27,6 +28,7 @@ The cosmetics are downstream of the structure. The fix is to restructure the car
 - Degrade gracefully when a card has **no image**.
 
 **Non-goals**
+
 - No carousel / horizontal paging (see §4, gesture budget).
 - No streak or session-count chrome on the card (removed).
 - No text-only/no-image card type — **every card ships with a lead image** (see §3b).
@@ -37,6 +39,7 @@ The cosmetics are downstream of the structure. The fix is to restructure the car
 One card type: a full-bleed image with overlaid chrome. Every card has an image (§3b).
 
 ### 3a. The card (full-bleed)
+
 ```
 ┌─────────────────────────────┐
 │                  [⌕] [LH]    │  ← top-right chrome: Explore · Account avatar
@@ -52,15 +55,20 @@ One card type: a full-bleed image with overlaid chrome. Every card has an image 
 │  A. Reader · CC BY-SA 4.0    [↗ Share]│
 └─────────────────────────────┘
 ```
+
 - Image fills the card. Text + rail overlay it on a scrim (§6).
 - **Accent moves from the kicker to the payoff** — the insight gets the single warm moment; the format kicker drops to muted. (Preserves the "one spark per card" principle.)
 
 ### 3b. Every card has an image
+
 All cards are full-bleed — there is no text-only layout. This is a hard requirement on the generation pipeline: a card is not publishable until a free-licensed lead image (Commons, ADR-005) is attached and its legibility level is computed (§6).
+
 - **Pipeline edge case (carry to plan):** what happens when no suitable image is found for a topic — hold the card from publishing (quality bar), or attach a deterministic branded/topical fallback background. Recommended default: **hold the card** so the feed never shows a degraded card; revisit if it starves supply.
 
 ### 3c. Depth ("page 2")
+
 Opened by single-tap; a sheet slides up over the card. Contains:
+
 - Full body text.
 - **Concept chips** (relocated here from the face — this is what de-busies the face).
 - **Topic + Follow row** — names the source topic (e.g. "Testing effect") with a `＋ Follow` toggle. This is Follow's home (see §5): low-frequency, self-labeling next to the named topic, off the face.
@@ -71,16 +79,17 @@ Opened by single-tap; a sheet slides up over the card. Contains:
 
 Every input does exactly one job. This is the core architectural decision.
 
-| Input | Job |
-|---|---|
-| **Vertical swipe** | next / previous card (the feed) |
-| **Single tap** | open / close the depth sheet — *free for us; no video to pause, unlike TikTok* |
-| **Double-tap** | like (heart burst, rail like fills) |
-| **Bottom-right rail buttons** | like · dislike · save · share (explicit + accessible mirrors) |
-| **Horizontal swipe** | **left free, deliberately** — no carousel, no collision |
+| Input                         | Job                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| **Vertical swipe**            | next / previous card (the feed)                                                |
+| **Single tap**                | open / close the depth sheet — _free for us; no video to pause, unlike TikTok_ |
+| **Double-tap**                | like (heart burst, rail like fills)                                            |
+| **Bottom-right rail buttons** | like · dislike · save · share (explicit + accessible mirrors)                  |
+| **Horizontal swipe**          | **left free, deliberately** — no carousel, no collision                        |
 
 **Why this allocation:**
-- Like/dislike claim the most valuable surface for taste signal. Following the proven feed playbook (TikTok/IG put *like* on double-tap + a button rail, **not** a swipe), taste stays off the swipe axes so they remain clean.
+
+- Like/dislike claim the most valuable surface for taste signal. Following the proven feed playbook (TikTok/IG put _like_ on double-tap + a button rail, **not** a swipe), taste stays off the swipe axes so they remain clean.
 - Putting like on **double-tap (not swipe) is what keeps single-tap free and instant for open/close.** The two decisions reinforce each other — do not move like to a swipe or open will collide with the vertical feed.
 - Horizontal swipe is left free rather than used for a carousel: a carousel collides with the vertical snap feed (diagonal ambiguity) and there's no payoff worth that cost.
 
@@ -88,7 +97,7 @@ Every input does exactly one job. This is the core architectural decision.
 
 - **Like / Dislike** — primary taste signal. Mutually exclusive, reversible, signal weighted softly (an accidental tap isn't catastrophic). Like via double-tap or rail; dislike via rail (no app makes dislike a swipe; we expose it as a button — our one deliberate divergence from TikTok/IG, which bury it).
 - **Dislike absorbs "Not interested."** A left-swipe-dismiss and a 👎 both meaning "negative" is redundant. Unify: **dislike = negative signal + advance to next card.** Like does **not** auto-advance.
-- **Save** — utility ("keep to revisit"), a rail button, not a swipe. The only bookmark icon on screen, so it unambiguously means "save this card." The saved *collection* is reached behind the account avatar.
+- **Save** — utility ("keep to revisit"), a rail button, not a swipe. The only bookmark icon on screen, so it unambiguously means "save this card." The saved _collection_ is reached behind the account avatar.
 - **Share** — rail button.
 - **Open the sheet** is itself a strong "go deeper" signal (stronger than passive dwell) — feed it to personalization (replaces today's `card_expand`).
 
