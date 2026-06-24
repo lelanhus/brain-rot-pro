@@ -227,3 +227,41 @@ test('imagedWithoutScrim returns only published cards that have an image but no 
 	expect(rows).toHaveLength(1);
 	expect(rows[0].thumbnailUrl).toBe('https://x/thumb.jpg');
 });
+
+test('heldForImage returns needs_review cards without an image (the promotion work-list)', async () => {
+	const t = convexTest(schema, modules);
+	const base = {
+		body: 'b',
+		whyItMatters: 'w',
+		format: 'object_story' as const,
+		conceptTags: ['t'],
+		shuffleKey: 0.5,
+		createdAt: 0,
+		source: { articleTitle: 'Held topic', articleUrl: 'u', revisionId: null, sourceSpan: 's' }
+	};
+	const img = {
+		thumbnailUrl: 'https://x/t.jpg',
+		commonsUrl: 'https://x',
+		author: 'A',
+		licenseShortName: 'CC',
+		licenseUrl: 'https://x/l',
+		attribution: 'A, CC'
+	};
+	await t.run(async (ctx) => {
+		// (a) held (needs_review) + no image → matched
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'held', status: 'needs_review' });
+		// (b) needs_review WITH image → not matched (already has its image)
+		await ctx.db.insert('knowledgeCards', {
+			...base,
+			hook: 'imaged',
+			status: 'needs_review',
+			image: img
+		});
+		// (c) published, no image → not matched here (imagelessPublished handles it)
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'pub', status: 'published' });
+	});
+
+	const rows = await t.query(internal.ingest.heldForImage, { limit: 50 });
+	expect(rows).toHaveLength(1);
+	expect(rows[0].title).toBe('Held topic');
+});

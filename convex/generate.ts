@@ -12,6 +12,7 @@ import {
 	buildValidationPrompt,
 	clampBody,
 	decidePublish,
+	gatePublishOnImage,
 	generatedCardSchema,
 	spanIsFromSource,
 	validationSchema
@@ -59,7 +60,7 @@ export const generateFromArticle = action({
 		args
 	): Promise<{
 		cardId: Id<'knowledgeCards'> | null;
-		status: 'published' | 'validation_failed' | 'duplicate';
+		status: 'published' | 'validation_failed' | 'duplicate' | 'needs_review';
 		grounded: boolean;
 		supportScore: number;
 		reason: string;
@@ -117,11 +118,17 @@ export const generateFromArticle = action({
 		// Auto-publish: no human in the loop, so a card publishes ONLY when it's
 		// grounded in a real source span AND the validator confirms support at high
 		// confidence (decidePublish). Otherwise it's auto-failed.
-		const status = decidePublish(grounded, {
-			supported: validation.supported,
-			score,
-			reason: validation.reason
-		});
+		// Image guarantee (redesign §3b): a card that would publish but has no
+		// free-licensed image is held at needs_review — the feed only shows full-bleed
+		// image cards. The image backfill can attach one and promote it later.
+		const status = gatePublishOnImage(
+			decidePublish(grounded, {
+				supported: validation.supported,
+				score,
+				reason: validation.reason
+			}),
+			article.image !== undefined
+		);
 
 		// For a passing card, embed it (for "more like this" + dedup) and drop it if
 		// it's a near-duplicate of something already published — infinite cards, not
@@ -265,12 +272,17 @@ export const generateBatch = action({
 		args
 	): Promise<{
 		attempted: number;
-		results: { published: number; validation_failed: number; duplicate: number };
+		results: {
+			published: number;
+			validation_failed: number;
+			duplicate: number;
+			needs_review: number;
+		};
 	}> => {
 		const ids = await ctx.runQuery(internal.generateDb.articlesNeedingCards, {
 			limit: args.limit ?? 3
 		});
-		const results = { published: 0, validation_failed: 0, duplicate: 0 };
+		const results = { published: 0, validation_failed: 0, duplicate: 0, needs_review: 0 };
 		for (const articleId of ids) {
 			const r = await ctx.runAction(api.generate.generateFromArticle, { articleId });
 			results[r.status] += 1;

@@ -86,6 +86,25 @@ export const imagelessPublished = internalQuery({
 	}
 });
 
+/**
+ * Cards held by the image guarantee (redesign §3b): they passed validation but
+ * have no free-licensed image, so they wait at `needs_review`. The backfill
+ * re-tries an image and PROMOTES them to published once one clears.
+ */
+export const heldForImage = internalQuery({
+	args: { limit: v.number() },
+	handler: async (ctx, { limit }) => {
+		const cards = await ctx.db
+			.query('knowledgeCards')
+			.withIndex('by_status_shuffle', (q) => q.eq('status', 'needs_review'))
+			.take(2000);
+		return cards
+			.filter((c) => !c.image)
+			.slice(0, limit)
+			.map((c) => ({ _id: c._id, title: c.source.articleTitle }));
+	}
+});
+
 /** Patch a (now-cleared, free-licensed) image onto an existing card. */
 export const setCardImage = internalMutation({
 	args: { cardId: v.id('knowledgeCards'), image: imageValidator },
@@ -438,12 +457,22 @@ export const ingestOne = internalAction({
  */
 export const backfillImages = action({
 	args: { limit: v.optional(v.number()) },
-	handler: async (ctx, args): Promise<{ scanned: number; updated: number; titles: string[] }> => {
-		const cards = await ctx.runQuery(internal.ingest.imagelessPublished, {
-			limit: args.limit ?? 40
-		});
+	handler: async (
+		ctx,
+		args
+	): Promise<{ scanned: number; updated: number; promoted: number; titles: string[] }> => {
+		const limit = args.limit ?? 40;
+		// Published cards missing an image, plus cards HELD by the image guarantee
+		// (needs_review, no image) which get promoted to published once one clears.
+		const published = await ctx.runQuery(internal.ingest.imagelessPublished, { limit });
+		const held = await ctx.runQuery(internal.ingest.heldForImage, { limit });
+		const work = [
+			...published.map((c) => ({ ...c, held: false })),
+			...held.map((c) => ({ ...c, held: true }))
+		];
 		const titles: string[] = [];
-		for (const card of cards) {
+		let promoted = 0;
+		for (const card of work) {
 			const page = await fetchArticle(card.title);
 			if (!page) continue;
 			const qid = page.pageprops?.wikibase_item;
@@ -451,10 +480,17 @@ export const backfillImages = action({
 			const image = await fetchBestImage(ctx, page, claims?.image);
 			if (image) {
 				await ctx.runMutation(internal.ingest.setCardImage, { cardId: card._id, image });
+				if (card.held) {
+					await ctx.runMutation(internal.generateDb.setCardStatus, {
+						cardId: card._id,
+						status: 'published'
+					});
+					promoted += 1;
+				}
 				titles.push(card.title);
 			}
 		}
-		return { scanned: cards.length, updated: titles.length, titles };
+		return { scanned: work.length, updated: titles.length, promoted, titles };
 	}
 });
 

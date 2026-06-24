@@ -139,6 +139,20 @@ export function decidePublish(
 }
 
 /**
+ * Image guarantee (redesign §3b / §6): every card in the feed is a full-bleed
+ * image poster, so a would-be-published card with no free-licensed image is HELD
+ * at `needs_review` instead of published — the feed never shows a degraded card.
+ * The image backfill can attach an image and promote it later. Non-publish
+ * statuses pass through untouched.
+ */
+export function gatePublishOnImage<S extends string>(
+	status: S | 'published',
+	hasImage: boolean
+): S | 'published' | 'needs_review' {
+	return status === 'published' && !hasImage ? 'needs_review' : status;
+}
+
+/**
  * Trim a body to <= max chars at a sentence boundary (keep whole sentences).
  * Falls back to a word boundary if even the first sentence exceeds max.
  */

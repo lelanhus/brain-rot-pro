@@ -5,6 +5,7 @@ import {
 	buildGenerationPrompt,
 	clampBody,
 	decidePublish,
+	gatePublishOnImage,
 	generatedCardSchema,
 	publishedDelta,
 	spanIsFromSource,
@@ -72,6 +73,19 @@ describe('decidePublish (auto-publish gate, default threshold 0.9)', () => {
 		expect(decidePublish(true, { supported: true, score: 0.8, reason: '' })).toBe(
 			'validation_failed'
 		);
+	});
+});
+
+describe('gatePublishOnImage (image guarantee, redesign §3b)', () => {
+	it('holds a would-be-published card at needs_review when it has no image', () => {
+		expect(gatePublishOnImage('published', false)).toBe('needs_review');
+	});
+	it('publishes when an image is present', () => {
+		expect(gatePublishOnImage('published', true)).toBe('published');
+	});
+	it('never resurrects a non-published status (no image cannot help a failed card)', () => {
+		expect(gatePublishOnImage('validation_failed', false)).toBe('validation_failed');
+		expect(gatePublishOnImage('validation_failed', true)).toBe('validation_failed');
 	});
 });
 

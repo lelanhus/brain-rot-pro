@@ -83,7 +83,13 @@ export const insertGeneratedCard = internalMutation({
 		source: sourceValidator,
 		image: v.optional(image),
 		embedding: v.optional(v.array(v.float64())),
-		status: v.union(v.literal('published'), v.literal('validation_failed')),
+		// `needs_review` = held by the image guarantee (redesign §3b): a card that
+		// passed validation but has no free-licensed image yet.
+		status: v.union(
+			v.literal('published'),
+			v.literal('validation_failed'),
+			v.literal('needs_review')
+		),
 		generation: generationValidator
 	},
 	returns: v.id('knowledgeCards'),
