@@ -1,11 +1,12 @@
 import { convexTest } from 'convex-test';
 import { expect, test } from 'vitest';
-import { api, internal } from './_generated/api';
+import { api } from './_generated/api';
 import schema from './schema';
+import { mergeAccounts } from './accountMerge';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!./**/*.d.ts']);
 
-test('mergeInto unions saves, re-points events, and drops the joining profile', async () => {
+test('mergeAccounts unions saves, re-points events, and drops the joining profile', async () => {
 	const t = convexTest(schema, modules);
 	await t.mutation(api.seed.seed, {});
 	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 2, cursor: null } });
@@ -21,7 +22,7 @@ test('mergeInto unions saves, re-points events, and drops the joining profile', 
 		events: [{ type: 'card_complete', cardId: c0._id, ts: 1 }]
 	});
 
-	await t.mutation(internal.accountMerge.mergeInto, { from: 'from', to: 'to' });
+	await t.run(async (ctx) => mergeAccounts(ctx, 'from', 'to'));
 
 	// Saves unioned onto `to`, and cleared from `from`.
 	const toSaved = (await t.query(api.saved.savedIds, { deviceId: 'to' })).map(String).sort();
@@ -36,15 +37,4 @@ test('mergeInto unions saves, re-points events, and drops the joining profile', 
 			.collect()
 	);
 	expect(fromEvents).toHaveLength(0);
-});
-
-test('mergeInto is a no-op when from === to', async () => {
-	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {});
-	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 1, cursor: null } });
-	await t.mutation(api.saved.toggle, { deviceId: 'solo', cardId: feed.page[0]._id });
-
-	await t.mutation(internal.accountMerge.mergeInto, { from: 'solo', to: 'solo' });
-
-	expect(await t.query(api.saved.savedIds, { deviceId: 'solo' })).toHaveLength(1);
 });

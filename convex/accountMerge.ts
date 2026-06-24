@@ -1,5 +1,4 @@
-import { internalMutation, type MutationCtx } from './_generated/server';
-import { v } from 'convex/values';
+import { type MutationCtx } from './_generated/server';
 import { mergeStreakStates } from './streakLogic';
 
 /**
@@ -75,20 +74,3 @@ export async function mergeAccounts(ctx: MutationCtx, from: string, to: string):
 		.unique();
 	if (fromProfile) await ctx.db.delete(fromProfile._id);
 }
-
-/**
- * Internal entry point for the merge — callable from other Convex functions
- * (sync redeem today; Better Auth `onLinkAccount` later). Internal, not public:
- * merging accounts is privileged and only triggered by a verified flow. No-op
- * when the two principals are the same.
- */
-export const mergeInto = internalMutation({
-	args: { from: v.string(), to: v.string() },
-	returns: v.null(),
-	handler: async (ctx, args) => {
-		if (args.from && args.to && args.from !== args.to) {
-			await mergeAccounts(ctx, args.from, args.to);
-		}
-		return null;
-	}
-});

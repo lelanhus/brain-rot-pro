@@ -28,14 +28,14 @@ export type SponsoredOffer = {
 
 export type SlotMode = 'offers' | 'network' | 'off';
 
-export type FeedItem<T> =
+type FeedItem<T> =
 	| { kind: 'card'; card: T }
 	| { kind: 'slot'; id: string; offer: SponsoredOffer | null };
 
 /** Slot pacing. Conservative defaults; tune against retention (plan phase B). */
-export const SLOT_CADENCE = 10; // one slot per N organic cards
-export const FIRST_SLOT_AFTER = 5; // no slot before the user is engaged
-export const MAX_SLOTS_PER_SESSION = 3; // frequency cap per render
+const SLOT_CADENCE = 10; // one slot per N organic cards
+const FIRST_SLOT_AFTER = 5; // no slot before the user is engaged
+const MAX_SLOTS_PER_SESSION = 3; // frequency cap per render
 
 /**
  * Pick the best active offer for a set of nearby concept tags. Score is tag

@@ -206,6 +206,9 @@ export default defineSchema({
 	userProfiles: defineTable({
 		deviceId: v.string(),
 		conceptWeights: v.array(v.object({ concept: v.string(), weight: v.number() })),
+		// Legacy: superseded by the `seenCards` table (ADR-007). Live docs still
+		// carry it, so the validator must keep it until a strip-migration clears
+		// the redundant arrays — then this can be dropped.
 		seen: v.optional(v.array(v.id('knowledgeCards'))),
 		notInterested: v.array(v.id('knowledgeCards')),
 		// Embedding of the user's taste (avg of liked cards), for AI feed ranking.
@@ -305,16 +308,5 @@ export default defineSchema({
 		createdAt: v.number()
 	})
 		.index('by_device', ['deviceId'])
-		.index('by_device_slug', ['deviceId', 'slug']),
-
-	/**
-	 * Staging buffer for offline-ETL Wikipedia dump imports. Rows are transient:
-	 * `mergeStagingIntoCatalog` drains them into `topics` and deletes each row as
-	 * it's consumed. Schema mirrors the minimum needed for an upsert-by-slug.
-	 */
-	topicsStaging: defineTable({
-		title: v.string(),
-		slug: v.string(),
-		pageviews: v.number()
-	})
+		.index('by_device_slug', ['deviceId', 'slug'])
 });

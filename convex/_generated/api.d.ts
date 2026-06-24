@@ -45,7 +45,6 @@ import type * as profileLogic from "../profileLogic.js";
 import type * as saved from "../saved.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
-import type * as seenMigration from "../seenMigration.js";
 import type * as stats from "../stats.js";
 import type * as streakLogic from "../streakLogic.js";
 import type * as sync from "../sync.js";
@@ -98,7 +97,6 @@ declare const fullApi: ApiFromModules<{
   saved: typeof saved;
   seed: typeof seed;
   seedData: typeof seedData;
-  seenMigration: typeof seenMigration;
   stats: typeof stats;
   streakLogic: typeof streakLogic;
   sync: typeof sync;

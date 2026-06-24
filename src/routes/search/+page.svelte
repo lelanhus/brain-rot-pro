@@ -4,6 +4,8 @@
 	import { useQuery, useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { getDeviceId } from '$lib/identity';
+	import { slugToDisplay } from '$lib/slug';
+	import { toggleInterest } from '$lib/interests';
 
 	let deviceId = $state('');
 	onMount(() => {
@@ -20,12 +22,12 @@
 	const addInterest = useMutation(api.interests.add);
 	const removeInterest = useMutation(api.interests.remove);
 
-	const display = (title: string) => title.replace(/_/g, ' ');
-	function toggle(slug: string, title: string) {
-		if (!deviceId) return;
-		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
-		else void addInterest({ deviceId, slug, title: display(title) });
-	}
+	const toggle = (slug: string, title: string) =>
+		toggleInterest(followedSlugs, slug, title, {
+			deviceId,
+			add: addInterest,
+			remove: removeInterest
+		});
 </script>
 
 <svelte:head><title>Explore</title></svelte:head>
@@ -50,7 +52,7 @@
 		<ul class="results">
 			{#each results.data ?? [] as t (t.slug)}
 				<li>
-					<span>{display(t.title)}</span>
+					<span>{slugToDisplay(t.title)}</span>
 					<button
 						type="button"
 						class="ghost"

@@ -7,3 +7,8 @@ export function toSlug(title: string): string {
 		.replace(/^_+|_+$/g, '')
 		.toLowerCase();
 }
+
+/** Slug/DB-title → human display ("roman_concrete" → "roman concrete"). */
+export function slugToDisplay(s: string): string {
+	return s.replace(/_/g, ' ');
+}

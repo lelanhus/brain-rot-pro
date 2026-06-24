@@ -20,6 +20,7 @@ convex/_generated/
 # not our source; formatting them is churn that reinstalls overwrite.
 .agents/
 .claude/skills/
+skills-lock.json
 
 # Subagent-driven-development scratch (briefs, reports, ledger) — not source.
 .superpowers/

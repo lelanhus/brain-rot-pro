@@ -2,6 +2,8 @@
 	import { resolve } from '$app/paths';
 	import { useQuery, useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
+	import { slugToDisplay } from '$lib/slug';
+	import { toggleInterest } from '$lib/interests';
 
 	let { deviceId, onDone }: { deviceId: string; onDone: () => void } = $props();
 
@@ -11,12 +13,12 @@
 	const addInterest = useMutation(api.interests.add);
 	const removeInterest = useMutation(api.interests.remove);
 
-	const display = (title: string) => title.replace(/_/g, ' ');
-	function toggle(slug: string, title: string) {
-		if (!deviceId) return;
-		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
-		else void addInterest({ deviceId, slug, title: display(title) });
-	}
+	const toggle = (slug: string, title: string) =>
+		toggleInterest(followedSlugs, slug, title, {
+			deviceId,
+			add: addInterest,
+			remove: removeInterest
+		});
 </script>
 
 <div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your interests">
@@ -32,7 +34,7 @@
 					aria-pressed={followedSlugs.has(t.slug)}
 					onclick={() => toggle(t.slug, t.title)}
 				>
-					{display(t.title)}
+					{slugToDisplay(t.title)}
 				</button>
 			{/each}
 		</div>
