@@ -14,11 +14,16 @@ import { v } from 'convex/values';
 import jpeg from 'jpeg-js';
 import { sampleLuminance, scrimLevelFor, type ScrimLevel } from './legibility';
 
+// Wikimedia policy requires a descriptive UA on every request, including static
+// upload.wikimedia.org thumbnails — a default/missing UA gets 403'd (ADR-005).
+const USER_AGENT =
+	'BrainRotPro/0.1 (https://github.com/lelanhus/brain-rot-pro; leland.husband@gmail.com)';
+
 export const computeScrim = internalAction({
 	args: { url: v.string() },
 	handler: async (_ctx, { url }): Promise<ScrimLevel> => {
 		try {
-			const res = await fetch(url);
+			const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
 			if (!res.ok) return 'medium';
 			const bytes = new Uint8Array(await res.arrayBuffer());
 			const { data, width, height } = jpeg.decode(bytes, {

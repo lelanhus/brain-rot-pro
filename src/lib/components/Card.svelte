@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
 	import { fly } from 'svelte/transition';
+	import { onDestroy } from 'svelte';
 	import { formatName } from '$lib/cards';
 
 	// Full-bleed image poster (redesign §3). The face shows kicker → hook → teaser
@@ -36,6 +37,13 @@
 	let burst = $state(false);
 	let burstTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Honor reduced-motion: skip the heart-burst (its CSS animation is force-disabled
+	// under reduced-motion, which would otherwise leave a static full-size heart) and
+	// zero the sheet's slide. Read once — the preference rarely flips mid-session.
+	const reduceMotion =
+		typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const sheetDuration = reduceMotion ? 0 : 200;
+
 	function toggleSheet() {
 		if (!open) onExpand?.(); // opening the sheet IS the "go deeper" signal (redesign §5)
 		open = !open;
@@ -43,6 +51,7 @@
 
 	function like() {
 		onLike?.();
+		if (reduceMotion) return; // no burst when motion is reduced
 		burst = true;
 		if (burstTimer) clearTimeout(burstTimer);
 		burstTimer = setTimeout(() => (burst = false), 600);
@@ -67,6 +76,11 @@
 	}
 
 	const scrim = $derived(card.image?.scrim ?? 'medium');
+
+	onDestroy(() => {
+		if (tapTimer) clearTimeout(tapTimer);
+		if (burstTimer) clearTimeout(burstTimer);
+	});
 </script>
 
 <!-- The card-level tap is a pointer convenience; the keyboard-accessible open/close
@@ -117,7 +131,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 		<section
 			class="depth-sheet"
-			transition:fly={{ y: 24, duration: 200 }}
+			transition:fly={{ y: 24, duration: sheetDuration }}
 			onclick={(e) => e.stopPropagation()}
 		>
 			<button
