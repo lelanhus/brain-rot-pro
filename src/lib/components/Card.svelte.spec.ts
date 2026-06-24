@@ -107,6 +107,26 @@ test('the Topic + Follow row lives in the sheet and toggles follow', async () =>
 	expect(onFollow).toHaveBeenCalledOnce();
 });
 
+test('legibility: both scrim layers render at every level (image-independent guarantee)', async () => {
+	// The directional scrim + the top-strip scrim (the §6 weak point) are always
+	// present regardless of the image or its computed level — that image-independence
+	// IS the guarantee. The CSS escalates their strength off [data-scrim]; the
+	// frosted-plate at 'heavy' is verified visually (Task 9 Step 3), but the
+	// deterministic structure that drives it is asserted here for every level.
+	for (const level of ['light', 'medium', 'heavy'] as const) {
+		const card = {
+			...withImage,
+			image: { ...withImage.image, scrim: level }
+		} as unknown as Doc<'knowledgeCards'>;
+		const { unmount } = render(Card, { card });
+		const face = document.querySelector(`.card-face[data-scrim="${level}"]`) as HTMLElement;
+		expect(face).not.toBeNull();
+		expect(face.querySelector('.scrim')).not.toBeNull();
+		expect(face.querySelector('.scrim-top')).not.toBeNull();
+		unmount();
+	}
+});
+
 test('double-tap likes without opening the sheet', async () => {
 	let likes = 0;
 	let expands = 0;
