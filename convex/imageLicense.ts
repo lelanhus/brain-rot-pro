@@ -17,6 +17,9 @@ export type CardImage = {
 	licenseShortName: string;
 	licenseUrl: string;
 	attribution: string;
+	// Legibility level for the full-bleed face (redesign §6), computed at ingest.
+	scrim?: 'light' | 'medium' | 'heavy';
+	dominantColor?: string;
 };
 
 /** A single extmetadata field as returned by the Action API's imageinfo. */

@@ -53,6 +53,7 @@
 		"better-auth": "~1.6.15",
 		"convex": "^1.41.0",
 		"convex-svelte": "^0.13.0",
+		"jpeg-js": "^0.4.4",
 		"zod": "^4.4.3"
 	}
 }

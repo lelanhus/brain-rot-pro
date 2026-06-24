@@ -1,4 +1,10 @@
-import { action, internalAction, internalMutation, internalQuery } from './_generated/server';
+import {
+	action,
+	internalAction,
+	internalMutation,
+	internalQuery,
+	type ActionCtx
+} from './_generated/server';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
@@ -88,6 +94,38 @@ export const setCardImage = internalMutation({
 	}
 });
 
+/**
+ * Published cards that HAVE an image but no computed scrim level yet — the
+ * legibility backfill work-list (redesign §6). Pre-redesign images predate the
+ * luminance check, so they render at the safe 'medium' default until backfilled.
+ */
+export const imagedWithoutScrim = internalQuery({
+	args: { limit: v.number() },
+	handler: async (ctx, { limit }) => {
+		const cards = await ctx.db
+			.query('knowledgeCards')
+			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
+			.take(2000);
+		return cards
+			.filter((c) => c.image !== undefined && c.image.scrim === undefined)
+			.slice(0, limit)
+			.map((c) => ({ _id: c._id, thumbnailUrl: c.image!.thumbnailUrl }));
+	}
+});
+
+/** Patch just the computed scrim level onto an existing card's image. */
+export const setCardScrim = internalMutation({
+	args: {
+		cardId: v.id('knowledgeCards'),
+		scrim: v.union(v.literal('light'), v.literal('medium'), v.literal('heavy'))
+	},
+	handler: async (ctx, { cardId, scrim }) => {
+		const card = await ctx.db.get(cardId);
+		if (!card?.image) return;
+		await ctx.db.patch(cardId, { image: { ...card.image, scrim } });
+	}
+});
+
 /** GET JSON from a Wikimedia endpoint, degrading to null on any HTTP/parse error. */
 async function getJsonOrNull<T>(apiUrl: string, params: URLSearchParams): Promise<T | null> {
 	try {
@@ -160,6 +198,7 @@ async function fetchCommonsImage(fileName: string | undefined): Promise<CardImag
  * Returns `null` when nothing clears (the card simply ships without an image).
  */
 async function fetchBestImage(
+	ctx: ActionCtx,
 	page: WikiPage,
 	wikidataImage: string | undefined
 ): Promise<CardImage | null> {
@@ -170,7 +209,14 @@ async function fetchBestImage(
 	});
 	for (const fileName of candidates) {
 		const cleared = await fetchCommonsImage(fileName);
-		if (cleared) return cleared;
+		if (cleared) {
+			// Compute the legibility level from the actual thumbnail (redesign §6).
+			// Fail-safe inside the Node action → 'medium', so this never blocks attach.
+			const scrim = await ctx.runAction(internal.imageScrim.computeScrim, {
+				url: cleared.thumbnailUrl
+			});
+			return { ...cleared, scrim };
+		}
 	}
 	return null;
 }
@@ -311,7 +357,7 @@ export const ingestTitles = action({
 				decisions.push({ title: page.title, status, basis });
 				const accepted = status === 'fetched';
 				// Only spend the image request on articles we'd actually generate from.
-				const leadImage = accepted ? await fetchBestImage(page, claims?.image) : null;
+				const leadImage = accepted ? await fetchBestImage(ctx, page, claims?.image) : null;
 				await ctx.runMutation(internal.ingest.upsertArticle, {
 					pageId: page.pageid!,
 					title: page.title,
@@ -365,7 +411,7 @@ export const ingestOne = internalAction({
 			nowYear: new Date().getUTCFullYear()
 		});
 		const accepted = status === 'fetched';
-		const leadImage = accepted ? await fetchBestImage(page, claims?.image) : null;
+		const leadImage = accepted ? await fetchBestImage(ctx, page, claims?.image) : null;
 		const articleId = await ctx.runMutation(internal.ingest.upsertArticle, {
 			pageId: page.pageid!,
 			title: page.title,
@@ -402,13 +448,37 @@ export const backfillImages = action({
 			if (!page) continue;
 			const qid = page.pageprops?.wikibase_item;
 			const claims = qid ? await fetchWikidataClaims(qid) : null;
-			const image = await fetchBestImage(page, claims?.image);
+			const image = await fetchBestImage(ctx, page, claims?.image);
 			if (image) {
 				await ctx.runMutation(internal.ingest.setCardImage, { cardId: card._id, image });
 				titles.push(card.title);
 			}
 		}
 		return { scanned: cards.length, updated: titles.length, titles };
+	}
+});
+
+/**
+ * Backfill the computed scrim level onto already-published cards that have an
+ * image but predate the luminance check (redesign §6). No Wikipedia round-trip —
+ * decode the stored thumbnail directly.
+ *   npx convex run ingest:backfillScrim '{"limit":200}'
+ */
+export const backfillScrim = action({
+	args: { limit: v.optional(v.number()) },
+	handler: async (ctx, args): Promise<{ scanned: number; updated: number }> => {
+		const cards = await ctx.runQuery(internal.ingest.imagedWithoutScrim, {
+			limit: args.limit ?? 200
+		});
+		let updated = 0;
+		for (const card of cards) {
+			const scrim = await ctx.runAction(internal.imageScrim.computeScrim, {
+				url: card.thumbnailUrl
+			});
+			await ctx.runMutation(internal.ingest.setCardScrim, { cardId: card._id, scrim });
+			updated += 1;
+		}
+		return { scanned: cards.length, updated };
 	}
 });
 

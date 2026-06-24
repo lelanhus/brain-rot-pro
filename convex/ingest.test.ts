@@ -185,3 +185,45 @@ test('classifyTitle marks a recent-event topic ephemeral (and not evergreen)', a
 
 	vi.unstubAllGlobals();
 });
+
+// ---------------------------------------------------------------------------
+// Scrim backfill work-list (redesign §6)
+// ---------------------------------------------------------------------------
+
+test('imagedWithoutScrim returns only published cards that have an image but no scrim', async () => {
+	const t = convexTest(schema, modules);
+	const base = {
+		body: 'b',
+		whyItMatters: 'w',
+		format: 'object_story' as const,
+		conceptTags: ['t'],
+		shuffleKey: 0.5,
+		createdAt: 0,
+		source: { articleTitle: 'T', articleUrl: 'u', revisionId: null, sourceSpan: 's' },
+		status: 'published' as const
+	};
+	const img = {
+		thumbnailUrl: 'https://x/thumb.jpg',
+		commonsUrl: 'https://x',
+		author: 'A',
+		licenseShortName: 'CC',
+		licenseUrl: 'https://x/l',
+		attribution: 'A, CC'
+	};
+	await t.run(async (ctx) => {
+		// (a) image, no scrim → matched
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'a', image: img });
+		// (b) image WITH scrim → not matched
+		await ctx.db.insert('knowledgeCards', {
+			...base,
+			hook: 'b',
+			image: { ...img, scrim: 'medium' as const }
+		});
+		// (c) no image → not matched
+		await ctx.db.insert('knowledgeCards', { ...base, hook: 'c' });
+	});
+
+	const rows = await t.query(internal.ingest.imagedWithoutScrim, { limit: 50 });
+	expect(rows).toHaveLength(1);
+	expect(rows[0].thumbnailUrl).toBe('https://x/thumb.jpg');
+});

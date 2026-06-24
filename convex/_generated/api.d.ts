@@ -37,6 +37,7 @@ import type * as generationPipeline from "../generationPipeline.js";
 import type * as http from "../http.js";
 import type * as imageCandidates from "../imageCandidates.js";
 import type * as imageLicense from "../imageLicense.js";
+import type * as imageScrim from "../imageScrim.js";
 import type * as ingest from "../ingest.js";
 import type * as ingestUtils from "../ingestUtils.js";
 import type * as interests from "../interests.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   imageCandidates: typeof imageCandidates;
   imageLicense: typeof imageLicense;
+  imageScrim: typeof imageScrim;
   ingest: typeof ingest;
   ingestUtils: typeof ingestUtils;
   interests: typeof interests;
