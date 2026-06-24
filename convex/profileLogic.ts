@@ -15,7 +15,13 @@ export const EVENT_DELTA: Record<string, number> = {
 	source_open: 1.5,
 	card_complete: 1,
 	card_skip: -0.5,
-	not_interested: -4
+	not_interested: -4,
+	// Soft taste signal from the rail / double-tap (redesign §5). Lighter than
+	// save / not_interested because a double-tap is accident-prone. `dislike`
+	// absorbs the old "not interested" as a negative signal (and advances the feed
+	// in the UI); both flow through accumulateWeights + buildTasteVector unchanged.
+	like: 2,
+	dislike: -3
 };
 
 /** Wildcard/novelty weight on the stored random key (keeps discovery alive). */

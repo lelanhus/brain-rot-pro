@@ -29,6 +29,23 @@ describe('accumulateWeights', () => {
 		const w = accumulateWeights([{ type: 'session_start' }, { type: 'save', cardId: null }], {});
 		expect(Object.keys(w)).toHaveLength(0);
 	});
+
+	it('like raises and dislike lowers the weight of the card concepts (dislike absorbs not-interested)', () => {
+		const liked = accumulateWeights([{ type: 'like', cardId: 'a' }], { a: ['testing'] });
+		const disliked = accumulateWeights([{ type: 'dislike', cardId: 'a' }], { a: ['testing'] });
+		expect(liked.testing).toBeGreaterThan(0);
+		expect(disliked.testing).toBeLessThan(0);
+	});
+});
+
+describe('like / dislike deltas', () => {
+	it('like is a soft positive and dislike a soft negative', () => {
+		expect(EVENT_DELTA.like).toBeGreaterThan(0);
+		expect(EVENT_DELTA.dislike).toBeLessThan(0);
+		// Softer than save / not_interested — a double-tap is accident-prone.
+		expect(EVENT_DELTA.like).toBeLessThan(EVENT_DELTA.save);
+		expect(EVENT_DELTA.dislike).toBeGreaterThan(EVENT_DELTA.not_interested);
+	});
 });
 
 describe('scoreCard', () => {

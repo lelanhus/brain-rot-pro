@@ -29,6 +29,11 @@ export const eventType = v.union(
 	v.literal('unsave'),
 	v.literal('source_open'),
 	v.literal('not_interested'),
+	// Primary taste signal (redesign §5): like via double-tap or rail, dislike via
+	// the rail. `dislike` supersedes `not_interested` for new UI; the latter stays
+	// in the union for historical rows.
+	v.literal('like'),
+	v.literal('dislike'),
 	// Monetization (ADR-008): a sponsored slot came into view / was clicked
 	// through. Carries `offerId` instead of `cardId`.
 	v.literal('sponsored_impression'),
