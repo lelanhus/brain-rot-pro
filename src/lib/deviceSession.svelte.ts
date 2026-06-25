@@ -9,13 +9,13 @@ import { authClient } from './auth-client';
  * establish an anonymous session if none exists, so every visitor gets a stable,
  * server-trusted id without a sign-in wall.
  *
- * `deviceId` stays '' until BOTH (a) the session subject is known AND (b) the
- * Convex client has attached its auth token (`authReady`, fed from
- * `useAuth().isAuthenticated` in the root layout). Exposing it any earlier races
- * the token attachment: queries self-heal on the auth change, but one-shot
- * mutations (recordActivity / recompute / ensureSupply) would fire once and fail
- * `unauthenticated`. Every consumer keys on this single value; the feed and the
- * device-scoped `'skip'` guards already tolerate the empty interim.
+ * `deviceId` is '' until the session subject resolves (SSR + the first client
+ * round-trip). Convex queries self-heal when the auth token attaches a beat
+ * later (convex-svelte re-runs them on the auth-state change); the one auto-fired
+ * mutation that can't (stats.recordActivity) retries on the transient
+ * `unauthenticated` (see +page.svelte). Gating `deviceId` itself on
+ * `isAuthenticated` was tried and reverted — that signal lags the actual token
+ * (~seconds) and needlessly delayed every device-scoped feature.
  *
  * Cross-device sync is sign-in-based (same Google account → the server's
  * `onLinkAccount` merges the anon device's data), replacing the old sync-code
@@ -23,19 +23,12 @@ import { authClient } from './auth-client';
  */
 
 let subject = $state('');
-let authReady = $state(false);
 
 export const deviceSession = {
 	get deviceId(): string {
-		return authReady ? subject : '';
+		return subject;
 	}
 };
-
-/** Fed from the layout's `useAuth().isAuthenticated` — gates `deviceId` on the
- *  Convex token actually being attached, not just the session existing. */
-export function setAuthReady(ready: boolean): void {
-	authReady = ready;
-}
 
 let started = false;
 

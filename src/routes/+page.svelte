@@ -117,9 +117,18 @@
 	$effect(() => {
 		if (!deviceId || deviceId === lastActivityDevice) return;
 		lastActivityDevice = deviceId;
-		recordActivity({ deviceId }).catch((err) =>
-			console.error('[stats] recordActivity failed', err)
-		);
+		// Fire once the deviceId resolves. The Convex auth token may attach a beat
+		// after the session subject is known, so a first attempt can race it and
+		// throw `unauthenticated`; retry a few times before giving up. This is a
+		// silent streak update — non-critical if it ultimately fails.
+		const id = deviceId;
+		const attempt = (left: number): void => {
+			recordActivity({ deviceId: id }).catch((err) => {
+				if (left > 0) setTimeout(() => attempt(left - 1), 1000);
+				else console.error('[stats] recordActivity failed', err);
+			});
+		};
+		attempt(3);
 	});
 
 	// Offline reading (PWA): mirror the live feed into IndexedDB, and fall back to
