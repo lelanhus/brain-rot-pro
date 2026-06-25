@@ -1,9 +1,10 @@
 <script lang="ts">
 	import '../app.css';
+	import { useAuth } from 'convex-svelte';
 	import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { env } from '$env/dynamic/public';
 	import { authClient } from '$lib/auth-client';
-	import { startDeviceSession } from '$lib/deviceSession.svelte';
+	import { startDeviceSession, setAuthReady } from '$lib/deviceSession.svelte';
 
 	let { children } = $props();
 
@@ -35,6 +36,14 @@
 	// by the anonymous plugin's onLinkAccount (convex/auth.ts) — no client adopt or
 	// reload needed, which also retires the old sync-code principal swap.
 	startDeviceSession();
+
+	// Gate deviceId on the Convex client actually being authenticated (token
+	// attached), not just the session existing — otherwise on-load mutations race
+	// the token and fail `unauthenticated`.
+	const auth = useAuth();
+	$effect(() => {
+		setAuthReady(auth.isAuthenticated);
+	});
 </script>
 
 {@render children()}
