@@ -21,11 +21,13 @@ attribution rendered with license-deed links), and the config-validation /
 `.env.example` should-fixes. **B1 server-side enforcement is done and fully
 tested** (every device-scoped function now trusts the session subject, not the
 arg; forgery is refused — `convex/deviceIdentity.ts` + `.test.ts`; 297 tests
-green). **B1 is now fully implemented** end-to-end — anonymous-session plugins,
-the client session bootstrap (`deviceId` = session subject), and sign-in-to-sync
-(sync-codes retired). All offline checks pass; **only live-app verification
-remains** before B1 can be merged/deployed. Open should-fixes: privacy policy,
-safety guardrails, admin-auth migration, error-tracking confirmation, lockfile.
+green). **B1 is implemented, merged, and live-verified on production** —
+anonymous-session plugins, the client session bootstrap (`deviceId` = session
+subject), and sign-in-to-sync (sync-codes retired). The deployed guards refuse a
+forged/session-less `deviceId`; anonymous load + save + streak all work; live
+testing caught and fixed three client timing bugs. Open should-fixes: privacy
+policy, safety guardrails, admin-auth migration, error-tracking confirmation,
+lockfile. (Google-sign-in→merge is the one B1 path not yet exercised live.)
 
 ---
 
@@ -87,17 +89,23 @@ the live app** (the offline suite can't exercise session establishment):
       `redeem` remain, guarded but now client-unused — safe to delete in cleanup;
       likewise `accounts.linkDevice`, superseded by `onLinkAccount`.)
 
-Remaining — **live verification only** (cannot be proven by `verify`; do before
-merge/deploy — the branch app is functionally complete but unproven at runtime):
+Live verification — **done on production 2026-06-24** (`brain-rot-pro.vercel.app`,
+backend deployed via `convex dev --once`, client via push to main):
 
-- [ ] **Verify on the live app** (`E2E_LIVE=1` Playwright + a manual pass):
-      anonymous first-load establishes a session and the feed personalizes; a
-      forged `deviceId` can no longer read or mutate another principal's data;
-      Google sign-in merges the anon device's data into the account.
-- [ ] **Deploy ordering:** push backend (`npx convex dev --once`) and the new
-      client together — the guards require sessions, so a client without the
-      bootstrap would break. (Codegen so far has NOT deployed; live still runs the
-      old code.)
+- [x] Anonymous first-load establishes a session (`isAnonymous: true`); feed
+      renders via the soft path; a save persists; `recordActivity` records.
+- [x] A forged / session-less `deviceId` is refused — `ConvexError:
+    unauthenticated` from `requireDevice` (verified via `convex run` + browser).
+- [x] `feed.unseen` without a session returns the global feed (no leak, no throw).
+- [ ] Google sign-in → anon-data merge (`onLinkAccount`) not yet exercised
+      end-to-end (needs a real Google OAuth round-trip); server path is wired.
+
+Bugs that **only live testing caught** (fixed, follow-up commits): `recordActivity`
+fired at mount with an empty `deviceId`; an `isAuthenticated` gate that lagged the
+token and delayed every device-scoped feature; the first `recordActivity` racing
+the token. Known minor: on a **brand-new** visit, device-scoped writes activate
+~10s in (anonymous sign-in + token round-trip); warm loads ~4s; the feed is
+instant always. Worth optimizing later, not a blocker.
 
 Then fold per-device rate-limiting (B2) onto `requireDevice`.
 
