@@ -1,6 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { advanceStreak, dayKey } from './streakLogic';
+import { requireDevice } from './deviceIdentity';
 
 /**
  * Engagement stats: the daily streak + lifetime days-learned (design: retention
@@ -21,7 +22,7 @@ export const get = query({
 		lastActiveDay: v.string()
 	}),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) return ZERO;
+		await requireDevice(ctx, args.deviceId);
 		const row = await ctx.db
 			.query('deviceStats')
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
@@ -55,7 +56,7 @@ export const recordActivity = mutation({
 		)
 	}),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) throw new Error('recordActivity: deviceId is required');
+		await requireDevice(ctx, args.deviceId);
 
 		const existing = await ctx.db
 			.query('deviceStats')

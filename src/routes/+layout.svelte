@@ -1,11 +1,9 @@
 <script lang="ts">
 	import '../app.css';
-	import { useAuth, getConvexClient } from 'convex-svelte';
 	import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { env } from '$env/dynamic/public';
 	import { authClient } from '$lib/auth-client';
-	import { getDeviceId, setDeviceId } from '$lib/identity';
-	import { api } from '$convex/_generated/api';
+	import { startDeviceSession } from '$lib/deviceSession.svelte';
 
 	let { children } = $props();
 
@@ -18,33 +16,25 @@
 	// PUBLIC_CONVEX_URL otherwise).
 	// (Cast: authClient's plugin-augmented type doesn't structurally match the
 	// adapter's narrower AuthClient union; it's valid at runtime.)
+	// Fail loud, not silent: an empty convexUrl would load a shell that fails
+	// every query with cryptic network errors (docs/release-gates.md config gate).
+	const convexUrl = env.PUBLIC_CONVEX_URL;
+	if (convexUrl === undefined || convexUrl === '') {
+		throw new Error(
+			'PUBLIC_CONVEX_URL is not set — the app cannot reach its Convex backend. ' +
+				'`npx convex dev` writes it for local dev; set it in the Vercel project env for deploys.'
+		);
+	}
 	createSvelteAuthClient({
 		authClient,
-		convexUrl: env.PUBLIC_CONVEX_URL ?? ''
+		convexUrl
 	} as unknown as Parameters<typeof createSvelteAuthClient>[0]);
 
-	// Link-on-auth: when the user signs in, bind/merge this anonymous device into
-	// their account and adopt the account principal (ADR-004 — same as sync
-	// redeem). First sign-in claims this device (principal === deviceId, no
-	// reload); a second device merges and adopts the principal, then reloads so
-	// live queries re-subscribe under the account.
-	const auth = useAuth();
-	let linkAttempted = false;
-	$effect(() => {
-		if (!auth.isAuthenticated || linkAttempted) return;
-		const deviceId = getDeviceId();
-		if (!deviceId) return;
-		linkAttempted = true;
-		getConvexClient()
-			.mutation(api.accounts.linkDevice, { deviceId })
-			.then((r) => {
-				if (r.principal !== deviceId) {
-					setDeviceId(r.principal);
-					location.reload();
-				}
-			})
-			.catch((err) => console.error('[auth] linkDevice failed', err));
-	});
+	// B1: establish an anonymous session (if none) and backfill the session-derived
+	// deviceId every consumer keys on. Sign-in linking/merge is handled server-side
+	// by the anonymous plugin's onLinkAccount (convex/auth.ts) — no client adopt or
+	// reload needed, which also retires the old sync-code principal swap.
+	startDeviceSession();
 </script>
 
 {@render children()}

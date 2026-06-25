@@ -1,17 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { useQuery, useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { getDeviceId } from '$lib/identity';
+	import { deviceSession } from '$lib/deviceSession.svelte';
 	import { formatName, relativeTime } from '$lib/cards';
 
-	let deviceId = $state('');
-	onMount(() => {
-		deviceId = getDeviceId();
-	});
+	const deviceId = $derived(deviceSession.deviceId);
 
 	const saved = useQuery(api.saved.list, () => (deviceId ? { deviceId } : 'skip'));
 	const toggleSave = useMutation(api.saved.toggle);

@@ -1,6 +1,6 @@
 import { convexTest } from 'convex-test';
 import { expect, test } from 'vitest';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import { type MutationCtx } from './_generated/server';
 import schema from './schema';
 
@@ -8,35 +8,32 @@ const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!
 
 test('feed.unseen excludes seen + not-interested, ranks the rest', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {});
+	await t.mutation(internal.seed.seed, {});
 	const deviceId = 'reader';
-	const first = await t.query(api.feed.unseen, {
-		deviceId,
-		paginationOpts: { numItems: 3, cursor: null }
-	});
+	const first = await t
+		.withIdentity({ subject: deviceId })
+		.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 3, cursor: null } });
 	expect(first.page.length).toBeGreaterThan(0);
 	const firstId = first.page[0]._id;
 
 	// Mark the first card seen, then it must never appear again.
-	await t.mutation(api.events.log, {
+	await t.withIdentity({ subject: deviceId }).mutation(api.events.log, {
 		deviceId,
 		sessionId: 's',
 		events: [{ type: 'card_complete', cardId: firstId, ts: 1 }]
 	});
-	const after = await t.query(api.feed.unseen, {
-		deviceId,
-		paginationOpts: { numItems: 50, cursor: null }
-	});
+	const after = await t
+		.withIdentity({ subject: deviceId })
+		.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 50, cursor: null } });
 	expect(after.page.map((c) => c._id)).not.toContain(firstId);
 });
 
 test('feed.unseen returns published cards for an anonymous (empty) deviceId', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {});
-	const res = await t.query(api.feed.unseen, {
-		deviceId: '',
-		paginationOpts: { numItems: 5, cursor: null }
-	});
+	await t.mutation(internal.seed.seed, {});
+	const res = await t
+		.withIdentity({ subject: '' })
+		.query(api.feed.unseen, { deviceId: '', paginationOpts: { numItems: 5, cursor: null } });
 	expect(res.page.length).toBeGreaterThan(0);
 });
 
@@ -84,7 +81,7 @@ test('focusConcept floats matching cards above non-matching', async () => {
 
 	const { alphaId, betaId } = await t.run(insertCards);
 
-	const res = await t.query(api.feed.unseen, {
+	const res = await t.withIdentity({ subject: 'focus-dev' }).query(api.feed.unseen, {
 		deviceId: 'focus-dev',
 		paginationOpts: { numItems: 50, cursor: null },
 		focusConcept: 'alpha'
@@ -114,11 +111,12 @@ test('feed.unseen boosts a followed topic above an equivalent unfollowed card', 
 		return { low: await mk('Low Topic', 0.1), high: await mk('High Topic', 0.9) };
 	});
 	// Without follow, High (shuffle .9) ranks first. Follow Low's topic → it should jump ahead.
-	await t.mutation(api.interests.add, { deviceId, slug: 'low_topic', title: 'Low Topic' });
-	const res = await t.query(api.feed.unseen, {
-		deviceId,
-		paginationOpts: { numItems: 10, cursor: null }
-	});
+	await t
+		.withIdentity({ subject: deviceId })
+		.mutation(api.interests.add, { deviceId, slug: 'low_topic', title: 'Low Topic' });
+	const res = await t
+		.withIdentity({ subject: deviceId })
+		.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 10, cursor: null } });
 	expect(res.page[0]._id).toBe(ids.low);
 });
 
@@ -174,17 +172,16 @@ test('threadFromCardId biases feed toward a thread neighbor', async () => {
 	});
 
 	// Mark the thread anchor card as seen so it's excluded from feed results
-	await t.mutation(api.events.log, {
+	await t.withIdentity({ subject: deviceId }).mutation(api.events.log, {
 		deviceId,
 		sessionId: 's',
 		events: [{ type: 'card_complete', cardId: threadCardId, ts: 1 }]
 	});
 
 	// Without threading: highShuffle (0.9) ranks above lowShuffle (0.1)
-	const plain = await t.query(api.feed.unseen, {
-		deviceId,
-		paginationOpts: { numItems: 50, cursor: null }
-	});
+	const plain = await t
+		.withIdentity({ subject: deviceId })
+		.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 50, cursor: null } });
 	const plainIds = plain.page.map((c) => c._id);
 	// Just verify lowShuffle doesn't win without threading (shuffleKey wins)
 	const plainLowIdx = plainIds.indexOf(lowShuffleId);
@@ -192,7 +189,7 @@ test('threadFromCardId biases feed toward a thread neighbor', async () => {
 	expect(plainHighIdx).toBeLessThan(plainLowIdx);
 
 	// With threadFromCardId: lowShuffle (aligned with thread) should rank first
-	const threaded = await t.query(api.feed.unseen, {
+	const threaded = await t.withIdentity({ subject: deviceId }).query(api.feed.unseen, {
 		deviceId,
 		paginationOpts: { numItems: 50, cursor: null },
 		threadFromCardId: threadCardId
@@ -245,10 +242,9 @@ test('feed.unseen ranks an on-taste card ahead of an off-taste one', async () =>
 				.map((_, i) => (i === 0 ? 1 : 0))
 		})
 	);
-	const res = await t.query(api.feed.unseen, {
-		deviceId,
-		paginationOpts: { numItems: 50, cursor: null }
-	});
+	const res = await t
+		.withIdentity({ subject: deviceId })
+		.query(api.feed.unseen, { deviceId, paginationOpts: { numItems: 50, cursor: null } });
 	const ids = res.page.map((c) => c._id);
 	// far has shuffleKey 0.9 > 0.1 (near), so scoreCard ranker would rank it first.
 	// Only cosine ranking makes near win despite the lower shuffleKey.

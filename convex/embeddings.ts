@@ -40,7 +40,7 @@ export const embedCard = internalAction({
  * Backfill embeddings for published cards that lack one (e.g. the seed library).
  *   npx convex run embeddings:backfillEmbeddings '{"limit":50}'
  */
-export const backfillEmbeddings = action({
+export const backfillEmbeddings = internalAction({
 	args: { limit: v.optional(v.number()) },
 	returns: v.object({ embedded: v.number() }),
 	handler: async (ctx, args): Promise<{ embedded: number }> => {

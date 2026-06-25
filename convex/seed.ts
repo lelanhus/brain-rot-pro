@@ -1,5 +1,5 @@
-import { mutation } from './_generated/server';
-import { api } from './_generated/api';
+import { internalMutation } from './_generated/server';
+import { internal } from './_generated/api';
 import { seedCards } from './seedData';
 
 /**
@@ -9,11 +9,12 @@ import { seedCards } from './seedData';
  * is assigned here (in a mutation, where randomness is allowed) and persisted,
  * so the feed query stays deterministic (ADR-007).
  *
- * Public so it can be invoked via `convex run` with a deploy key. This is a
- * dev-only seeding utility — gate it behind an admin check or remove it before
- * any external (non-Leland) user (acceptance-criteria.md release gates).
+ * Internal (no public surface): invoke via `npx convex run seed:seed` with a
+ * deploy key — `convex run` reaches internal functions, but no client SDK can.
+ * This closes the release gate that flagged a public, destructive re-seed
+ * (acceptance-criteria.md release gates; docs/release-gates.md B2).
  */
-export const seed = mutation({
+export const seed = internalMutation({
 	args: {},
 	handler: async (ctx) => {
 		const existing = await ctx.db.query('knowledgeCards').collect();
@@ -34,7 +35,9 @@ export const seed = mutation({
 		// Backfill embeddings for the freshly-seeded library so "more like this"
 		// uses vectors, not just concept overlap. Best-effort: no gateway key just
 		// leaves them embedding-less (the fallback still works).
-		await ctx.scheduler.runAfter(0, api.embeddings.backfillEmbeddings, { limit: seedCards.length });
+		await ctx.scheduler.runAfter(0, internal.embeddings.backfillEmbeddings, {
+			limit: seedCards.length
+		});
 
 		return { inserted: seedCards.length };
 	}

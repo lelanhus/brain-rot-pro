@@ -86,7 +86,7 @@ test('report joins offers with their tallied impressions/clicks and CTR', async 
 		url: 'https://example.com',
 		conceptTags: ['rome']
 	});
-	await t.mutation(api.events.log, {
+	await t.withIdentity({ subject: 'd1' }).mutation(api.events.log, {
 		deviceId: 'd1',
 		sessionId: 's1',
 		events: [
@@ -113,7 +113,7 @@ test('events.log accepts sponsored events carrying an offerId', async () => {
 		url: 'https://example.com',
 		conceptTags: ['rome']
 	});
-	const res = await t.mutation(api.events.log, {
+	const res = await t.withIdentity({ subject: 'd1' }).mutation(api.events.log, {
 		deviceId: 'd1',
 		sessionId: 's1',
 		events: [

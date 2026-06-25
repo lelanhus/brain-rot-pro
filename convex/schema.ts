@@ -273,7 +273,13 @@ export default defineSchema({
 	 */
 	supplyState: defineTable({
 		key: v.string(),
-		lastTriggeredAt: v.number()
+		// Optional so the reserve-budget path can create the singleton before any
+		// supply trigger has set a timestamp (widen; backward-compatible).
+		lastTriggeredAt: v.optional(v.number()),
+		// Daily generation cost cap (B2): the UTC date the counter covers and how
+		// many AI-generation attempts have been reserved that day.
+		budgetDay: v.optional(v.string()),
+		budgetCount: v.optional(v.number())
 	}).index('by_key', ['key']),
 
 	/**

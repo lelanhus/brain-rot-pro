@@ -24,12 +24,12 @@ test('recompute stores a tasteVector from positively-engaged embedded cards', as
 				.map((_, i) => (i === 0 ? 1 : 0))
 		})
 	);
-	await t.mutation(api.events.log, {
+	await t.withIdentity({ subject: deviceId }).mutation(api.events.log, {
 		deviceId,
 		sessionId: 's',
 		events: [{ type: 'save', cardId, ts: Date.now() }]
 	});
-	await t.mutation(api.profile.recompute, { deviceId });
+	await t.withIdentity({ subject: deviceId }).mutation(api.profile.recompute, { deviceId });
 	const profile = await t.run(async (ctx) =>
 		ctx.db
 			.query('userProfiles')
@@ -43,7 +43,7 @@ test('recompute stores a tasteVector from positively-engaged embedded cards', as
 test('recompute omits tasteVector at cold-start (no embedded positive engagement)', async () => {
 	const t = convexTest(schema, modules);
 	const deviceId = 'cold-dev';
-	await t.mutation(api.profile.recompute, { deviceId });
+	await t.withIdentity({ subject: deviceId }).mutation(api.profile.recompute, { deviceId });
 	const profile = await t.run(async (ctx) =>
 		ctx.db
 			.query('userProfiles')

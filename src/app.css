@@ -586,6 +586,14 @@ body {
 	color: var(--muted);
 }
 
+/* Image credit (TASL): same muted register as the text license, sitting just
+   under it so all provenance reads as one block (ADR-005, B3). */
+.image-credit {
+	margin: var(--space-1) 0 0;
+	font-size: 0.6875rem;
+	color: var(--muted);
+}
+
 /* Action bar — a single viewport-FIXED thumb-zone stack, bottom-right. Fixed (not
    per-card absolute) so the controls sit in the identical spot on every screen
    size and stay reachable even while a tall card scrolls — consistent across all

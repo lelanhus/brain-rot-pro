@@ -1,16 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { useQuery, useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
-	import { getDeviceId } from '$lib/identity';
+	import { deviceSession } from '$lib/deviceSession.svelte';
 	import { slugToDisplay } from '$lib/slug';
 	import { toggleInterest } from '$lib/interests';
 
-	let deviceId = $state('');
-	onMount(() => {
-		deviceId = getDeviceId();
-	});
+	const deviceId = $derived(deviceSession.deviceId);
 
 	let q = $state('');
 	const results = useQuery(api.topics.search, () =>

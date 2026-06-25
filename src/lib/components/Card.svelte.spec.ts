@@ -127,6 +127,33 @@ test('legibility: both scrim layers render at every level (image-independent gua
 	}
 });
 
+test('image cards show TASL attribution in the sheet: author, a license-deed link, and a Commons source link', async () => {
+	render(Card, { card: withImage });
+	await page.getByRole('article').click(); // open the sheet
+
+	// Author credit is visible (CC BY / CC BY-SA require attributing the author).
+	await expect.element(page.getByText('Jane Doe', { exact: false })).toBeVisible();
+	// The license short name links to the license deed (CC requires a link to the license).
+	const license = page.getByRole('link', { name: 'CC BY-SA 4.0' });
+	await expect.element(license).toBeVisible();
+	await expect
+		.element(license)
+		.toHaveAttribute('href', 'https://creativecommons.org/licenses/by-sa/4.0/');
+	// Source links back to the Commons file page.
+	const source = page.getByRole('link', { name: 'Wikimedia Commons' });
+	await expect
+		.element(source)
+		.toHaveAttribute('href', 'https://commons.wikimedia.org/wiki/File:Oxford.jpg');
+});
+
+test('text-only cards render no image credit', async () => {
+	render(Card, { card: sample });
+	await page.getByRole('article').click(); // open the sheet
+	await expect
+		.element(page.getByRole('link', { name: 'Wikimedia Commons' }))
+		.not.toBeInTheDocument();
+});
+
 test('double-tap likes without opening the sheet', async () => {
 	let likes = 0;
 	let expands = 0;

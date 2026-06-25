@@ -2,7 +2,8 @@ import { browser } from '$app/environment';
 import { getConvexClient } from 'convex-svelte';
 import { api } from '$convex/_generated/api';
 import type { Doc, Id } from '$convex/_generated/dataModel';
-import { getDeviceId, getSessionId } from './identity';
+import { getSessionId } from './identity';
+import { deviceSession } from './deviceSession.svelte';
 
 /**
  * Client-side event buffer (design doc §22.2). Events are queued and flushed in
@@ -53,11 +54,16 @@ export async function flush(): Promise<void> {
 		clearTimeout(timer);
 		timer = null;
 	}
+	const deviceId = deviceSession.deviceId;
+	// B1: events.log requires the caller's session subject. Until the (anonymous)
+	// session resolves, deviceId is '' — keep events buffered rather than send a
+	// batch the server would reject; a later flush delivers them.
+	if (deviceId.length === 0) return;
 	const batch = queue;
 	queue = [];
 	try {
 		await getConvexClient().mutation(api.events.log, {
-			deviceId: getDeviceId(),
+			deviceId,
 			sessionId: getSessionId(),
 			events: batch
 		});

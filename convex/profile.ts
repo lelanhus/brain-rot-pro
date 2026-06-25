@@ -2,6 +2,7 @@ import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { accumulateWeights, buildTasteVector, meanCompleteDwell } from './profileLogic';
+import { requireDevice } from './deviceIdentity';
 
 /**
  * Rebuild this device's personalization profile from its events (ADR-007:
@@ -14,7 +15,7 @@ export const recompute = mutation({
 	args: { deviceId: v.string() },
 	returns: v.object({ concepts: v.number(), notInterested: v.number() }),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) throw new Error('recompute: deviceId is required');
+		await requireDevice(ctx, args.deviceId);
 
 		const events = await ctx.db
 			.query('events')

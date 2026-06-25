@@ -1,6 +1,6 @@
 import { convexTest } from 'convex-test';
 import { expect, test } from 'vitest';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import schema from './schema';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!./**/*.d.ts']);
@@ -15,7 +15,7 @@ test('overview requires a valid admin token', async () => {
 
 test('overview folds content, audience, engagement and monetization', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {}); // seeds published cards
+	await t.mutation(internal.seed.seed, {}); // seeds published cards
 
 	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 3, cursor: null } });
 	const cardId = feed.page[0]._id;
@@ -27,8 +27,8 @@ test('overview folds content, audience, engagement and monetization', async () =
 		conceptTags: ['x']
 	});
 
-	await t.mutation(api.saved.toggle, { deviceId: 'd1', cardId });
-	await t.mutation(api.events.log, {
+	await t.withIdentity({ subject: 'd1' }).mutation(api.saved.toggle, { deviceId: 'd1', cardId });
+	await t.withIdentity({ subject: 'd1' }).mutation(api.events.log, {
 		deviceId: 'd1',
 		sessionId: 's1',
 		events: [
@@ -54,13 +54,17 @@ test('overview folds content, audience, engagement and monetization', async () =
 
 test('accounts lists devices, and account returns detail; both gated', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {});
+	await t.mutation(internal.seed.seed, {});
 	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 2, cursor: null } });
 	const cardId = feed.page[0]._id;
 
-	await t.mutation(api.saved.toggle, { deviceId: 'dev-1', cardId });
-	await t.mutation(api.stats.recordActivity, { deviceId: 'dev-1' });
-	await t.mutation(api.events.log, {
+	await t
+		.withIdentity({ subject: 'dev-1' })
+		.mutation(api.saved.toggle, { deviceId: 'dev-1', cardId });
+	await t
+		.withIdentity({ subject: 'dev-1' })
+		.mutation(api.stats.recordActivity, { deviceId: 'dev-1' });
+	await t.withIdentity({ subject: 'dev-1' }).mutation(api.events.log, {
 		deviceId: 'dev-1',
 		sessionId: 's1',
 		events: [{ type: 'card_complete', cardId, ts: 1 }]
@@ -80,7 +84,7 @@ test('accounts lists devices, and account returns detail; both gated', async () 
 
 test('cards search + setCardStatus moderation (gated)', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {});
+	await t.mutation(internal.seed.seed, {});
 	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 1, cursor: null } });
 	const cardId = feed.page[0]._id;
 

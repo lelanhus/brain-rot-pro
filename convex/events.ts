@@ -2,6 +2,7 @@ import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { eventType } from './schema';
+import { requireDevice } from './deviceIdentity';
 
 const SEEN_TYPES = new Set(['card_impression', 'card_complete', 'card_skip']);
 
@@ -27,9 +28,10 @@ export const log = mutation({
 	},
 	returns: v.object({ logged: v.number() }),
 	handler: async (ctx, args) => {
-		// Fail fast on a malformed identity rather than writing orphan events.
-		if (args.deviceId.length === 0 || args.sessionId.length === 0) {
-			throw new Error('log: deviceId and sessionId are required');
+		// Trust the session, not the arg: the caller may only log as itself.
+		await requireDevice(ctx, args.deviceId);
+		if (args.sessionId.length === 0) {
+			throw new Error('log: sessionId is required');
 		}
 		// Guard against a runaway client batch (Convex caps writes per txn anyway).
 		if (args.events.length > 200) {

@@ -10,7 +10,9 @@ import {
 	publishedDelta,
 	spanIsFromSource,
 	fillBudget,
-	shouldKeepFilling
+	shouldKeepFilling,
+	reserveDailyBudget,
+	maxCardsPerDay
 } from './generateLogic';
 
 describe('buildGenerationPrompt', () => {
@@ -258,6 +260,62 @@ describe('shouldKeepFilling', () => {
 		expect(shouldKeepFilling(0, 0, budget)).toBe(true); // start: owe 2
 		expect(shouldKeepFilling(1, 2, budget)).toBe(true); // published 1, owe 1 more
 		expect(shouldKeepFilling(2, 3, budget)).toBe(false); // published 2 == needed — done at TARGET
+	});
+});
+
+describe('reserveDailyBudget (daily generation cost cap, B2)', () => {
+	it('a missing row starts the day at count 1 and grants the slot', () => {
+		expect(reserveDailyBudget(null, '2026-06-24', 3)).toEqual({
+			ok: true,
+			nextDay: '2026-06-24',
+			nextCount: 1
+		});
+	});
+	it('increments within the same day until the cap, then refuses', () => {
+		const day = '2026-06-24';
+		expect(reserveDailyBudget({ budgetDay: day, budgetCount: 1 }, day, 3).nextCount).toBe(2);
+		expect(reserveDailyBudget({ budgetDay: day, budgetCount: 2 }, day, 3)).toEqual({
+			ok: true,
+			nextDay: day,
+			nextCount: 3
+		});
+		// At the cap: no slot, and the count is left unchanged (idempotent patch).
+		expect(reserveDailyBudget({ budgetDay: day, budgetCount: 3 }, day, 3)).toEqual({
+			ok: false,
+			nextDay: day,
+			nextCount: 3
+		});
+	});
+	it('rolls over on a new day — a maxed-out yesterday still grants today', () => {
+		expect(
+			reserveDailyBudget({ budgetDay: '2026-06-23', budgetCount: 99 }, '2026-06-24', 3)
+		).toEqual({ ok: true, nextDay: '2026-06-24', nextCount: 1 });
+	});
+	it('treats a row with no budget fields as a fresh day', () => {
+		expect(reserveDailyBudget({}, '2026-06-24', 2)).toEqual({
+			ok: true,
+			nextDay: '2026-06-24',
+			nextCount: 1
+		});
+	});
+});
+
+describe('maxCardsPerDay', () => {
+	it('defaults to a positive cap when MAX_CARDS_PER_DAY is unset/invalid', () => {
+		const prev = process.env.MAX_CARDS_PER_DAY;
+		delete process.env.MAX_CARDS_PER_DAY;
+		expect(maxCardsPerDay()).toBeGreaterThan(0);
+		process.env.MAX_CARDS_PER_DAY = 'not-a-number';
+		expect(maxCardsPerDay()).toBeGreaterThan(0);
+		if (prev === undefined) delete process.env.MAX_CARDS_PER_DAY;
+		else process.env.MAX_CARDS_PER_DAY = prev;
+	});
+	it('honors a valid override (floored)', () => {
+		const prev = process.env.MAX_CARDS_PER_DAY;
+		process.env.MAX_CARDS_PER_DAY = '42.9';
+		expect(maxCardsPerDay()).toBe(42);
+		if (prev === undefined) delete process.env.MAX_CARDS_PER_DAY;
+		else process.env.MAX_CARDS_PER_DAY = prev;
 	});
 });
 

@@ -1,5 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
+import { requireDevice } from './deviceIdentity';
 
 /**
  * Toggle a card's saved state for a device. Idempotent per (device, card):
@@ -9,9 +10,7 @@ export const toggle = mutation({
 	args: { deviceId: v.string(), cardId: v.id('knowledgeCards') },
 	returns: v.object({ saved: v.boolean() }),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) {
-			throw new Error('toggle: deviceId is required');
-		}
+		await requireDevice(ctx, args.deviceId);
 		const existing = await ctx.db
 			.query('savedCards')
 			.withIndex('by_device_card', (q) => q.eq('deviceId', args.deviceId).eq('cardId', args.cardId))
@@ -35,7 +34,7 @@ export const savedIds = query({
 	args: { deviceId: v.string() },
 	returns: v.array(v.id('knowledgeCards')),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) return [];
+		await requireDevice(ctx, args.deviceId);
 		const rows = await ctx.db
 			.query('savedCards')
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
@@ -48,7 +47,7 @@ export const savedIds = query({
 export const list = query({
 	args: { deviceId: v.string() },
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) return [];
+		await requireDevice(ctx, args.deviceId);
 		const rows = await ctx.db
 			.query('savedCards')
 			.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))

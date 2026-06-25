@@ -1,10 +1,4 @@
-import {
-	action,
-	internalAction,
-	internalMutation,
-	internalQuery,
-	query
-} from './_generated/server';
+import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
 import { v } from 'convex/values';
 import {
 	isRealArticleTitle,
@@ -279,7 +273,7 @@ export const unclassifiedTopByPageviews = internalQuery({
 });
 
 /** Proactively classify the top unclassified topics via Wikidata (bounded; ops/cron). */
-export const classifyTopTopics = action({
+export const classifyTopTopics = internalAction({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, { limit }): Promise<{ classified: number }> => {
 		const todo: Array<{ title: string; slug: string }> = await ctx.runQuery(
