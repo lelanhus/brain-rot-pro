@@ -117,18 +117,19 @@
 	$effect(() => {
 		if (!deviceId || deviceId === lastActivityDevice) return;
 		lastActivityDevice = deviceId;
-		// Fire once the deviceId resolves. The Convex auth token may attach a beat
-		// after the session subject is known, so a first attempt can race it and
-		// throw `unauthenticated`; retry a few times before giving up. This is a
-		// silent streak update — non-critical if it ultimately fails.
+		// Fire once the deviceId resolves, but give the Convex auth token (~400ms)
+		// a moment to attach first — firing immediately races it and the client
+		// logs an `unauthenticated` error even though our retry would recover.
+		// Retry a few times after that to cover a slower attach. Silent streak
+		// update — non-critical if it ultimately fails.
 		const id = deviceId;
 		const attempt = (left: number): void => {
 			recordActivity({ deviceId: id }).catch((err) => {
-				if (left > 0) setTimeout(() => attempt(left - 1), 1000);
+				if (left > 0) setTimeout(() => attempt(left - 1), 1500);
 				else console.error('[stats] recordActivity failed', err);
 			});
 		};
-		attempt(3);
+		setTimeout(() => attempt(3), 1200);
 	});
 
 	// Offline reading (PWA): mirror the live feed into IndexedDB, and fall back to
