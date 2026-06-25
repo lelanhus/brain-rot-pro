@@ -71,20 +71,19 @@ test('defaults to the medium scrim when the level is unknown', async () => {
 	expect(face.getAttribute('data-scrim')).toBe('medium');
 });
 
-test('single tap opens the depth sheet (source + body) and fires onExpand once; grip closes it', async () => {
+test('single tap opens the depth sheet (attribution + body) and fires onExpand once; grip closes it', async () => {
 	let expands = 0;
 	render(Card, { card: withImage, onExpand: () => (expands += 1) });
 
-	// Sheet content (the source quote/link) is absent until opened.
-	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
+	// Sheet-only content (the attribution link) is absent until opened.
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).not.toBeInTheDocument();
 
 	await page.getByRole('article').click(); // single tap anywhere on the card
-	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
 	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
 	expect(expands).toBe(1);
 
 	await page.getByRole('button', { name: 'Close details' }).click(); // grip
-	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument();
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).not.toBeInTheDocument();
 	expect(expands).toBe(1); // closing does not re-fire the deepening signal
 });
 
@@ -93,10 +92,11 @@ test('concept chips live in the sheet and re-rank via onRelated without closing 
 	render(Card, { card: withImage, onRelated: (t: string) => tags.push(t) });
 
 	await page.getByRole('article').click();
-	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible();
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
 	await page.getByRole('button', { name: 'Oxford' }).click(); // a conceptTag chip
 	expect(tags).toEqual(['Oxford']);
-	await expect.element(page.getByText(SOURCE_SPAN)).toBeVisible(); // chip tap did NOT close the sheet
+	// chip tap did NOT close the sheet
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).toBeVisible();
 });
 
 test('the Topic + Follow row lives in the sheet and toggles follow', async () => {
@@ -134,6 +134,7 @@ test('double-tap likes without opening the sheet', async () => {
 
 	await page.getByRole('article').dblClick();
 	expect(likes).toBe(1);
-	await expect.element(page.getByText(SOURCE_SPAN)).not.toBeInTheDocument(); // sheet stayed closed
+	// sheet stayed closed
+	await expect.element(page.getByRole('link', { name: /Wikipedia/ })).not.toBeInTheDocument();
 	expect(expands).toBe(0);
 });

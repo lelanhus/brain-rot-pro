@@ -41,9 +41,9 @@
 
 	/* Floating action buttons (ui-ux.md §4). --action-size is the tap target
 	   (kept ≥44px), smaller on phones. --action-zone reserves the bottom strip so a
-	   short card's last line clears the buttons; on phones --slot-pad-right also
-	   reserves a right rail so a tall card scrolling under the fixed buttons never
-	   hides its text behind them. */
+	   short card's last line clears the buttons; --slot-pad-right is the caption's
+	   right inset — below 1100px it widens to the rail's width so the full-bleed
+	   caption text never sits under the overlaid buttons. */
 	--action-size: 56px;
 	--action-zone: 9.5rem;
 	--slot-pad-right: var(--space-5);
@@ -155,23 +155,19 @@ body {
 	);
 }
 
-/* Each slot is at least one viewport and TOP-anchored: every card's tag/hook
-   lands at the same Y regardless of body length, so swiping never makes the hook
-   jump — calm and predictable ("snappy, not floaty", ui-ux.md §11). A card whose
-   content exceeds the viewport grows the slot and the feed scrolls to it (the
-   true one-screen-fit layout needs a compaction pass — see design notes). */
+/* Each slot is exactly one viewport and the card fills it edge-to-edge: the image
+   is full-bleed (redesign §3a), so there is NO slot padding/gutter — the caption,
+   scrim, and depth sheet are all absolutely positioned inside the fixed-height face,
+   so nothing grows the slot. The rail-clearance that used to live here moved onto
+   the caption (it's the only thing that must dodge the overlaid rail). */
 .slot {
 	position: relative;
 	height: 100dvh;
 	display: flex;
-	flex-direction: column;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: center;
 	scroll-snap-align: start;
-	/* Top space scales with viewport height so short phones don't overflow; bottom
-	   padding reserves the fixed action-bar strip so content never hides under it. */
-	padding: clamp(var(--space-5), 9vh, 6rem) var(--slot-pad-right)
-		calc(var(--action-zone) + env(safe-area-inset-bottom)) var(--space-5);
+	padding: 0;
 	/* Browser owns vertical scroll. The horizontal axis is deliberately free — no
 	   swipe-to-act — so pan-y keeps gestures from drifting off the vertical feed
 	   (redesign §4: single-tap=open, double-tap=like, horizontal unused). */
@@ -196,7 +192,8 @@ body {
 	height: 100%;
 	width: 100%;
 	overflow: hidden;
-	border-radius: var(--radius);
+	/* Full-bleed: the face runs to the slot edges with no rounding (redesign §3a). */
+	border-radius: 0;
 	background: var(--surface-2); /* graceful fill behind a slow/absent image */
 	isolation: isolate;
 }
@@ -253,7 +250,10 @@ body {
 	flex-direction: column;
 	gap: var(--space-2);
 	padding: var(--space-5);
-	/* Reserve the bottom strip so the caption clears the fixed action rail + hint. */
+	/* Reserve the right strip so caption text never slides under the overlaid rail
+	   (--slot-pad-right = rail width below 1100px, normal inset once the rail moves
+	   into the desktop gutter), and a bottom strip to clear the rail's base + hint. */
+	padding-right: var(--slot-pad-right);
 	padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 	color: #fff;
 	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); /* (3) glyph-edge insurance */
@@ -304,7 +304,10 @@ body {
 	overflow: hidden;
 }
 
-/* The payoff — the single warm accent moment per card (§3a). */
+/* The payoff — the single warm accent moment per card (§3a). A short punch line,
+   not a paragraph: clamp it so a long whyItMatters can't grow the bottom-anchored
+   caption up past the card's top edge (which clipped the hook under the top chrome
+   on text-heavy / image-less cards). The full text lives in the depth sheet. */
 .payoff {
 	margin: var(--space-2) 0 0;
 	max-width: 46ch;
@@ -314,6 +317,10 @@ body {
 	line-height: 1.4;
 	font-weight: 600;
 	color: #fff;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
 }
 
 .face-foot {
@@ -425,6 +432,20 @@ body {
 	text-wrap: pretty;
 }
 
+/* Full "why it matters" in the depth sheet — echoes the face payoff's accent rule,
+   unclamped here so the complete text is readable once the face teaser is clamped. */
+.why-full {
+	margin: var(--space-4) 0 0;
+	max-width: 60ch;
+	padding-inline-start: var(--space-3);
+	border-inline-start: 3px solid var(--accent);
+	font-size: var(--fs-why);
+	line-height: 1.5;
+	font-weight: 600;
+	color: var(--text);
+	text-wrap: pretty;
+}
+
 .topic-row {
 	display: flex;
 	align-items: center;
@@ -439,20 +460,28 @@ body {
 	color: var(--text);
 }
 
+/* Neutral at rest (the accent is reserved for the "why" rule + the More-like-this
+   dive); only the active "Following" state earns the accent fill. */
 .follow {
 	min-height: 36px;
 	padding: 0 var(--space-3);
 	font: inherit;
 	font-size: var(--fs-meta);
 	font-weight: 600;
-	color: var(--accent);
+	color: var(--text-2);
 	background: none;
-	border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+	border: 1px solid var(--border);
 	border-radius: var(--radius-sm);
 	cursor: pointer;
 	transition:
 		color var(--dur-fast) var(--ease),
-		background var(--dur-fast) var(--ease);
+		background var(--dur-fast) var(--ease),
+		border-color var(--dur-fast) var(--ease);
+}
+
+.follow:hover {
+	color: var(--text);
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 
 .follow.active {
@@ -462,46 +491,36 @@ body {
 }
 
 /* Concept chips — relocated into the sheet (de-busies the face, §3c). Still
-   re-rank the feed via onRelated. Words with a small dot, not filled boxes. */
+   re-rank the feed via onRelated. Discrete tag/badge pills (a hairline surface
+   token reads as "tappable thing"), not a bullet-dotted word list. */
 .chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-3) var(--space-4);
+	gap: var(--space-2);
 	margin-top: var(--space-5);
 }
 
 .chip {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-2);
-	min-height: 44px;
+	min-height: 36px;
 	font: inherit;
-	font-size: var(--fs-meta);
-	color: var(--muted);
-	background: none;
-	border: 0;
-	padding: 0;
+	font-size: var(--fs-tag);
+	color: var(--text-2);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: var(--space-1) var(--space-3);
 	cursor: pointer;
 	transition:
 		color var(--dur-fast) var(--ease),
+		border-color var(--dur-fast) var(--ease),
 		transform var(--dur-fast) var(--ease-spring);
-}
-
-.chip::before {
-	content: '';
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	background: var(--muted);
-	transition: background var(--dur-fast) var(--ease);
 }
 
 .chip:hover {
 	color: var(--text);
-}
-
-.chip:hover::before {
-	background: var(--accent);
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 
 .chip:active {
@@ -543,20 +562,22 @@ body {
 	cursor: default;
 }
 
-/* Source — the relocated attribution (ADR-005): quote, Wikipedia link, license. */
+/* Source — the relocated attribution (ADR-005): Wikipedia link + license. The
+   provenance link is muted (underlined so it still reads as a link); the accent is
+   reserved for the editorial "why" rule and the More-like-this dive. */
 .source {
 	margin-top: var(--space-6);
 }
 
-.depth-sheet blockquote {
-	max-width: var(--measure);
-	margin: 0 0 var(--space-3);
-	font-style: italic;
+.depth-sheet a {
 	color: var(--text-2);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	transition: color var(--dur-fast) var(--ease);
 }
 
-.depth-sheet a {
-	color: var(--accent);
+.depth-sheet a:hover {
+	color: var(--text);
 }
 
 .license {
@@ -568,16 +589,16 @@ body {
 /* Action bar — a single viewport-FIXED thumb-zone stack, bottom-right. Fixed (not
    per-card absolute) so the controls sit in the identical spot on every screen
    size and stay reachable even while a tall card scrolls — consistent across all
-   mobile screens. `column-reverse` puts Save (first in the DOM) at the very
-   bottom — easiest thumb reach for the rewarding action — and the semi-destructive
-   Dismiss above it, 16px apart so an overshoot can't hit the wrong target (Fitts). */
+   mobile screens. Top→bottom DOM order (like · dislike · save · share, spec §4)
+   reads in source order — the familiar feed rail — with the gap kept at 16px so an
+   overshoot can't land on the wrong target (Fitts). */
 .actions {
 	position: fixed;
 	right: var(--space-4);
 	bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
 	z-index: 20;
 	display: flex;
-	flex-direction: column-reverse;
+	flex-direction: column;
 	gap: var(--space-4);
 }
 
@@ -760,7 +781,7 @@ body {
 .feed-nav {
 	position: fixed;
 	top: calc(env(safe-area-inset-top) + var(--space-3));
-	left: var(--space-4);
+	right: var(--space-4);
 	z-index: 10;
 	display: flex;
 	gap: var(--space-2);
@@ -785,6 +806,14 @@ body {
 .nav-pill:hover {
 	color: var(--text);
 	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+/* Account avatar — an icon-only pill (spec §5: the saved collection / "you" surface
+   lives behind the account avatar). Square 44px target, glyph optically centered. */
+.nav-pill.nav-icon {
+	justify-content: center;
+	width: 44px;
+	padding: var(--space-2);
 }
 
 /* Offline status — fixed top-center so it's visible above the snapped feed. */
@@ -861,69 +890,10 @@ body {
 	border: 0;
 }
 
-/* Momentum HUD: streak + live session count, fixed top-right out of the thumb zone. */
-.hud {
-	position: fixed;
-	top: calc(env(safe-area-inset-top) + var(--space-3));
-	right: var(--space-4);
-	z-index: 10;
-	display: flex;
-	gap: var(--space-2);
-}
-
-.hud-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	font-size: var(--fs-meta);
-	font-weight: 650;
-	font-variant-numeric: tabular-nums;
-	color: var(--text);
-	background: var(--surface);
-	border: 1px solid var(--border);
-	padding: var(--space-1) var(--space-2);
-	border-radius: var(--radius-sm);
-}
-
-/* A quiet accent tick anchors each HUD count — the same editorial-bar motif as the
-   card kicker — instead of an emoji (emoji-as-icon and a streak flame are both
-   AI-slop/gamification tells). Calm momentum, not a casino counter. */
-.hud-tick {
-	width: 3px;
-	height: 0.85em;
-	border-radius: 1px;
-	background: var(--accent);
-	opacity: 0.85;
-}
-
-.hud-label {
-	color: var(--muted);
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	font-size: 0.62rem;
-	font-weight: 600;
-}
-
-.hud-value.pop {
-	display: inline-block;
-	animation: hud-pop var(--dur) var(--ease);
-}
-
-/* A quiet acknowledgement when the count ticks — a small settle, no colour flash
-   (the scale(1.6) accent-flash was a number-go-up slot-machine flourish). */
-@keyframes hud-pop {
-	0% {
-		transform: scale(1.15);
-	}
-	100% {
-		transform: scale(1);
-	}
-}
-
-/* Milestone toast: transient confirmation, not confetti. Neutral surface + hairline
-   border + a real (non-coloured) shadow, with the accent appearing only as a thin
-   left rule — a calm "noted", not a glowing "you won a prize". Reserved for genuine
-   moments (streak start, session milestones), never routine saves. */
+/* Toast: transient confirmation, not confetti. Neutral surface + hairline border +
+   a real (non-coloured) shadow, with the accent appearing only as a thin left rule —
+   a calm "noted". Used for incidental feedback (link copied, share failed, no
+   related cards), never as a reward counter. */
 .toast {
 	position: fixed;
 	left: 50%;
@@ -998,11 +968,10 @@ body {
 	}
 }
 
-/* Below the desktop breakpoint the actions float as a bottom-right overlay over
-   the reading column, so reserve a right rail (button + edge inset + gap) on the
-   slot. Without it, a tall card scrolling under the fixed buttons slides its text
-   behind them. Desktop (≥1100px) instead moves the stack out into the gutter, so
-   no rail is needed there and the column keeps its symmetric padding. */
+/* Below the desktop breakpoint the actions float as a bottom-right overlay on the
+   full-bleed image, so widen the caption's right inset (button + edge inset + gap)
+   so its text never slides under the buttons. Desktop (≥1100px) instead moves the
+   stack out into the gutter, so the caption keeps its normal symmetric inset. */
 @media (max-width: 1099px) {
 	:root {
 		--slot-pad-right: calc(var(--action-size) + var(--space-4) + var(--space-4));

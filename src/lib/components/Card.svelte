@@ -143,6 +143,12 @@
 
 			<p class="body-full">{card.body}</p>
 
+			{#if card.whyItMatters}
+				<!-- Full "why it matters": the face clamps this to a 3-line teaser so a long
+				     payoff can't overflow the caption; the complete text lives here. -->
+				<p class="why-full">{card.whyItMatters}</p>
+			{/if}
+
 			<div class="topic-row">
 				<span class="topic-name">{card.source.articleTitle}</span>
 				<button
@@ -170,8 +176,10 @@
 				</button>
 			{/if}
 
+			<!-- Attribution only (ADR-005). The raw source span used to sit here as a
+			     blockquote, but it just restated the adapted body — provenance is the
+			     link + license, not a second copy of the same facts. -->
 			<div class="source">
-				<blockquote>{card.source.sourceSpan}</blockquote>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -- external source link, not an internal route -->
 				<a
 					href={card.source.articleUrl}

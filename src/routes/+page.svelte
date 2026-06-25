@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { useQuery, useMutation, usePaginatedQuery, getConvexClient } from 'convex-svelte';
@@ -17,6 +18,7 @@
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
 	import { mergeStableOrder } from '$lib/feedOrder';
+	import { buildResume, canResume, type FeedResume } from '$lib/feedResume';
 	import { injectSponsored, type SlotMode } from '$lib/sponsored';
 	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { persistCards, readCards } from '$lib/offlineFeed';
@@ -48,12 +50,10 @@
 	const injectedAfter = new SvelteMap<string, Doc<'knowledgeCards'>[]>();
 	let divingId = $state<string | null>(null);
 
-	// Momentum (engagement layer): a live count of cards completed this session and
-	// a transient celebration toast. Streak lives server-side; session count is
-	// client-only so it ticks instantly. Each card counts once per session.
+	// Once-per-session set: dedupes the connected-wander threading signal so a card
+	// re-entering the viewport doesn't re-thread the feed. (No session/streak counter
+	// — the gamification HUD was removed; threading is the only consumer now.)
 	const completedThisSession = new SvelteSet<string>();
-	let sessionCount = $state(0);
-	let lastMilestone = $state(0);
 
 	// Connected-wander threading: bias the live feed toward neighbors of the last
 	// completed card. Updated at a coarse cadence (inside scheduleAdapt's settle
@@ -64,8 +64,6 @@
 	// debounced settle, so the feed re-sorts at most once per ~1.5s window.
 	let _pendingThreadCardId: Id<'knowledgeCards'> | null = null;
 	const toast = createToast();
-
-	const SESSION_MILESTONES = [5, 10, 25, 50, 100];
 
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
@@ -107,10 +105,9 @@
 	);
 	const recompute = useMutation(api.profile.recompute);
 
-	// Engagement stats (streak): reactive HUD read + a once-per-session record.
-	const stats = useQuery(api.stats.get, () => (deviceId ? { deviceId } : 'skip'));
+	// Daily-activity record (drives the streak shown on the account page). Recorded
+	// silently here — the feed no longer surfaces a streak/session HUD.
 	const recordActivity = useMutation(api.stats.recordActivity);
-	const streak = $derived(stats.data?.currentStreak ?? 0);
 
 	// Offline reading (PWA): mirror the live feed into IndexedDB, and fall back to
 	// that cache when offline with nothing live to show. Read-only — saving and
@@ -180,6 +177,66 @@
 			.filter((c): c is Doc<'knowledgeCards'> => c !== undefined)
 	);
 
+	// ── Return-to-feed resume ($lib/feedResume) ────────────────────────────────
+	// Navigating to /search or /account unmounts the feed; the card the reader was
+	// on is already in seenCards (dwell fires complete/skip on the way out), so the
+	// live feed can never refetch it and scroll resets to top. Snapshot the
+	// on-screen cards + active card on leave (sessionStorage) and re-seed on
+	// return so the reader lands exactly where they left; new unseen cards still
+	// append below (mergeStableOrder never drops the restored ids).
+	const RESUME_KEY = 'brp:feedResume';
+	let pendingResumeId: string | null = null; // scroll target, applied once the seed renders
+
+	function readResume(): FeedResume | null {
+		if (typeof sessionStorage === 'undefined') return null;
+		try {
+			const raw = sessionStorage.getItem(RESUME_KEY);
+			return raw === null ? null : (JSON.parse(raw) as FeedResume);
+		} catch {
+			return null;
+		}
+	}
+
+	function applyResume() {
+		const snap = readResume();
+		if (!canResume(snap, deviceId)) return;
+		for (const c of snap.cards) cardStore.set(c._id, c);
+		displayIds = snap.cards.map((c) => c._id);
+		// Adopt the restored order WITHOUT a rebuild: the next live page (which now
+		// excludes these seen cards) merges in below instead of replacing them.
+		prevKey = `${deviceId}|${focusConcept ?? ''}`;
+		rebuild = false;
+		activeCardId = (snap.activeId as Id<'knowledgeCards'> | null) ?? activeCardId;
+		pendingResumeId = snap.activeId ?? snap.cards[0]?._id ?? null;
+	}
+
+	// The card occupying the middle of the viewport, read straight from the DOM —
+	// robust regardless of the dwell observer's active-card tracking.
+	function topCardId(): string | null {
+		if (!feedEl) return null;
+		const mid = feedEl.clientHeight / 2;
+		for (const s of feedEl.querySelectorAll<HTMLElement>('.slot[data-card-id]')) {
+			const r = s.getBoundingClientRect();
+			if (r.top <= mid && r.bottom >= mid) return s.getAttribute('data-card-id');
+		}
+		return null;
+	}
+
+	// Persist on the way out — beforeNavigate covers link clicks and back/forward.
+	beforeNavigate(() => {
+		if (typeof sessionStorage === 'undefined') return;
+		const snap = buildResume(
+			deviceId,
+			topCardId(),
+			$state.snapshot(orderedCards) as Doc<'knowledgeCards'>[]
+		);
+		try {
+			if (snap !== null) sessionStorage.setItem(RESUME_KEY, JSON.stringify(snap));
+		} catch {
+			/* sessionStorage unavailable/full — resume is best-effort */
+		}
+	});
+
 	// `notInterested` is an in-memory optimistic hide for the gap before
 	// recompute() rewrites the profile (the server is the durable source —
 	// feed.unseen hard-excludes notInterested server-side).
@@ -241,6 +298,17 @@
 
 	onMount(() => {
 		deviceId = getDeviceId();
+		// Re-seed the feed from the saved snapshot BEFORE the live query reconciles,
+		// then scroll back to the card the reader left on.
+		applyResume();
+		if (pendingResumeId !== null) {
+			const target = pendingResumeId;
+			void tick().then(() => {
+				const el = feedEl?.querySelector(`.slot[data-card-id="${target}"]`);
+				if (el instanceof HTMLElement) el.scrollIntoView({ block: 'start' });
+				pendingResumeId = null;
+			});
+		}
 		if (!isOnboarded()) showOnboarding = true;
 		online = navigator.onLine;
 		const goOnline = () => (online = true);
@@ -254,13 +322,11 @@
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
-		// Register today's visit; celebrate a kept or new streak.
-		recordActivity({ deviceId })
-			.then((res) => {
-				if (res.event === 'extended') toast.show(`${res.currentStreak}-day streak`);
-				else if (res.event === 'started') toast.show('Streak started — see you tomorrow');
-			})
-			.catch((err) => console.error('[stats] recordActivity failed', err));
+		// Register today's visit (kept for the account-page streak); no toast — the
+		// feed deliberately doesn't celebrate streaks.
+		recordActivity({ deviceId }).catch((err) =>
+			console.error('[stats] recordActivity failed', err)
+		);
 		return () => {
 			track('session_end');
 			void flush();
@@ -271,17 +337,11 @@
 		};
 	});
 
-	// One card finished (dwell ≥ threshold): tick the live counter and celebrate
-	// milestones. Counted once per card per session.
+	// One card finished (dwell ≥ threshold): stage it for connected-wander threading.
+	// Once per card per session — the dedupe stops a re-viewed card from re-threading.
 	function handleComplete(cardId: string) {
 		if (completedThisSession.has(cardId)) return;
 		completedThisSession.add(cardId);
-		sessionCount += 1;
-		const milestone = SESSION_MILESTONES.find((m) => m === sessionCount);
-		if (milestone && milestone > lastMilestone) {
-			lastMilestone = milestone;
-			toast.show(`${milestone} ideas this session`);
-		}
 		// Stage the completed card for threading; scheduleAdapt's settle will
 		// promote it to threadCardId at the coarse ~1.5s cadence.
 		_pendingThreadCardId = cardId as Id<'knowledgeCards'>;
@@ -496,33 +556,49 @@
      *under* the chrome instead of colliding with the pills' negative space. -->
 <div class="feed-topscrim" aria-hidden="true"></div>
 
+<!-- Two icon affordances, right-aligned (spec §10: account chrome top-right). Search
+     (the feed's only text-query surface) and Account — the saved collection lives
+     behind the account avatar (spec §5), so it isn't a separate top-level entry. -->
 <nav class="feed-nav">
-	<a class="nav-pill" href={resolve('/search')}>Explore</a>
-	<a class="nav-pill" href={resolve('/saved')}>Saved</a>
-	<a class="nav-pill" href={resolve('/account')}>Account</a>
+	<a
+		class="nav-pill nav-icon"
+		href={resolve('/search')}
+		aria-label="Search"
+		title="Search"
+		data-testid="search-link"
+	>
+		<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+			<circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+			<path
+				d="M16 16l4 4"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+			/>
+		</svg>
+		<span class="vh">Search</span>
+	</a>
+	<a
+		class="nav-pill nav-icon"
+		href={resolve('/account')}
+		aria-label="Account"
+		title="Account"
+		data-testid="account-link"
+	>
+		<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+			<circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8" />
+			<path
+				d="M5.5 19.5a6.5 6.5 0 0 1 13 0"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+			/>
+		</svg>
+		<span class="vh">Account</span>
+	</a>
 </nav>
-
-<div class="hud" aria-live="polite">
-	{#if streak > 0}
-		<span
-			class="hud-pill streak"
-			title={`Longest streak: ${stats.data?.longestStreak ?? streak} days · ${stats.data?.daysLearned ?? 0} days learned`}
-		>
-			<span class="hud-tick" aria-hidden="true"></span>
-			<span class="hud-value">{streak}</span>
-			<span class="hud-label" aria-hidden="true">{streak === 1 ? 'day' : 'days'}</span>
-			<span class="sr-only">day streak</span>
-		</span>
-	{/if}
-	{#if sessionCount > 0}
-		<span class="hud-pill session" data-testid="session-count">
-			<span class="hud-tick" aria-hidden="true"></span>
-			{#key sessionCount}<span class="hud-value pop">{sessionCount}</span>{/key}
-			<span class="hud-label" aria-hidden="true">read</span>
-			<span class="sr-only">learned this session</span>
-		</span>
-	{/if}
-</div>
 
 {#if !online}
 	<div class="offline-banner" role="status">
@@ -575,6 +651,7 @@
 				{@const card = item.card}
 				<div
 					class="slot"
+					data-card-id={card._id}
 					use:dwell={{
 						cardId: card._id,
 						body: card.body,
@@ -615,11 +692,7 @@
 		{:else if liveFeed.status === 'Exhausted'}
 			<section class="state end">
 				<span class="end-kicker">That's today</span>
-				{#if sessionCount > 0}
-					<h2>You explored {sessionCount} {sessionCount === 1 ? 'idea' : 'ideas'}</h2>
-				{:else}
-					<h2>You're caught up</h2>
-				{/if}
+				<h2>You're caught up</h2>
 				<p>More are on the way — pick the thread back up whenever you like.</p>
 				<button
 					type="button"
