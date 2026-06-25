@@ -1,11 +1,13 @@
-import { internalMutation, mutation, query } from './_generated/server';
+import { internalMutation, internalQuery, mutation, query } from './_generated/server';
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
+import { requireDevice } from './deviceIdentity';
 
 /** Follow a catalog topic. Idempotent per device+slug; schedules generation so the topic has a card. */
 export const add = mutation({
 	args: { deviceId: v.string(), slug: v.string(), title: v.string() },
 	handler: async (ctx, { deviceId, slug, title }) => {
+		await requireDevice(ctx, deviceId);
 		const existing = await ctx.db
 			.query('interests')
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
@@ -26,6 +28,7 @@ export const add = mutation({
 export const remove = mutation({
 	args: { deviceId: v.string(), slug: v.string() },
 	handler: async (ctx, { deviceId, slug }) => {
+		await requireDevice(ctx, deviceId);
 		const row = await ctx.db
 			.query('interests')
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
@@ -34,7 +37,9 @@ export const remove = mutation({
 	}
 });
 
-export const list = query({
+/** Internal read for trusted server callers (e.g. discovery), bypassing the
+ *  per-session guard — the scheduling caller was already verified. */
+export const byDevice = internalQuery({
 	args: { deviceId: v.string() },
 	handler: async (ctx, { deviceId }) =>
 		await ctx.db
@@ -42,6 +47,18 @@ export const list = query({
 			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
 			.order('desc')
 			.collect()
+});
+
+export const list = query({
+	args: { deviceId: v.string() },
+	handler: async (ctx, { deviceId }) => {
+		await requireDevice(ctx, deviceId);
+		return await ctx.db
+			.query('interests')
+			.withIndex('by_device', (q) => q.eq('deviceId', deviceId))
+			.order('desc')
+			.collect();
+	}
 });
 
 /** Add a discovered interest (from auto-discovery). Dedupes; schedules generation; does NOT trigger further discovery. */

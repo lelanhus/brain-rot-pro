@@ -89,7 +89,8 @@
 <article class="card" onclick={onFaceActivate} ondblclick={(e) => e.preventDefault()}>
 	<div class="card-face" data-scrim={scrim}>
 		{#if card.image}
-			<!-- Free-licensed Commons asset; attribution lives in the depth sheet (ADR-005). -->
+			<!-- Free-licensed Commons asset; the author + license-deed + Commons-source
+			     credit is rendered in the depth sheet's .source block (ADR-005, B3). -->
 			<img class="face-img" src={card.image.thumbnailUrl} alt={card.hook} loading="lazy" />
 		{/if}
 		<div class="scrim" aria-hidden="true"></div>
@@ -189,8 +190,34 @@
 				>
 					{card.source.articleTitle} — Wikipedia
 				</a>
+				<!-- License + share-alike notice. CC BY-SA requires naming the license,
+				     linking to it, and stating that the adaptation is shared alike. -->
+				<!-- eslint-disable svelte/no-navigation-without-resolve -- external license deed, not an internal route -->
+				<p class="license">
+					Text adapted from Wikipedia under a <a
+						href="https://creativecommons.org/licenses/by-sa/4.0/"
+						target="_blank"
+						rel="noreferrer noopener">Creative Commons BY-SA 4.0</a
+					> license; this adaptation is shared under the same license.
+				</p>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
-				<p class="license">Text adapted from Wikipedia (CC BY-SA 4.0), modified.</p>
+				{#if card.image}
+					<!-- Image credit (TASL): author + a link to the license deed + a link
+					     back to the Commons file page. CC BY / CC BY-SA require both the
+					     author attribution and a link to the license (ADR-005, B3). -->
+					<!-- eslint-disable svelte/no-navigation-without-resolve -- external license/Commons links, not internal routes -->
+					<p class="image-credit">
+						Image: {card.image.author} ·
+						<a href={card.image.licenseUrl} target="_blank" rel="noreferrer noopener">
+							{card.image.licenseShortName}
+						</a>
+						·
+						<a href={card.image.commonsUrl} target="_blank" rel="noreferrer noopener">
+							Wikimedia Commons
+						</a>
+					</p>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{/if}
 			</div>
 		</section>
 	{/if}

@@ -29,3 +29,4 @@ test-results
 
 # offline-ETL output (build-catalog.mjs default --out)
 catalog.jsonl
+package-lock.json

@@ -228,3 +228,31 @@ export function shouldKeepFilling(
 ): boolean {
 	return published < budget.needed && attempts < budget.maxAttempts;
 }
+
+/**
+ * Daily generation cost cap (B2 / docs/release-gates.md). Bounds the number of
+ * AI generation attempts per UTC day regardless of trigger (cron, ensureSupply,
+ * or the run CLI) so an abusive caller — or a runaway loop — can't drain the AI
+ * budget. Env-overridable via MAX_CARDS_PER_DAY; defaults to a generous-but-finite
+ * ceiling well above the hourly cron's steady-state.
+ */
+export function maxCardsPerDay(): number {
+	const raw = Number(process.env.MAX_CARDS_PER_DAY);
+	return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 300;
+}
+
+/**
+ * Pure decision for the atomic reserve mutation: given the stored counter row
+ * and today's UTC date, return the next counter state and whether a slot is
+ * free. Resets the count when the day rolls over; when already at the cap it
+ * refuses the slot and leaves the count unchanged (so the patch is idempotent).
+ */
+export function reserveDailyBudget(
+	row: { budgetDay?: string; budgetCount?: number } | null,
+	today: string,
+	max: number
+): { ok: boolean; nextDay: string; nextCount: number } {
+	const current = row?.budgetDay === today ? (row.budgetCount ?? 0) : 0;
+	if (current >= max) return { ok: false, nextDay: today, nextCount: current };
+	return { ok: true, nextDay: today, nextCount: current + 1 };
+}

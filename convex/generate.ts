@@ -1,7 +1,7 @@
 'use node';
 
-import { action } from './_generated/server';
-import { api, internal } from './_generated/api';
+import { internalAction } from './_generated/server';
+import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { generateObject, embed } from 'ai';
@@ -51,7 +51,7 @@ function wrapAiError(stage: string, e: unknown): Error {
  * the grounding + validator for faithfulness.
  *   npx convex run generate:generateFromArticle '{"articleId":"<id>"}'
  */
-export const generateFromArticle = action({
+export const generateFromArticle = internalAction({
 	args: { articleId: v.id('sourceArticles'), avoidHooks: v.optional(v.array(v.string())) },
 	// Explicit return type breaks the self-referential inference cycle (the
 	// action reads its own deployment's `internal` api).
@@ -204,7 +204,7 @@ export const generateFromArticle = action({
  * left untouched.
  *   npx convex run generate:backfillShortenOverlong '{"limit":50}'
  */
-export const backfillShortenOverlong = action({
+export const backfillShortenOverlong = internalAction({
 	args: {
 		cap: v.optional(v.number()),
 		hookCap: v.optional(v.number()),
@@ -233,7 +233,7 @@ export const backfillShortenOverlong = action({
 				status: 'suppressed'
 			});
 			try {
-				const r = await ctx.runAction(api.generate.generateFromArticle, {
+				const r = await ctx.runAction(internal.generate.generateFromArticle, {
 					articleId: row.articleId
 				});
 				if (r.status === 'published') {
@@ -265,7 +265,7 @@ export const backfillShortenOverlong = action({
  * Sequential to stay polite to the model + within action limits.
  *   npx convex run generate:generateBatch '{"limit":3}'
  */
-export const generateBatch = action({
+export const generateBatch = internalAction({
 	args: { limit: v.optional(v.number()) },
 	handler: async (
 		ctx,
@@ -284,7 +284,7 @@ export const generateBatch = action({
 		});
 		const results = { published: 0, validation_failed: 0, duplicate: 0, needs_review: 0 };
 		for (const articleId of ids) {
-			const r = await ctx.runAction(api.generate.generateFromArticle, { articleId });
+			const r = await ctx.runAction(internal.generate.generateFromArticle, { articleId });
 			results[r.status] += 1;
 		}
 		return { attempted: ids.length, results };

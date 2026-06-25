@@ -14,7 +14,7 @@
 	import CardActions from '$lib/components/CardActions.svelte';
 	import { dwell } from '$lib/actions/dwell';
 	import { formatName } from '$lib/cards';
-	import { getDeviceId } from '$lib/identity';
+	import { deviceSession } from '$lib/deviceSession.svelte';
 	import { initTelemetry, track, flush } from '$lib/telemetry';
 	import { weaveFeed } from '$lib/feed';
 	import { mergeStableOrder } from '$lib/feedOrder';
@@ -32,7 +32,9 @@
 	let { data }: { data: PageData } = $props();
 	const feed = $derived(data.feed);
 
-	let deviceId = $state('');
+	// B1: the session-derived device principal (anonymous-first). '' until the
+	// session resolves; the SSR/global-feed path and `'skip'` guards cover the gap.
+	const deviceId = $derived(deviceSession.deviceId);
 	let showOnboarding = $state(false);
 	const notInterested = new SvelteSet<string>();
 	// Taste signal (redesign §5): like (double-tap / rail) and dislike (rail) are
@@ -297,7 +299,6 @@
 	}
 
 	onMount(() => {
-		deviceId = getDeviceId();
 		// Re-seed the feed from the saved snapshot BEFORE the live query reconciles,
 		// then scroll back to the card the reader left on.
 		applyResume();

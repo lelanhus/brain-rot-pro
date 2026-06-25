@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { action, internalMutation, internalQuery } from './_generated/server';
+import { internalAction, internalMutation, internalQuery } from './_generated/server';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 
@@ -31,7 +31,7 @@ export const suppressCards = internalMutation({
  *   npx convex run curation:auditEphemeralPublished '{"apply":true}'
  * Reversible: suppressed cards can be set back to 'published'.
  */
-export const auditEphemeralPublished = action({
+export const auditEphemeralPublished = internalAction({
 	args: { apply: v.optional(v.boolean()) },
 	handler: async (
 		ctx,

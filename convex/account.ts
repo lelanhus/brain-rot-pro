@@ -1,6 +1,7 @@
 import { mutation, internalMutation, type MutationCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
+import { requireDevice } from './deviceIdentity';
 
 /**
  * Privacy: erase everything tied to an anonymous account (release gate —
@@ -57,7 +58,7 @@ export const deleteData = mutation({
 	args: { deviceId: v.string() },
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) throw new Error('deleteData: deviceId is required');
+		await requireDevice(ctx, args.deviceId);
 
 		const saved = await ctx.db
 			.query('savedCards')

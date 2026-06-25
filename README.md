@@ -9,17 +9,17 @@ Design, decisions, standards, and acceptance criteria live in **[`docs/`](./docs
 ## Quick start
 
 ```sh
-npm install
-npx convex dev          # one-time: configures a deployment and writes PUBLIC_CONVEX_URL
-npm run convex:seed     # load the Phase-0 card library
-npm run dev             # run the feed
+bun install
+bunx convex dev         # one-time: configures a deployment and writes PUBLIC_CONVEX_URL
+bun run convex:seed     # load the Phase-0 card library
+bun run dev             # run the feed
 ```
 
 Copy `.env.example` to `.env.local` if you set `PUBLIC_CONVEX_URL` manually.
 
 ## The verification loop
 
-`npm run verify` is the iterate-until-green gate (typecheck → lint → unit → convex-test → component), all runnable offline. `npm run verify:full` adds Playwright e2e, which needs a live Convex deployment (`E2E_LIVE=1`). See [`docs/engineering-standards.md`](./docs/engineering-standards.md).
+`bun run verify` is the iterate-until-green gate (typecheck → lint → unit → convex-test → component), all runnable offline. `bun run verify:full` adds Playwright e2e, which needs a live Convex deployment (`E2E_LIVE=1`). See [`docs/engineering-standards.md`](./docs/engineering-standards.md).
 
 ## Layout
 

@@ -1,6 +1,6 @@
 import { convexTest } from 'convex-test';
 import { expect, test } from 'vitest';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import schema from './schema';
 
 // Include the Convex function modules (and _generated/*.js), excluding test
@@ -9,7 +9,7 @@ const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!
 
 test('seed publishes cards; feed returns only published cards with provenance', async () => {
 	const t = convexTest(schema, modules);
-	const { inserted } = await t.mutation(api.seed.seed, {});
+	const { inserted } = await t.mutation(internal.seed.seed, {});
 	expect(inserted).toBeGreaterThan(0);
 
 	const firstPage = await t.query(api.cards.feed, {
@@ -28,8 +28,8 @@ test('seed publishes cards; feed returns only published cards with provenance', 
 
 test('seed is idempotent (re-running does not duplicate)', async () => {
 	const t = convexTest(schema, modules);
-	const first = await t.mutation(api.seed.seed, {});
-	const second = await t.mutation(api.seed.seed, {});
+	const first = await t.mutation(internal.seed.seed, {});
+	const second = await t.mutation(internal.seed.seed, {});
 	expect(second.inserted).toBe(first.inserted);
 
 	let cursor: string | null = null;

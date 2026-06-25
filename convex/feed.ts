@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
 import { scoreByTaste } from './profileLogic';
 import { toSlug } from './topicsLogic';
+import { ownedDeviceOrEmpty } from './deviceIdentity';
 
 /**
  * Unseen feed (never-repeat at scale). Paginates published cards, HARD-EXCLUDES
@@ -19,22 +20,26 @@ export const unseen = query({
 		threadFromCardId: v.optional(v.id('knowledgeCards'))
 	},
 	handler: async (ctx, args) => {
+		// Personalize ONLY for the caller's own device (B1). A forged or absent id
+		// resolves to '' → the anonymous/global feed path below, never another
+		// user's. Soft (no throw) so SSR of the first card stays session-free.
+		const me = await ownedDeviceOrEmpty(ctx, args.deviceId);
 		const profile =
-			args.deviceId.length === 0
+			me.length === 0
 				? null
 				: await ctx.db
 						.query('userProfiles')
-						.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
+						.withIndex('by_device', (q) => q.eq('deviceId', me))
 						.unique();
 		const weights: Record<string, number> = {};
 		for (const { concept, weight } of profile?.conceptWeights ?? []) weights[concept] = weight;
 		const notInterested = new Set((profile?.notInterested ?? []).map(String));
 
 		const interestSlugs = new Set<string>();
-		if (args.deviceId.length > 0) {
+		if (me.length > 0) {
 			const ints = await ctx.db
 				.query('interests')
-				.withIndex('by_device', (q) => q.eq('deviceId', args.deviceId))
+				.withIndex('by_device', (q) => q.eq('deviceId', me))
 				.collect();
 			for (const i of ints) interestSlugs.add(i.slug);
 		}
@@ -57,12 +62,10 @@ export const unseen = query({
 		const unseenCards: typeof page.page = [];
 		for (const card of page.page) {
 			if (notInterested.has(card._id)) continue;
-			if (args.deviceId.length > 0) {
+			if (me.length > 0) {
 				const seen = await ctx.db
 					.query('seenCards')
-					.withIndex('by_device_card', (q) =>
-						q.eq('deviceId', args.deviceId).eq('cardId', card._id)
-					)
+					.withIndex('by_device_card', (q) => q.eq('deviceId', me).eq('cardId', card._id))
 					.unique();
 				if (seen !== null) continue;
 			}

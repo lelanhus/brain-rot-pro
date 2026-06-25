@@ -1,17 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { useQuery, useMutation, useAuth, getConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
-	import { getDeviceId, clearDeviceId } from '$lib/identity';
+	import { deviceSession } from '$lib/deviceSession.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { errorMessage } from '$lib/errors';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
-	let deviceId = $state('');
-	onMount(() => {
-		deviceId = getDeviceId();
-	});
+	const deviceId = $derived(deviceSession.deviceId);
 
 	const stats = useQuery(api.stats.get, () => (deviceId ? { deviceId } : 'skip'));
 	const savedIds = useQuery(api.saved.savedIds, () => (deviceId ? { deviceId } : 'skip'));
@@ -21,8 +17,7 @@
 	const interests = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
 	const removeInterest = useMutation(api.interests.remove);
 
-	// Delete-my-data (two-step confirm) — the account-level action, relocated here
-	// from /sync so /sync is purely device pairing.
+	// Delete-my-data (two-step confirm) — the account-level data-erase action.
 	let confirmingDelete = $state(false);
 	let deleting = $state(false);
 	let deleteError = $state<string | null>(null);
@@ -33,7 +28,9 @@
 		deleteError = null;
 		try {
 			await getConvexClient().mutation(api.account.deleteData, { deviceId });
-			clearDeviceId(); // next visit starts fresh
+			// Sign out so the next load mints a fresh anonymous session (B1: identity
+			// is the session, not a localStorage id we can clear).
+			await authClient.signOut().catch(() => {});
 			location.assign(resolve('/'));
 		} catch (err) {
 			deleteError = errorMessage(err, 'Could not delete your data.');
@@ -42,7 +39,8 @@
 	}
 
 	// Google sign-in (cross-device identity). Anonymous browsing stays the default;
-	// signing in binds this device's data to the account (link-on-auth in +layout).
+	// signing in merges this device's data into the account server-side (the
+	// anonymous plugin's onLinkAccount in convex/auth.ts).
 	const auth = useAuth();
 	let signingOut = $state(false);
 	function signInGoogle() {
@@ -51,8 +49,8 @@
 	async function signOut() {
 		if (signingOut) return;
 		signingOut = true;
+		// Next load mints a fresh anonymous session (B1).
 		await authClient.signOut();
-		clearDeviceId(); // revert to a fresh anonymous device
 		location.assign(resolve('/'));
 	}
 
@@ -112,11 +110,6 @@
 			</p>
 			<button type="button" class="ghost" onclick={signInGoogle}>Sign in with Google</button>
 		{/if}
-		<p class="note">
-			Prefer to stay anonymous? <a class="row-link" href={resolve('/sync')}
-				>Sync with a one-time code →</a
-			>
-		</p>
 	</section>
 
 	<section class="panel">
@@ -236,10 +229,6 @@
 	}
 	.row-link:hover {
 		text-decoration: underline;
-	}
-	.note {
-		margin: 0.9rem 0 0 !important;
-		font-size: 0.82rem !important;
 	}
 	button {
 		font: inherit;

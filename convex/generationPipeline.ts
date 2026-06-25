@@ -2,7 +2,13 @@ import { action, internalAction, internalMutation, internalQuery } from './_gene
 import { api, components, internal } from './_generated/api';
 import { v } from 'convex/values';
 import { Workpool } from '@convex-dev/workpool';
-import { publishedDelta, fillBudget, shouldKeepFilling } from './generateLogic';
+import {
+	publishedDelta,
+	fillBudget,
+	shouldKeepFilling,
+	reserveDailyBudget,
+	maxCardsPerDay
+} from './generateLogic';
 import { evergreenFromStatus, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
 
 /**
@@ -86,9 +92,22 @@ export const generateForTopic = internalAction({
 		let published = 0;
 		let lastStatus = 'skipped';
 
+		// Daily cost cap (B2): reserve a slot before each AI generation attempt so
+		// total spend is bounded per UTC day no matter what triggered this run.
+		const today = new Date(Date.now()).toISOString().slice(0, 10);
+		const dailyMax = maxCardsPerDay();
+
 		while (shouldKeepFilling(published, attempts, budget)) {
+			const slot = await ctx.runMutation(internal.generationPipeline.reserveGenerationSlot, {
+				day: today,
+				max: dailyMax
+			});
+			if (!slot.ok) {
+				lastStatus = 'budget_exhausted';
+				break;
+			}
 			attempts++;
-			const r = await ctx.runAction(api.generate.generateFromArticle, {
+			const r = await ctx.runAction(internal.generate.generateFromArticle, {
 				articleId,
 				avoidHooks: avoidHooks.length > 0 ? avoidHooks : undefined
 			});
@@ -138,6 +157,34 @@ export const readSupplyState = internalQuery({
 			.withIndex('by_key', (q) => q.eq('key', 'global'))
 			.unique();
 		return row?.lastTriggeredAt ?? null;
+	}
+});
+
+/**
+ * Atomically reserve one daily generation slot (B2 cost cap). Convex mutations
+ * are serializable, so the read-modify-write here is race-free even with the
+ * Workpool running topics in parallel. Resets the counter when the UTC day rolls
+ * over; returns `{ ok: false }` once the day's cap is reached.
+ */
+export const reserveGenerationSlot = internalMutation({
+	args: { day: v.string(), max: v.number() },
+	returns: v.object({ ok: v.boolean() }),
+	handler: async (ctx, { day, max }): Promise<{ ok: boolean }> => {
+		const row = await ctx.db
+			.query('supplyState')
+			.withIndex('by_key', (q) => q.eq('key', 'global'))
+			.unique();
+		const next = reserveDailyBudget(row, day, max);
+		if (row !== null) {
+			await ctx.db.patch(row._id, { budgetDay: next.nextDay, budgetCount: next.nextCount });
+		} else {
+			await ctx.db.insert('supplyState', {
+				key: 'global',
+				budgetDay: next.nextDay,
+				budgetCount: next.nextCount
+			});
+		}
+		return { ok: next.ok };
 	}
 });
 

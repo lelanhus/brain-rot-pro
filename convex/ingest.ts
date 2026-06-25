@@ -1,5 +1,4 @@
 import {
-	action,
 	internalAction,
 	internalMutation,
 	internalQuery,
@@ -338,7 +337,7 @@ export const classifyTitle = internalAction({
  * doesn't abort the batch.
  *   npx convex run ingest:ingestTitles '{"titles":["Roman concrete","Octopus"]}'
  */
-export const ingestTitles = action({
+export const ingestTitles = internalAction({
 	args: { titles: v.array(v.string()) },
 	handler: async (ctx, args) => {
 		let ingested = 0;
@@ -455,7 +454,7 @@ export const ingestOne = internalAction({
  * clears the fail-closed gate (via the wider candidate search), patch it on.
  *   npx convex run ingest:backfillImages '{"limit":40}'
  */
-export const backfillImages = action({
+export const backfillImages = internalAction({
 	args: { limit: v.optional(v.number()) },
 	handler: async (
 		ctx,
@@ -500,7 +499,7 @@ export const backfillImages = action({
  * decode the stored thumbnail directly.
  *   npx convex run ingest:backfillScrim '{"limit":200}'
  */
-export const backfillScrim = action({
+export const backfillScrim = internalAction({
 	args: { limit: v.optional(v.number()) },
 	handler: async (ctx, args): Promise<{ scanned: number; updated: number }> => {
 		const cards = await ctx.runQuery(internal.ingest.imagedWithoutScrim, {
@@ -547,7 +546,7 @@ export async function searchArticleTitles(query: string, limit = 3): Promise<str
  * plausible articles. Returns titles for inspection / feeding ingestTitles.
  *   npx convex run ingest:topTitles '{"limit":20}'
  */
-export const topTitles = action({
+export const topTitles = internalAction({
 	args: { limit: v.optional(v.number()), daysAgo: v.optional(v.number()) },
 	handler: async (_ctx, args) => {
 		const limit = args.limit ?? 20;

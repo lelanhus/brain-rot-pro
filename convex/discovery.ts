@@ -1,5 +1,5 @@
 import { internalAction, internalQuery } from './_generated/server';
-import { api, internal } from './_generated/api';
+import { internal } from './_generated/api';
 import { v } from 'convex/values';
 import { toSlug } from './topicsLogic';
 import { pickDiscoveries } from './discoveryLogic';
@@ -55,7 +55,7 @@ export const discoverFor = internalAction({
 		if (titles.length === 0) return { discovered: 0 };
 		const slugs = titles.map(toSlug);
 		const candidates = await ctx.runQuery(internal.discovery.candidatesBySlugs, { slugs });
-		const followedRows = await ctx.runQuery(api.interests.list, { deviceId });
+		const followedRows = await ctx.runQuery(internal.interests.byDevice, { deviceId });
 		const followed = new Set<string>(followedRows.map((i) => i.slug));
 		const picks = pickDiscoveries(candidates, followed, 3);
 		for (const p of picks) {

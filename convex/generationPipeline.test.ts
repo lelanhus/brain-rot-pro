@@ -86,3 +86,19 @@ test('generateFromCatalog enqueues one job per needing-cards topic, popularity-f
 	const slugs = needing.map((topic) => topic.slug);
 	expect(slugs).not.toContain('covered');
 });
+
+test('reserveGenerationSlot caps attempts per UTC day and rolls over the next day', async () => {
+	const t = convexTest(schema, modules);
+	const day = '2026-06-24';
+	const reserve = (d: string) =>
+		t.mutation(internal.generationPipeline.reserveGenerationSlot, { day: d, max: 3 });
+
+	// Three reservations on the same day succeed; the fourth is refused (cap hit).
+	expect((await reserve(day)).ok).toBe(true);
+	expect((await reserve(day)).ok).toBe(true);
+	expect((await reserve(day)).ok).toBe(true);
+	expect((await reserve(day)).ok).toBe(false);
+
+	// A new UTC day resets the counter, so generation resumes.
+	expect((await reserve('2026-06-25')).ok).toBe(true);
+});

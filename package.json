@@ -18,8 +18,8 @@
 		"test:e2e": "playwright test",
 		"convex:dev": "convex dev",
 		"convex:seed": "convex run seed:seed",
-		"verify": "npm run check && npm run lint && npm run test:unit && npm run test:convex && npm run test:component",
-		"verify:full": "npm run verify && npm run test:e2e"
+		"verify": "bun run check && bun run lint && bun run test:unit && bun run test:convex && bun run test:component",
+		"verify:full": "bun run verify && bun run test:e2e"
 	},
 	"devDependencies": {
 		"@edge-runtime/vm": "^5.0.0",

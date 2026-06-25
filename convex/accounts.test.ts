@@ -21,14 +21,18 @@ test('applyLink claims the device principal on first sign-in', async () => {
 
 test('applyLink merges a new device into the existing principal', async () => {
 	const t = convexTest(schema, modules);
-	await t.mutation(api.seed.seed, {}); // gives devB a card to save so the merge has data
+	await t.mutation(internal.seed.seed, {}); // gives devB a card to save so the merge has data
 	// First sign-in on devA claims it.
 	await t.mutation(internal.accounts.applyLink, { authUserId: 'u1', deviceId: 'devA' });
 	// devB saves a card, then the same user signs in on devB → merge devB into devA.
 	const feed = await t.query(api.cards.feed, { paginationOpts: { numItems: 1, cursor: null } });
-	await t.mutation(api.saved.toggle, { deviceId: 'devB', cardId: feed.page[0]._id });
+	await t
+		.withIdentity({ subject: 'devB' })
+		.mutation(api.saved.toggle, { deviceId: 'devB', cardId: feed.page[0]._id });
 	const r = await t.mutation(internal.accounts.applyLink, { authUserId: 'u1', deviceId: 'devB' });
 	expect(r).toEqual({ principal: 'devA', merged: true });
 	// devB's save now lives under devA (the principal).
-	expect(await t.query(api.saved.savedIds, { deviceId: 'devA' })).toContain(feed.page[0]._id);
+	expect(
+		await t.withIdentity({ subject: 'devA' }).query(api.saved.savedIds, { deviceId: 'devA' })
+	).toContain(feed.page[0]._id);
 });

@@ -2,7 +2,7 @@
 import { convexTest } from 'convex-test';
 import { describe, expect, test, vi } from 'vitest';
 import schema from './schema';
-import { api, internal } from './_generated/api';
+import { internal } from './_generated/api';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.{test,spec}.ts', '!./**/*.d.ts']);
 
@@ -109,12 +109,12 @@ describe('auditEphemeralPublished', () => {
 
 		stubClassify('2026 Iran war');
 
-		const dry = await t.action(api.curation.auditEphemeralPublished, {});
+		const dry = await t.action(internal.curation.auditEphemeralPublished, {});
 		expect(dry.wouldSuppress).toBe(1);
 		expect(dry.applied).toBe(0);
 		expect((await t.run((ctx) => ctx.db.get(ephId)))?.status).toBe('published');
 
-		const applied = await t.action(api.curation.auditEphemeralPublished, { apply: true });
+		const applied = await t.action(internal.curation.auditEphemeralPublished, { apply: true });
 		expect(applied.applied).toBe(1);
 		expect((await t.run((ctx) => ctx.db.get(ephId)))?.status).toBe('suppressed');
 		expect((await t.run((ctx) => ctx.db.get(keepId)))?.status).toBe('published');

@@ -59,7 +59,11 @@ test('discoverFor adds up to 3 catalog-present, unfollowed related topics', asyn
 	});
 	// Hannibal followed; Random Title not in catalog → Carthage + Punic Wars discovered (cap 3).
 	expect(res.discovered).toBe(2);
-	const slugs = (await t.query(api.interests.list, { deviceId })).map((i) => i.slug).sort();
+	const slugs = (
+		await t.withIdentity({ subject: deviceId }).query(api.interests.list, { deviceId })
+	)
+		.map((i) => i.slug)
+		.sort();
 	expect(slugs).toEqual(['carthage', 'hannibal', 'punic_wars']);
 	vi.unstubAllGlobals();
 });

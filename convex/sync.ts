@@ -8,6 +8,7 @@ import {
 	normalizeCode
 } from './syncLogic';
 import { mergeAccounts } from './accountMerge';
+import { requireDevice } from './deviceIdentity';
 
 /**
  * Cross-device account sync (ADR-004). `createCode` mints a short-lived code for
@@ -21,7 +22,7 @@ export const createCode = mutation({
 	args: { deviceId: v.string() },
 	returns: v.object({ code: v.string(), expiresAt: v.number() }),
 	handler: async (ctx, args) => {
-		if (args.deviceId.length === 0) throw new Error('createCode: deviceId is required');
+		await requireDevice(ctx, args.deviceId);
 
 		// Retire this device's earlier live codes so only the newest works.
 		const prior = await ctx.db
@@ -59,6 +60,9 @@ export const redeem = mutation({
 	args: { code: v.string(), deviceId: v.string() },
 	returns: v.object({ deviceId: v.string(), merged: v.boolean() }),
 	handler: async (ctx, args) => {
+		// The redeeming device must be the caller's own; the code authorizes access
+		// to the OTHER (source) device's data, which is the point of redeem.
+		await requireDevice(ctx, args.deviceId);
 		const code = normalizeCode(args.code);
 		if (!isValidCodeFormat(code)) throw new Error('That code is not valid.');
 
