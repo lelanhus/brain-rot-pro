@@ -108,8 +108,19 @@
 	const recompute = useMutation(api.profile.recompute);
 
 	// Daily-activity record (drives the streak shown on the account page). Recorded
-	// silently here — the feed no longer surfaces a streak/session HUD.
+	// silently here — the feed no longer surfaces a streak/session HUD. Fired
+	// reactively once the session-derived deviceId resolves (it's '' at mount until
+	// the anonymous session + Convex token are ready), once per identity — never at
+	// mount with an empty id, which the server would reject `unauthenticated`.
 	const recordActivity = useMutation(api.stats.recordActivity);
+	let lastActivityDevice = '';
+	$effect(() => {
+		if (!deviceId || deviceId === lastActivityDevice) return;
+		lastActivityDevice = deviceId;
+		recordActivity({ deviceId }).catch((err) =>
+			console.error('[stats] recordActivity failed', err)
+		);
+	});
 
 	// Offline reading (PWA): mirror the live feed into IndexedDB, and fall back to
 	// that cache when offline with nothing live to show. Read-only — saving and
@@ -323,11 +334,6 @@
 		const cleanupTelemetry = initTelemetry();
 		track('session_start');
 		scheduleAdapt(); // fold in prior sessions' signals
-		// Register today's visit (kept for the account-page streak); no toast — the
-		// feed deliberately doesn't celebrate streaks.
-		recordActivity({ deviceId }).catch((err) =>
-			console.error('[stats] recordActivity failed', err)
-		);
 		return () => {
 			track('session_end');
 			void flush();
