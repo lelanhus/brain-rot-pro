@@ -46,6 +46,8 @@ import type * as legibility from "../legibility.js";
 import type * as profile from "../profile.js";
 import type * as profileLogic from "../profileLogic.js";
 import type * as rateLimits from "../rateLimits.js";
+import type * as safety from "../safety.js";
+import type * as safetyLogic from "../safetyLogic.js";
 import type * as saved from "../saved.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
@@ -102,6 +104,8 @@ declare const fullApi: ApiFromModules<{
   profile: typeof profile;
   profileLogic: typeof profileLogic;
   rateLimits: typeof rateLimits;
+  safety: typeof safety;
+  safetyLogic: typeof safetyLogic;
   saved: typeof saved;
   seed: typeof seed;
   seedData: typeof seedData;
