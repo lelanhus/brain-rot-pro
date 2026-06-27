@@ -127,12 +127,17 @@ Then fold per-device rate-limiting (B2) onto `requireDevice`.
       hit. Bounds spend for **every** trigger — cron, `ensureSupply`, `interests`,
       and the `run` CLI alike. Pure `reserveDailyBudget` helper is unit-tested;
       the atomic reserve is convex-tested. _(done 2026-06-24)_
-- [ ] **Per-device rate-limit `ensureSupply` / `forCard` / `interests.add`.**
-      Deferred and folded into **B1**: a forgeable client-supplied `deviceId`
-      makes per-device limits trivially bypassable, so the limiter must key off the
-      **server-derived** identity from B1, not the arg. The daily cap above already
-      removes the _cost-runaway_ teeth from these paths; what remains is fairness /
-      per-actor DoS, which B1 unblocks.
+- [x] **Per-device rate-limit `ensureSupply` / `forCard` / `interests.add`.**
+      Done (W5, 2026-06-27) via the `@convex-dev/rate-limiter` component, keyed off
+      the **server-derived** B1 subject (never the arg), so forgery can't bypass it.
+      Token buckets, env-overridable rates (`RL_*`); `ensureSupply` returns
+      `{ triggered: false }` on limit (never throws), `forCard`/`interests.add`
+      throw `ConvexError({ code: 'rate_limited' })` which the client surfaces as a
+      gentle toast. Enforcement **live-verified** on the dev deployment: with
+      `forCard` temporarily capped at 1, the first call returned and the next threw
+      `{"code":"rate_limited","retryAfter":58548}` (default rate restored after).
+      Pure config/key/error logic is unit-tested; components don't run under
+      convex-test, so enforcement is validated live (mirrors the Workpool pattern).
 
 ### B3 — ⚖ Content-licensing attribution is half-met
 
