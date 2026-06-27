@@ -161,12 +161,19 @@ Then fold per-device rate-limiting (B2) onto `requireDevice`.
       behavioral events (+ ad/affiliate clicks). The delete-cascade exists
       (`account.deleteData`); the policy, a `/privacy` link, and an
       event-retention/rollup job do not (`acceptance-criteria.md:113`).
-- [ ] **Safety guardrails are reactive only.** There's a prompt nudge
-      (`generateLogic.ts:94`) and manual admin suppress, but **no ingestion
-      suppress-list and no rank-time topic filter** (medical / legal /
-      active-politics) — the doc's third gate (`acceptance-criteria.md:114`).
-      With auto-publish and no human in the loop, a sensitive article can reach
-      the feed.
+- [x] **Safety guardrails — proactive.** Done (W4, 2026-06-27). A pure
+      `classifySafety` (`convex/safetyLogic.ts`, **targeted** posture: always-block
+      harm + advice-framed health; block politics/legal/tragedy only when
+      _current_, so historical science/politics/medicine stay) is folded into the
+      ingest chokepoint `decideArticleStatus` (`convex/wikidataLogic.ts`) — unsafe
+      articles become `filtered_out` (`basis: 'safety: <reason>'`, logged in the
+      per-title `decisions` log) and are never generated. **Rank-time is
+      structural**: the feed serves only `published`, and nothing unsafe ever
+      becomes/stays published. `convex/safety.ts:backfillSafety` (dry-run unless
+      `apply`) re-classifies and suppresses already-published unsafe cards. The
+      keyword lists are tunable against the `decisions` log. **Run live when
+      deploys resume:** `bunx convex run safety:backfillSafety '{"apply":true,"nowYear":2026}'`.
+      (Deferred: an LLM content-level check on generated card text.)
 - [ ] **Admin auth is a localStorage token** (`src/lib/admin.svelte.ts`,
       `convex/adminAuth.ts`). Comparison is timing-safe, but the token is sent on
       every call and is XSS-stealable. Move to a Better Auth role / HTTP-only
