@@ -49,6 +49,7 @@ export default defineConfig({
 				test: {
 					name: 'convex',
 					environment: 'edge-runtime',
+					env: { RATE_LIMIT_DISABLED: '1' },
 					include: ['convex/**/*.{test,spec}.ts'],
 					server: { deps: { inline: ['convex-test'] } }
 				}
