@@ -52,9 +52,19 @@ scripted abuse. They are guardrails, not product limits.
 - **New** `convex/rateLimits.ts` — constructs the shared `RateLimiter` instance
   with the three named limits, reading env-overridable values through pure
   helpers (e.g. `ensureSupplyLimit()`, `forCardLimit()`, `interestsAddLimit()`),
-  each returning `{ rate, period, capacity }` with the documented defaults.
-  Exports a small `checkRateLimit(ctx, name, key)` wrapper that returns the
-  component's `{ ok, retryAfter }` so call sites stay one line.
+  each returning `{ kind: 'token bucket', rate, period, capacity }` with the
+  documented defaults. Exports a small `checkRateLimit(ctx, name, key)` wrapper
+  returning `{ ok, retryAfter }` so call sites stay one line, a pure
+  `forCardKey(subject)` ('anon' fallback), and a `rateLimitedError(retryAfter)`
+  helper returning `ConvexError({ code: 'rate_limited', retryAfter })`.
+- **Test seam.** `checkRateLimit` returns `{ ok: true }` immediately when
+  `RATE_LIMIT_DISABLED === '1'`, and the convex vitest project sets that env. This
+  is required because **components do not run under convex-test in this repo**
+  (the same constraint the Workpool tests document at
+  `generationPipeline.test.ts:80`); the seam keeps the limiter from breaking the
+  4 existing convex-test files that call these handlers, with **zero churn** to
+  them. Enforcement is validated live (see Testing), exactly as the repo already
+  does for its other components.
 - `convex/generationPipeline.ts` — `ensureSupply`: after the global-cooldown
   check, derive the soft subject and, when non-empty, consume a per-device token;
   on `!ok` return `{ triggered: false }` without enqueuing a pass.
@@ -85,13 +95,24 @@ scripted abuse. They are guardrails, not product limits.
 
 ## Testing
 
+Constraint: Convex **components do not run under convex-test** in this repo
+(documented for Workpool at `generationPipeline.test.ts:80`), so enforcement is
+unit-tested where pure and **validated live** for the stateful path — mirroring
+how the repo already treats its components.
+
 - **Unit** (`convex/rateLimits.spec.ts`, server project): the pure limit-resolving
-  helpers — default when env unset, env override honored, invalid env ⇒ default.
-- **Integration** (convex-test, `withIdentity`): for each target — the same actor
-  exceeding its bucket is refused (`forCard`/`interests.add` throw `rate_limited`;
-  `ensureSupply` returns `{ triggered: false }`); a **second** actor is unaffected
-  (per-device isolation); the B1 refusal for a forged/session-less caller on
-  `interests.add` still fires before the limiter.
+  helpers — default when env unset, env override honored, invalid env ⇒ default;
+  `forCardKey` returns the subject or `'anon'`; `rateLimitedError(retryAfter)`
+  carries `code: 'rate_limited'`.
+- **No-regression** (convex-test): with the seam's `RATE_LIMIT_DISABLED` set in
+  the convex vitest project, the 4 existing test files that call these handlers
+  stay green unchanged, and each wired handler's happy path still works under
+  `withIdentity` (interest added / related cards returned / supply triggered).
+- **Live validation** (manual, recorded in `docs/release-gates.md` like the other
+  B-gates): on a `convex dev` deployment, rapidly call `forCard` past its bucket
+  → a `rate_limited` `ConvexError`; a second device is unaffected; `ensureSupply`
+  past its bucket returns `{ triggered: false }`. B1's forged/session-less refusal
+  on `interests.add` already has offline coverage and still fires before the limiter.
 - `bun run verify` green (typecheck + lint + unit + convex + component).
 
 ## Deferred (recorded — not this spec)
