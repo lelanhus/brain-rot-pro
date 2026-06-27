@@ -21,7 +21,7 @@
 			.then(() => undefined)
 			.catch((err: unknown) => {
 				if (isRateLimited(err)) toast.show('Slow down a moment');
-				else throw err;
+				else console.error('[interests] add failed', err);
 			});
 	}
 
