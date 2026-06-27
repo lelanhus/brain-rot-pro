@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -22,7 +22,6 @@
 	import { injectSponsored, type SlotMode } from '$lib/sponsored';
 	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { persistCards, readCards } from '$lib/offlineFeed';
-	import { createToast } from '$lib/toast.svelte';
 	import { isRateLimited } from '$lib/errors';
 	import { cooldownGate } from '$lib/cooldownGate';
 	import { shareCard } from '$lib/share';
@@ -66,7 +65,8 @@
 	// only promotes it to threadCardId (triggering a feed re-query) inside the
 	// debounced settle, so the feed re-sorts at most once per ~1.5s window.
 	let _pendingThreadCardId: Id<'knowledgeCards'> | null = null;
-	const toast = createToast();
+	let shareCopied = $state(false);
+	let shareCopiedTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let feedEl = $state<HTMLElement | null>(null);
 	let sentinel = $state<HTMLDivElement | null>(null);
@@ -325,6 +325,10 @@
 		}, 1500);
 	}
 
+	onDestroy(() => {
+		if (shareCopiedTimer) clearTimeout(shareCopiedTimer);
+	});
+
 	onMount(() => {
 		// Re-seed the feed from the saved snapshot BEFORE the live query reconciles,
 		// then scroll back to the card the reader left on.
@@ -353,7 +357,6 @@
 		return () => {
 			track('session_end');
 			void flush();
-			toast.dismiss();
 			cleanupTelemetry();
 			window.removeEventListener('online', goOnline);
 			window.removeEventListener('offline', goOffline);
@@ -384,8 +387,14 @@
 
 	async function handleShare(card: Doc<'knowledgeCards'>) {
 		const result = await shareCard(card._id, card.hook);
-		if (result === 'copied') toast.show('Link copied');
-		else if (result === 'failed') toast.show('Could not share');
+		if (result === 'copied') {
+			shareCopied = true;
+			if (shareCopiedTimer) clearTimeout(shareCopiedTimer);
+			shareCopiedTimer = setTimeout(() => (shareCopied = false), 1500);
+		} else if (result === 'failed') {
+			console.error('[share] failed');
+		}
+		// 'shared' (OS sheet confirmed) and 'cancelled' show nothing.
 	}
 
 	// The dismiss button is stationary and the next card snaps into its slot
@@ -457,21 +466,16 @@
 				limit: 3
 			})) as Doc<'knowledgeCards'>[];
 			const fresh = related.filter((r) => !notInterested.has(r._id));
-			if (fresh.length === 0) {
-				toast.show('No related cards yet — keep exploring');
-			} else {
+			if (fresh.length > 0) {
 				injectedAfter.set(card._id, fresh);
 				scheduleAdapt();
 				await tick();
 				scrollByViewport(1);
 			}
+			// Empty result: do nothing — tapping again is harmless.
 		} catch (err) {
-			// A rate-limited dive is silently dropped (unreachable for a human at 30/min);
-			// the existing error surfaces only for genuine failures.
-			if (!isRateLimited(err)) {
-				console.error('[feed] more-like-this failed', err);
-				toast.show('Could not load related cards');
-			}
+			// A rate-limited dive is silently dropped; genuine failures are logged.
+			if (!isRateLimited(err)) console.error('[feed] more-like-this failed', err);
 		} finally {
 			divingId = null;
 		}
@@ -633,12 +637,6 @@
 	</div>
 {/if}
 
-{#if toast.message}
-	{#key toast.id}
-		<div class="toast" role="status" data-testid="toast">{toast.message}</div>
-	{/key}
-{/if}
-
 {#if focusConcept}
 	<button type="button" class="focus-pill" onclick={clearFocus} data-testid="focus-pill">
 		<span class="focus-label">Exploring</span>
@@ -744,6 +742,7 @@
 		saved={savedSet.has(activeCard._id)}
 		onSave={() => handleSave(activeCard)}
 		onShare={() => handleShare(activeCard)}
+		justCopied={shareCopied}
 	/>
 {/if}
 
