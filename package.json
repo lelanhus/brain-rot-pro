@@ -47,6 +47,7 @@
 		"vitest-browser-svelte": "^2.1.1"
 	},
 	"dependencies": {
+		"@convex-dev/rate-limiter": "^0.3.2",
 		"@convex-dev/workpool": "^0.4.7",
 		"@mmailaender/convex-better-auth-svelte": "^0.8.0",
 		"@vercel/analytics": "^2.0.1",
