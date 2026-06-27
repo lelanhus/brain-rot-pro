@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import {
 	classifyTopic,
 	decideArticleStatus,
@@ -100,6 +100,27 @@ describe('isEphemeral', () => {
 	it('uses EPHEMERAL_WINDOW_YEARS = 2', () => {
 		expect(EPHEMERAL_WINDOW_YEARS).toBe(2);
 	});
+});
+
+test('decideArticleStatus filters an unsafe article before anything else', () => {
+	const out = decideArticleStatus({
+		verdict: { verdict: 'allow', reason: 'class disease' },
+		categories: ['2026 United States elections'],
+		title: '2026 United States Senate elections',
+		nowYear: 2026
+	});
+	expect(out.status).toBe('filtered_out');
+	expect(out.basis).toBe('safety: active-politics');
+});
+
+test('decideArticleStatus keeps a safe allowed article', () => {
+	const out = decideArticleStatus({
+		verdict: { verdict: 'allow', reason: 'class chemical element' },
+		categories: ['Chemical elements'],
+		title: 'Oxygen',
+		nowYear: 2026
+	});
+	expect(out.status).toBe('fetched');
 });
 
 describe('decideArticleStatus recency', () => {

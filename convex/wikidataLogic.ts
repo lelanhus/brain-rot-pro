@@ -16,6 +16,7 @@
  */
 
 import { isEvergreenArticle } from './ingestUtils';
+import { classifySafety } from './safetyLogic';
 
 /** Recency window: a topic is ephemeral if anchored within the last N years. */
 export const EPHEMERAL_WINDOW_YEARS = 2;
@@ -165,6 +166,12 @@ export function decideArticleStatus(args: {
 	status: ArticleStatus;
 	basis: string;
 } {
+	const safety = classifySafety({
+		categories: args.categories,
+		title: args.title ?? '',
+		nowYear: args.nowYear
+	});
+	if (!safety.safe) return { status: 'filtered_out', basis: `safety: ${safety.reason}` };
 	if (args.nowYear !== undefined) {
 		const eph = isEphemeral(
 			{ temporalYears: args.temporalYears ?? [], title: args.title ?? '' },
