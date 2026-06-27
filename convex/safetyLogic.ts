@@ -14,7 +14,8 @@ export const HARM_TERMS = [
 	'sexual abuse',
 	'child sexual',
 	'terroris',
-	'extremis',
+	'extremist',
+	'extremism',
 	'neo-nazi',
 	'white supremac',
 	'hate group'
@@ -55,7 +56,7 @@ export const TRAGEDY_TERMS = [
 	'wildfire'
 ];
 
-const ONGOING = /\bongoing\b|\bcurrent\b|\bincumbent\b|\bactive\s/;
+const ONGOING = /\bongoing\b|\bcurrent\b|\bincumbent\b|\bactive\b/;
 
 function some(hay: string, terms: string[]): boolean {
 	return terms.some((t) => hay.includes(t));

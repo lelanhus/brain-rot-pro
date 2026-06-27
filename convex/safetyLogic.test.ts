@@ -9,6 +9,15 @@ describe('classifySafety — keeps evergreen', () => {
 			classifySafety({ categories: ['Human anatomy', 'Organs'], title: 'Heart', nowYear: NOW }).safe
 		).toBe(true);
 	});
+	it('keeps anatomy with an "extremities" category (not harm)', () => {
+		expect(
+			classifySafety({
+				categories: ['Injuries to the extremities'],
+				title: 'Frostbite',
+				nowYear: 2026
+			}).safe
+		).toBe(true);
+	});
 	it('keeps a historical war', () => {
 		expect(
 			classifySafety({
@@ -60,6 +69,11 @@ describe('classifySafety — blocks current, keeps old', () => {
 		});
 		expect(r.safe).toBe(false);
 		expect(r.reason).toBe('recent-tragedy');
+	});
+	it('blocks an ongoing political topic without a year', () => {
+		const r = classifySafety({ categories: ['Ongoing civil unrest'], title: 'Civil unrest' });
+		expect(r.safe).toBe(false);
+		expect(r.reason).toBe('active-politics');
 	});
 	it('keeps an old disaster', () => {
 		expect(
