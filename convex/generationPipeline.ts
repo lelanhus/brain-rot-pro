@@ -10,6 +10,8 @@ import {
 	maxCardsPerDay
 } from './generateLogic';
 import { evergreenFromStatus, TARGET_CARDS_PER_TOPIC } from './topicsLogic';
+import { ownedDeviceOrEmpty } from './deviceIdentity';
+import { rateLimiter, rateLimitsDisabled } from './rateLimits';
 
 /**
  * Catalog-driven generation pipeline (the "warm-ahead" loop). A
@@ -209,17 +211,19 @@ export const markSupplyTriggered = internalMutation({
 export const ensureSupply = action({
 	args: { deviceId: v.string() },
 	returns: v.object({ triggered: v.boolean() }),
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	handler: async (ctx, _args): Promise<{ triggered: boolean }> => {
-		// `deviceId` is accepted for client call-signature stability and future
-		// per-device throttling, but is intentionally unused now — the throttle is
-		// GLOBAL (single key:'global' row) because the library is shared, and cost
-		// is bounded by the Workpool maxParallelism:2 cap + the 60s cooldown.
+	handler: async (ctx, args): Promise<{ triggered: boolean }> => {
 		const now = Date.now();
 		// Best-effort throttle: a rare concurrent double-trigger is acceptable (the
 		// Workpool + per-run caps bound cost); strict at-most-once isn't needed here.
 		const last: number | null = await ctx.runQuery(internal.generationPipeline.readSupplyState, {});
 		if (!supplyThrottleOk(last ?? undefined, now)) return { triggered: false };
+		// Per-device fairness on top of the global cooldown. Soft subject so a
+		// transiently session-less call degrades to no-trigger, never an error.
+		const subject = await ownedDeviceOrEmpty(ctx, args.deviceId);
+		if (subject !== '' && !rateLimitsDisabled()) {
+			const { ok } = await rateLimiter.limit(ctx, 'ensureSupply', { key: subject });
+			if (!ok) return { triggered: false };
+		}
 		await ctx.runMutation(internal.generationPipeline.markSupplyTriggered, { now });
 		await ctx.runAction(internal.generationPipeline.generateFromCatalog, { count: CATALOG_BATCH });
 		return { triggered: true };

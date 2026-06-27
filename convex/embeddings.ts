@@ -7,6 +7,7 @@ import { v } from 'convex/values';
 import { embed, embedMany } from 'ai';
 import { buildEmbeddingText, embeddingModel, relatedByConcepts } from './embedLogic';
 import { requireGatewayKey } from './aiKey';
+import { rateLimiter, rateLimitsDisabled, forCardKey, rateLimitedError } from './rateLimits';
 
 // The embedding dimension is locked to the schema's vector index (1536).
 // Overriding EMBEDDING_MODEL to a model with different dimensions requires a reindex.
@@ -76,6 +77,13 @@ export const backfillEmbeddings = internalAction({
 export const forCard = action({
 	args: { cardId: v.id('knowledgeCards'), limit: v.optional(v.number()) },
 	handler: async (ctx, args): Promise<Doc<'knowledgeCards'>[]> => {
+		if (!rateLimitsDisabled()) {
+			const identity = await ctx.auth.getUserIdentity();
+			const { ok, retryAfter } = await rateLimiter.limit(ctx, 'forCard', {
+				key: forCardKey(identity?.subject)
+			});
+			if (!ok) throw rateLimitedError(retryAfter);
+		}
 		const limit = args.limit ?? 3;
 		const target = await ctx.runQuery(internal.embeddingsDb.getCard, { cardId: args.cardId });
 		if (!target) return [];

@@ -2,12 +2,17 @@ import { internalMutation, internalQuery, mutation, query } from './_generated/s
 import { internal } from './_generated/api';
 import { v } from 'convex/values';
 import { requireDevice } from './deviceIdentity';
+import { rateLimiter, rateLimitsDisabled, rateLimitedError } from './rateLimits';
 
 /** Follow a catalog topic. Idempotent per device+slug; schedules generation so the topic has a card. */
 export const add = mutation({
 	args: { deviceId: v.string(), slug: v.string(), title: v.string() },
 	handler: async (ctx, { deviceId, slug, title }) => {
-		await requireDevice(ctx, deviceId);
+		const subject = await requireDevice(ctx, deviceId);
+		if (!rateLimitsDisabled()) {
+			const { ok, retryAfter } = await rateLimiter.limit(ctx, 'interestsAdd', { key: subject });
+			if (!ok) throw rateLimitedError(retryAfter);
+		}
 		const existing = await ctx.db
 			.query('interests')
 			.withIndex('by_device_slug', (q) => q.eq('deviceId', deviceId).eq('slug', slug))
