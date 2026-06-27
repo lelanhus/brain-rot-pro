@@ -898,41 +898,6 @@ body {
 	border: 0;
 }
 
-/* Toast: transient confirmation, not confetti. Neutral surface + hairline border +
-   a real (non-coloured) shadow, with the accent appearing only as a thin left rule —
-   a calm "noted". Used for incidental feedback (link copied, share failed, no
-   related cards), never as a reward counter. */
-.toast {
-	position: fixed;
-	left: 50%;
-	bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
-	transform: translateX(-50%);
-	z-index: 20;
-	max-width: min(86vw, 22rem);
-	text-align: left;
-	font-size: var(--fs-meta);
-	font-weight: 600;
-	color: var(--text);
-	background: var(--surface-2);
-	border: 1px solid var(--border);
-	border-left: 2px solid var(--accent);
-	padding: var(--space-3) var(--space-4);
-	border-radius: var(--radius-sm);
-	box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
-	animation: toast-in var(--dur) var(--ease);
-}
-
-@keyframes toast-in {
-	from {
-		opacity: 0;
-		transform: translate(-50%, 0.6rem) scale(0.96);
-	}
-	to {
-		opacity: 1;
-		transform: translate(-50%, 0) scale(1);
-	}
-}
-
 /* Continuation cue — the quiet "there's more this way" anchored to the first card's
    slot, centered in the bottom whitespace, with a gentle 2.4s drift (NOT a bounce —
    it invites, it doesn't demand). Scroll-snap carries it off-screen the moment the
