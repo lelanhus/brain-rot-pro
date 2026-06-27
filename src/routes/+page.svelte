@@ -87,8 +87,9 @@
 		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
 		else
 			addInterest({ deviceId, slug, title: card.source.articleTitle }).catch((err) => {
-				if (isRateLimited(err)) toast.show('Slow down a moment');
-				else console.error('[interests] add failed', err);
+				// Rate-limited follows are silently dropped (unreachable for a human at
+				// 20/min); only genuine failures are logged.
+				if (!isRateLimited(err)) console.error('[interests] add failed', err);
 			});
 	}
 
@@ -465,8 +466,9 @@
 				scrollByViewport(1);
 			}
 		} catch (err) {
-			if (isRateLimited(err)) toast.show('Slow down a moment');
-			else {
+			// A rate-limited dive is silently dropped (unreachable for a human at 30/min);
+			// the existing error surfaces only for genuine failures.
+			if (!isRateLimited(err)) {
 				console.error('[feed] more-like-this failed', err);
 				toast.show('Could not load related cards');
 			}

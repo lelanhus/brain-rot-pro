@@ -5,39 +5,32 @@
 	import { slugToDisplay } from '$lib/slug';
 	import { toggleInterest } from '$lib/interests';
 	import { isRateLimited } from '$lib/errors';
-	import { createToast } from '$lib/toast.svelte';
 
 	let { deviceId, onDone }: { deviceId: string; onDone: () => void } = $props();
 
-	const toast = createToast();
 	const suggestions = useQuery(api.topics.topByPageviews, () => ({ limit: 18 }));
 	const interestsQuery = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
 	const followedSlugs = $derived(new Set<string>((interestsQuery.data ?? []).map((i) => i.slug)));
 	const addInterest = useMutation(api.interests.add);
 	const removeInterest = useMutation(api.interests.remove);
 
-	function addWithToast(args: { deviceId: string; slug: string; title: string }): Promise<void> {
+	function addInterestSafe(args: { deviceId: string; slug: string; title: string }): Promise<void> {
 		return addInterest(args)
 			.then(() => undefined)
 			.catch((err: unknown) => {
-				if (isRateLimited(err)) toast.show('Slow down a moment');
-				else console.error('[interests] add failed', err);
+				// Rate-limited follows are silently dropped (unreachable for a human at
+				// 20/min); only genuine failures are logged.
+				if (!isRateLimited(err)) console.error('[interests] add failed', err);
 			});
 	}
 
 	const toggle = (slug: string, title: string) =>
 		toggleInterest(followedSlugs, slug, title, {
 			deviceId,
-			add: addWithToast,
+			add: addInterestSafe,
 			remove: removeInterest
 		});
 </script>
-
-{#if toast.message}
-	{#key toast.id}
-		<div class="toast" role="status">{toast.message}</div>
-	{/key}
-{/if}
 
 <div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your interests">
 	<div class="sheet">

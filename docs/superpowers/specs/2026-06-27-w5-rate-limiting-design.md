@@ -73,10 +73,11 @@ scripted abuse. They are guardrails, not product limits.
 - `convex/interests.ts` — `add`: after the existing `requireDevice`, consume a
   token; on `!ok` throw `rate_limited`.
 - **Client** (`src/lib`): wherever `forCard` and `interests.add` are called,
-  catch a `ConvexError` whose `data.code === 'rate_limited'` and surface a gentle
-  toast (the `toast.svelte` util already exists) — e.g. "Slow down a moment."
-  `ensureSupply` needs no client change (it already ignores its result shape
-  beyond `triggered`).
+  detect a `ConvexError` whose `data.code === 'rate_limited'` via `isRateLimited`
+  and **handle it silently** — no toast (user preference; the limits are
+  unreachable by a human, so a rate-limited action is just quietly dropped). Only
+  genuine (non-rate-limit) failures are logged / surfaced as before. `ensureSupply`
+  needs no client change.
 
 ## Error handling / edge cases
 
