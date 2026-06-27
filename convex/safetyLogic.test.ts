@@ -86,11 +86,20 @@ describe('classifySafety — blocks current, keeps old', () => {
 	});
 });
 
-describe('classifySafety — blocks advice-framed health', () => {
-	it('blocks a medication', () => {
+describe('classifySafety — health: keeps descriptive, blocks advice', () => {
+	it('keeps a descriptive medication article (evergreen science)', () => {
+		expect(
+			classifySafety({
+				categories: ['Antidepressants', 'Medications', 'Stimulants'],
+				title: 'Caffeine',
+				nowYear: NOW
+			}).safe
+		).toBe(true);
+	});
+	it('blocks advice-framed health (self-medication / treatment)', () => {
 		const r = classifySafety({
-			categories: ['Antidepressants', 'Medications'],
-			title: 'Sertraline',
+			categories: ['Self-medication', 'Medical treatments'],
+			title: 'Home remedies for a cold',
 			nowYear: NOW
 		});
 		expect(r.safe).toBe(false);

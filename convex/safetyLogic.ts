@@ -21,13 +21,14 @@ export const HARM_TERMS = [
 	'hate group'
 ];
 
-// Advice-framed health — blocked any era (advice risk regardless of date). Tight by design.
+// Advice-framed health — blocked any era. NOT bare descriptive drug/supplement
+// categories: those are evergreen science (caffeine, aspirin, vitamins stay).
+// Only treatment/dosage/self-care framing is blocked. Tunable.
 export const MEDICAL_ADVICE_TERMS = [
-	'medications',
-	'antidepressant',
+	'self-medication',
+	'drug overdose',
+	'home remedies',
 	'medical treatment',
-	'psychiatric medication',
-	'dietary supplement',
 	'drugs used to treat'
 ];
 
