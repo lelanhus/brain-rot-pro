@@ -4,22 +4,40 @@
 	import { api } from '$convex/_generated/api';
 	import { slugToDisplay } from '$lib/slug';
 	import { toggleInterest } from '$lib/interests';
+	import { isRateLimited } from '$lib/errors';
+	import { createToast } from '$lib/toast.svelte';
 
 	let { deviceId, onDone }: { deviceId: string; onDone: () => void } = $props();
 
+	const toast = createToast();
 	const suggestions = useQuery(api.topics.topByPageviews, () => ({ limit: 18 }));
 	const interestsQuery = useQuery(api.interests.list, () => (deviceId ? { deviceId } : 'skip'));
 	const followedSlugs = $derived(new Set<string>((interestsQuery.data ?? []).map((i) => i.slug)));
 	const addInterest = useMutation(api.interests.add);
 	const removeInterest = useMutation(api.interests.remove);
 
+	function addWithToast(args: { deviceId: string; slug: string; title: string }): Promise<void> {
+		return addInterest(args)
+			.then(() => undefined)
+			.catch((err: unknown) => {
+				if (isRateLimited(err)) toast.show('Slow down a moment');
+				else throw err;
+			});
+	}
+
 	const toggle = (slug: string, title: string) =>
 		toggleInterest(followedSlugs, slug, title, {
 			deviceId,
-			add: addInterest,
+			add: addWithToast,
 			remove: removeInterest
 		});
 </script>
+
+{#if toast.message}
+	{#key toast.id}
+		<div class="toast" role="status">{toast.message}</div>
+	{/key}
+{/if}
 
 <div class="overlay" role="dialog" aria-modal="true" aria-label="Pick your interests">
 	<div class="sheet">

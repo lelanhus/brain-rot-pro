@@ -23,6 +23,7 @@
 	import { getAdNetworkConfig } from '$lib/adNetwork';
 	import { persistCards, readCards } from '$lib/offlineFeed';
 	import { createToast } from '$lib/toast.svelte';
+	import { isRateLimited } from '$lib/errors';
 	import { cooldownGate } from '$lib/cooldownGate';
 	import { shareCard } from '$lib/share';
 	import { toSlug } from '$lib/slug';
@@ -84,7 +85,11 @@
 		if (!deviceId) return;
 		const slug = toSlug(card.source.articleTitle);
 		if (followedSlugs.has(slug)) void removeInterest({ deviceId, slug });
-		else void addInterest({ deviceId, slug, title: card.source.articleTitle });
+		else
+			addInterest({ deviceId, slug, title: card.source.articleTitle }).catch((err) => {
+				if (isRateLimited(err)) toast.show('Slow down a moment');
+				else throw err;
+			});
 	}
 
 	// Live paginated unseen feed: re-keys on deviceId + focusConcept so it
@@ -460,8 +465,11 @@
 				scrollByViewport(1);
 			}
 		} catch (err) {
-			console.error('[feed] more-like-this failed', err);
-			toast.show('Could not load related cards');
+			if (isRateLimited(err)) toast.show('Slow down a moment');
+			else {
+				console.error('[feed] more-like-this failed', err);
+				toast.show('Could not load related cards');
+			}
 		} finally {
 			divingId = null;
 		}
