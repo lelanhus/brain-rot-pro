@@ -16,7 +16,7 @@ export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'failed';
 export async function shareCard(cardId: string, hook: string): Promise<ShareResult> {
 	if (!browser) return 'failed';
 	const url = cardUrl(cardId);
-	const data: ShareData = { title: 'Brain Rot Pro', text: hook, url };
+	const data: ShareData = { title: 'Wonderwell', text: hook, url };
 
 	if (typeof navigator.share === 'function' && navigator.canShare?.(data) !== false) {
 		try {

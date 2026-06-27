@@ -557,7 +557,7 @@
 </script>
 
 <svelte:window onkeydown={onKeydown} />
-<svelte:head><title>Brain Rot Pro</title></svelte:head>
+<svelte:head><title>Wonderwell</title></svelte:head>
 
 {#if showOnboarding && deviceId}
 	<OnboardingSheet

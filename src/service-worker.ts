@@ -27,7 +27,7 @@ const OFFLINE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 background:#0b0b0f;color:#f3f3f7;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center;padding:2rem}
 h1{font-size:1.3rem;margin:0 0 .5rem}p{color:#9a9aa8;line-height:1.5;margin:0}
 </style></head><body><div><h1>You're offline</h1>
-<p>Brain Rot Pro needs a connection for fresh cards.<br>Reconnect and we'll pick up where you left off.</p>
+<p>Wonderwell needs a connection for fresh cards.<br>Reconnect and we'll pick up where you left off.</p>
 </div></body></html>`;
 
 sw.addEventListener('install', (event) => {

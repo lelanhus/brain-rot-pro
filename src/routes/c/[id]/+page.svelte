@@ -17,19 +17,21 @@
 	}
 
 	// OG/Twitter metadata, rendered at SSR so shared links unfurl with a rich preview.
-	const title = $derived(card ? card.hook : 'Brain Rot Pro');
+	const title = $derived(card ? card.hook : 'Wonderwell');
 	const description = $derived(
-		card ? card.body.slice(0, 200) : 'Source-backed knowledge cards. One more idea, always.'
+		card
+			? card.body.slice(0, 200)
+			: 'Surprising, source-backed sparks of wonder. One more idea, always.'
 	);
 	const ogImage = $derived(card?.image?.thumbnailUrl);
 	const canonical = $derived(card ? `${data.origin}/c/${card._id}` : data.origin);
 </script>
 
 <svelte:head>
-	<title>{title} · Brain Rot Pro</title>
+	<title>{title} · Wonderwell</title>
 	<meta name="description" content={description} />
 	<meta property="og:type" content="article" />
-	<meta property="og:site_name" content="Brain Rot Pro" />
+	<meta property="og:site_name" content="Wonderwell" />
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={canonical} />
@@ -43,7 +45,7 @@
 
 <main class="share-page">
 	<header class="share-head">
-		<a class="back" href={resolve('/')}>Brain Rot Pro</a>
+		<a class="back" href={resolve('/')}>Wonderwell</a>
 		{#if card}
 			<button type="button" class="share-btn" onclick={onShare}>
 				<svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
