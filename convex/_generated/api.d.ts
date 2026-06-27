@@ -45,6 +45,7 @@ import type * as interests from "../interests.js";
 import type * as legibility from "../legibility.js";
 import type * as profile from "../profile.js";
 import type * as profileLogic from "../profileLogic.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as saved from "../saved.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   legibility: typeof legibility;
   profile: typeof profile;
   profileLogic: typeof profileLogic;
+  rateLimits: typeof rateLimits;
   saved: typeof saved;
   seed: typeof seed;
   seedData: typeof seedData;
