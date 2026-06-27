@@ -10,7 +10,8 @@
 		onDislike,
 		saved,
 		onSave,
-		onShare
+		onShare,
+		justCopied = false
 	}: {
 		liked: boolean;
 		onLike: () => void;
@@ -19,6 +20,7 @@
 		saved: boolean;
 		onSave: () => void;
 		onShare?: () => void;
+		justCopied?: boolean;
 	} = $props();
 </script>
 
@@ -87,18 +89,37 @@
 	</button>
 
 	{#if onShare}
-		<button type="button" class="action share" aria-label="Share" title="Share" onclick={onShare}>
-			<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
-				<path
-					d="M12 15V4M12 4 8.5 7.5M12 4l3.5 3.5M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-			</svg>
-			<span class="vh">Share</span>
+		<button
+			type="button"
+			class="action share"
+			aria-label={justCopied ? 'Link copied' : 'Share'}
+			title={justCopied ? 'Link copied' : 'Share'}
+			onclick={onShare}
+		>
+			{#if justCopied}
+				<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+					<path
+						d="M5 13l4 4L19 7"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+			{:else}
+				<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+					<path
+						d="M12 15V4M12 4 8.5 7.5M12 4l3.5 3.5M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+			{/if}
+			<span class="vh">{justCopied ? 'Copied' : 'Share'}</span>
 		</button>
 	{/if}
 </div>

@@ -46,6 +46,16 @@ test('reflects liked / disliked / saved state via aria-pressed and labels', asyn
 		.toHaveAttribute('aria-pressed', 'false');
 });
 
+test('share button shows the copied state when justCopied is set', async () => {
+	render(CardActions, { ...base, onShare: noop, justCopied: true });
+	await expect.element(page.getByRole('button', { name: 'Link copied' })).toBeVisible();
+});
+
+test('share button reads "Share" when justCopied is not set', async () => {
+	render(CardActions, { ...base, onShare: noop });
+	await expect.element(page.getByRole('button', { name: 'Share' })).toBeVisible();
+});
+
 // The floating buttons must stay a comfortable tap target (ui-ux.md §4: ≥44px)
 // without ballooning so large they overlap the card text on a phone.
 test('action buttons are a ≥44px tap target and shrink on phone widths', async () => {
