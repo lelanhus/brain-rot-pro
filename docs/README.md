@@ -1,4 +1,6 @@
-# Brain Rot Pro — Documentation
+# Wonderwell — Documentation
+
+> formerly _Brain Rot Pro_
 
 A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 

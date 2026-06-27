@@ -1,4 +1,6 @@
-# Brain Rot Pro
+# Wonderwell
+
+> formerly _Brain Rot Pro_
 
 A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia — discrete, source-backed "one more idea" cards in an infinite vertical feed.
 
