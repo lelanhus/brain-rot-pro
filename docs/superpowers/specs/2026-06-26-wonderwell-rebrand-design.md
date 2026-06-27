@@ -18,12 +18,12 @@ tracking) are tracked separately and out of scope here.
 ## Decisions (locked)
 
 - **Public name:** `Wonderwell` (no "Pro" suffix). 10 chars — fits PWA `short_name`.
-- **Tagline:** keep the hook *"One more idea, always."*; reframe the lead-in
+- **Tagline:** keep the hook _"One more idea, always."_; reframe the lead-in
   around curiosity/wonder rather than "knowledge cards."
   - **Long (meta/manifest description):**
-    *"A zero-friction feed for the endlessly curious — surprising, source-backed sparks of wonder. One more idea, always."*
+    _"A zero-friction feed for the endlessly curious — surprising, source-backed sparks of wonder. One more idea, always."_
   - **Short (OG/Twitter fallback on `/c/[id]`):**
-    *"Surprising, source-backed sparks of wonder. One more idea, always."*
+    _"Surprising, source-backed sparks of wonder. One more idea, always."_
 - **Icon/glyph:** keep the existing glyph art in `static/icon.svg` and
   `static/favicon.svg`; only update the `aria-label`. Visual redesign deferred.
 - **Internal identifiers:** unchanged. The `package.json` name stays
@@ -36,23 +36,23 @@ tracking) are tracked separately and out of scope here.
 Display strings only. Each row is a user-visible "Brain Rot Pro" / "Brain Rot"
 occurrence.
 
-| File | Change |
-|------|--------|
-| `src/app.html` | `meta[name=apple-mobile-web-app-title]` `Brain Rot` → `Wonderwell`; `meta[name=description]` → **long tagline**. The inline `localStorage.getItem('brp_theme')` read stays (internal key). |
-| `static/manifest.webmanifest` | `name` `Brain Rot Pro` → `Wonderwell`; `short_name` `Brain Rot` → `Wonderwell`; `description` → **long tagline**. |
-| `src/service-worker.ts` (line ~30) | offline page copy `Brain Rot Pro needs a connection…` → `Wonderwell needs a connection…`. |
-| `src/lib/share.ts` (line ~19) | `ShareData.title` `'Brain Rot Pro'` → `'Wonderwell'`. |
-| `src/routes/+page.svelte` (line ~560) | `<title>Brain Rot Pro</title>` → `<title>Wonderwell</title>`. |
-| `src/routes/c/[id]/+page.svelte` | fallback `title` `'Brain Rot Pro'` → `'Wonderwell'`; fallback `description` → **short tagline**; `<title>{title} · Brain Rot Pro</title>` → `· Wonderwell`; `og:site_name` → `Wonderwell`; back-link text `Brain Rot Pro` → `Wonderwell`. |
-| `static/icon.svg`, `static/favicon.svg` | `role="img"` `aria-label="Brain Rot Pro"` → `aria-label="Wonderwell"`. Glyph paths untouched. |
-| Tests | grep the test suite for `Brain Rot` and update any assertions on display strings (e.g. an `og:site_name` or `<title>` assertion). |
-| `README.md`, `docs/README.md` | Title/first line → `Wonderwell` with a `(formerly Brain Rot Pro)` parenthetical. Internal design docs (`architecture-decisions.md`, `release-gates.md`, etc.) kept verbatim as historical record. |
+| File                                    | Change                                                                                                                                                                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app.html`                          | `meta[name=apple-mobile-web-app-title]` `Brain Rot` → `Wonderwell`; `meta[name=description]` → **long tagline**. The inline `localStorage.getItem('brp_theme')` read stays (internal key).                                                |
+| `static/manifest.webmanifest`           | `name` `Brain Rot Pro` → `Wonderwell`; `short_name` `Brain Rot` → `Wonderwell`; `description` → **long tagline**.                                                                                                                         |
+| `src/service-worker.ts` (line ~30)      | offline page copy `Brain Rot Pro needs a connection…` → `Wonderwell needs a connection…`.                                                                                                                                                 |
+| `src/lib/share.ts` (line ~19)           | `ShareData.title` `'Brain Rot Pro'` → `'Wonderwell'`.                                                                                                                                                                                     |
+| `src/routes/+page.svelte` (line ~560)   | `<title>Brain Rot Pro</title>` → `<title>Wonderwell</title>`.                                                                                                                                                                             |
+| `src/routes/c/[id]/+page.svelte`        | fallback `title` `'Brain Rot Pro'` → `'Wonderwell'`; fallback `description` → **short tagline**; `<title>{title} · Brain Rot Pro</title>` → `· Wonderwell`; `og:site_name` → `Wonderwell`; back-link text `Brain Rot Pro` → `Wonderwell`. |
+| `static/icon.svg`, `static/favicon.svg` | `role="img"` `aria-label="Brain Rot Pro"` → `aria-label="Wonderwell"`. Glyph paths untouched.                                                                                                                                             |
+| Tests                                   | grep the test suite for `Brain Rot` and update any assertions on display strings (e.g. an `og:site_name` or `<title>` assertion).                                                                                                         |
+| `README.md`, `docs/README.md`           | Title/first line → `Wonderwell` with a `(formerly Brain Rot Pro)` parenthetical. Internal design docs (`architecture-decisions.md`, `release-gates.md`, etc.) kept verbatim as historical record.                                         |
 
 ## Out of scope (other workstreams)
 
 - **W2 — Domain + deployment:** adding wonderwell.app on Vercel, DNS, `SITE_URL`,
-  Google OAuth redirect URIs, canonical-origin wiring. The rebrand changes *names*,
-  not *URLs*; the canonical/OG `og:url` already derives from `data.origin` at
+  Google OAuth redirect URIs, canonical-origin wiring. The rebrand changes _names_,
+  not _URLs_; the canonical/OG `og:url` already derives from `data.origin` at
   runtime and needs no edit here.
 - Icon visual redesign.
 - `brp_` → `ww_` storage-key rename.
@@ -80,14 +80,14 @@ occurrence.
 
 ## Launch program (context only — not this workstream)
 
-| # | Workstream | Status |
-|---|-----------|--------|
-| **W1** | **Rebrand → Wonderwell** | **this spec** |
-| W2 | Domain + deployment (wonderwell.app, `SITE_URL`, OAuth URIs, Convex prod posture) | pending |
-| W3 | Privacy & legal (`/privacy`, consent/links, retention job; ⚖ counsel review in parallel) | pending |
-| W4 | Safety guardrails (ingestion suppress-list + rank-time topic filter) | pending |
-| W5 | Security hardening (admin auth → role/cookie; per-device rate limiting) | pending |
-| W6 | Error tracking + resilience (`+error.svelte`, wire error tracking, reduced-motion/focus-trap, UA contact) | pending |
+| #      | Workstream                                                                                                | Status        |
+| ------ | --------------------------------------------------------------------------------------------------------- | ------------- |
+| **W1** | **Rebrand → Wonderwell**                                                                                  | **this spec** |
+| W2     | Domain + deployment (wonderwell.app, `SITE_URL`, OAuth URIs, Convex prod posture)                         | pending       |
+| W3     | Privacy & legal (`/privacy`, consent/links, retention job; ⚖ counsel review in parallel)                  | pending       |
+| W4     | Safety guardrails (ingestion suppress-list + rank-time topic filter)                                      | pending       |
+| W5     | Security hardening (admin auth → role/cookie; per-device rate limiting)                                   | pending       |
+| W6     | Error tracking + resilience (`+error.svelte`, wire error tracking, reduced-motion/focus-trap, UA contact) | pending       |
 
 Human gates to start in parallel: ⚖ counsel review of the CC BY-SA reuse model;
 Google OAuth console setup for wonderwell.app (unblocks the one untested B1 path,

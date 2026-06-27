@@ -26,6 +26,7 @@
 ### Task 1: Rebrand guard + swap every user-facing string
 
 **Files:**
+
 - Create: `src/lib/branding.spec.ts` (node/server-project test)
 - Modify: `src/app.html`
 - Modify: `static/manifest.webmanifest`
@@ -37,6 +38,7 @@
 - Modify: `static/favicon.svg:1`
 
 **Interfaces:**
+
 - Consumes: nothing (first task).
 - Produces: the rebranded user-facing surface. Task 2 (docs) depends on nothing from this task except that the app strings are already "Wonderwell".
 
@@ -83,72 +85,92 @@ Expected: FAIL — every case fails `expect(content).toContain('Wonderwell')` (a
 - [ ] **Step 3: Swap the app-shell + PWA + icon strings**
 
 In `src/app.html`:
+
 - Change the description meta to the long tagline:
   ```html
-  		<meta
-  			name="description"
-  			content="A zero-friction feed for the endlessly curious — surprising, source-backed sparks of wonder. One more idea, always."
-  		/>
+  <meta
+  	name="description"
+  	content="A zero-friction feed for the endlessly curious — surprising, source-backed sparks of wonder. One more idea, always."
+  />
   ```
 - Change the apple web-app title:
   ```html
-  		<meta name="apple-mobile-web-app-title" content="Wonderwell" />
+  <meta name="apple-mobile-web-app-title" content="Wonderwell" />
   ```
 - Leave the `localStorage.getItem('brp_theme')` script untouched.
 
 In `static/manifest.webmanifest`, set:
+
 ```json
 	"name": "Wonderwell",
 	"short_name": "Wonderwell",
 	"description": "A zero-friction feed for the endlessly curious — surprising, source-backed sparks of wonder. One more idea, always.",
 ```
+
 (Leave `start_url`, `scope`, colors, `categories`, and `icons` unchanged.)
 
 In `src/service-worker.ts`, in the offline-page HTML string change the paragraph:
+
 ```html
-<p>Wonderwell needs a connection for fresh cards.<br>Reconnect and we'll pick up where you left off.</p>
+<p>
+	Wonderwell needs a connection for fresh cards.<br />Reconnect and we'll pick up where you left
+	off.
+</p>
 ```
 
 In `static/icon.svg` line 1 and `static/favicon.svg` line 1, change only the label:
+
 ```html
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Wonderwell">
+<svg
+	xmlns="http://www.w3.org/2000/svg"
+	viewBox="0 0 512 512"
+	role="img"
+	aria-label="Wonderwell"
+></svg>
 ```
+
 (Do not touch any `<path>`/glyph markup.)
 
 - [ ] **Step 4: Swap the titles + share + OG strings**
 
 In `src/lib/share.ts` line ~19:
+
 ```ts
-	const data: ShareData = { title: 'Wonderwell', text: hook, url };
+const data: ShareData = { title: 'Wonderwell', text: hook, url };
 ```
 
 In `src/routes/+page.svelte` line ~560:
+
 ```svelte
 <svelte:head><title>Wonderwell</title></svelte:head>
 ```
 
 In `src/routes/c/[id]/+page.svelte`:
+
 - Fallback title (line ~20):
   ```ts
-  	const title = $derived(card ? card.hook : 'Wonderwell');
+  const title = $derived(card ? card.hook : 'Wonderwell');
   ```
 - Fallback description (line ~22):
   ```ts
-  	const description = $derived(
-  		card ? card.body.slice(0, 200) : 'Surprising, source-backed sparks of wonder. One more idea, always.'
-  	);
+  const description = $derived(
+  	card
+  		? card.body.slice(0, 200)
+  		: 'Surprising, source-backed sparks of wonder. One more idea, always.'
+  );
   ```
 - Title suffix (line ~29):
   ```svelte
-  	<title>{title} · Wonderwell</title>
+  <title>{title} · Wonderwell</title>
   ```
 - og:site_name (line ~32):
   ```svelte
-  	<meta property="og:site_name" content="Wonderwell" />
+  <meta property="og:site_name" content="Wonderwell" />
   ```
 - Back-link text (line ~46):
+
   ```svelte
-  		<a class="back" href={resolve('/')}>Wonderwell</a>
+  <a class="back" href={resolve('/')}>Wonderwell</a>
   ```
 
 - [ ] **Step 5: Run the guard test to verify it passes**
@@ -180,35 +202,41 @@ git commit -m "feat(rebrand): swap user-facing strings to Wonderwell (W1)"
 ### Task 2: Rebrand README + docs index note
 
 **Files:**
+
 - Modify: `README.md` (title + first line)
 - Modify: `docs/README.md` (title)
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: docs that name the product "Wonderwell". Internal design docs (`architecture-decisions.md`, `release-gates.md`, etc.) are intentionally left verbatim as historical record.
 
 - [ ] **Step 1: Update `README.md`**
 
 Change the top heading and intro line:
+
 ```md
 # Wonderwell
 
-> formerly *Brain Rot Pro*
+> formerly _Brain Rot Pro_
 
 A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia — discrete, source-backed "one more idea" cards in an infinite vertical feed.
 ```
+
 (Leave the rest of the README — stack line, quick start, layout — unchanged.)
 
 - [ ] **Step 2: Update `docs/README.md`**
 
 Change the top heading:
+
 ```md
 # Wonderwell — Documentation
 
-> formerly *Brain Rot Pro*
+> formerly _Brain Rot Pro_
 
 A zero-friction, AI-generated knowledge feed sourced from Wikipedia/Wikimedia.
 ```
+
 (Leave the "Read in this order", "Current status", and "Running it" sections unchanged — they are historical record.)
 
 - [ ] **Step 3: Confirm docs build/lint is unaffected**
@@ -228,6 +256,7 @@ git commit -m "docs(rebrand): rename product to Wonderwell in README + docs inde
 ## Self-Review
 
 **Spec coverage** (against `2026-06-26-wonderwell-rebrand-design.md`):
+
 - app.html (title + description) → Task 1 Step 3 ✓
 - manifest (name/short_name/description) → Task 1 Step 3 ✓
 - service-worker offline copy → Task 1 Step 3 ✓

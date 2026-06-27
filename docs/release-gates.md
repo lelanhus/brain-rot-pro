@@ -95,7 +95,7 @@ backend deployed via `convex dev --once`, client via push to main):
 - [x] Anonymous first-load establishes a session (`isAnonymous: true`); feed
       renders via the soft path; a save persists; `recordActivity` records.
 - [x] A forged / session-less `deviceId` is refused — `ConvexError:
-    unauthenticated` from `requireDevice` (verified via `convex run` + browser).
+unauthenticated` from `requireDevice` (verified via `convex run` + browser).
 - [x] `feed.unseen` without a session returns the global feed (no leak, no throw).
 - [ ] Google sign-in → anon-data merge (`onLinkAccount`) not yet exercised
       end-to-end (needs a real Google OAuth round-trip); server path is wired.
