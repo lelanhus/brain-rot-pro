@@ -7,7 +7,9 @@ import { classifySafety } from './safetyLogic';
 /** Published cards with their source title + categories (categories from the linked article). */
 export const listPublishedForSafety = internalQuery({
 	args: {},
-	handler: async (ctx) => {
+	handler: async (
+		ctx
+	): Promise<{ cardId: Id<'knowledgeCards'>; title: string; categories: string[] }[]> => {
 		const cards = await ctx.db
 			.query('knowledgeCards')
 			.withIndex('by_status_shuffle', (q) => q.eq('status', 'published'))
@@ -40,7 +42,15 @@ export const backfillSafety = internalAction({
 		suppressed: v.number(),
 		reasons: v.array(v.object({ title: v.string(), reason: v.string() }))
 	}),
-	handler: async (ctx, { apply, nowYear }) => {
+	handler: async (
+		ctx,
+		{ apply, nowYear }
+	): Promise<{
+		scanned: number;
+		unsafe: number;
+		suppressed: number;
+		reasons: { title: string; reason: string }[];
+	}> => {
 		const rows = await ctx.runQuery(internal.safety.listPublishedForSafety, {});
 		const unsafeIds: Id<'knowledgeCards'>[] = [];
 		const reasons: { title: string; reason: string }[] = [];
