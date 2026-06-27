@@ -50,7 +50,7 @@ export function forCardKey(subject: string | undefined): string {
 	return subject !== undefined && subject.length > 0 ? subject : 'anon';
 }
 
-/** The typed error clients detect to show a gentle "slow down" toast. */
+/** The typed error clients detect to handle a rate-limited call silently. */
 export function rateLimitedError(retryAfter?: number): ConvexError<{
 	code: 'rate_limited';
 	retryAfter: number | undefined;

@@ -10,8 +10,9 @@ export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'failed';
 
 /**
  * Share a card: native share sheet where available (mobile/PWA), else copy the
- * link to the clipboard. Returns what happened so the caller can confirm (e.g. a
- * "Link copied" toast). A user-cancelled share sheet is `cancelled`, not a failure.
+ * link to the clipboard. Returns what happened so the caller can confirm the copy
+ * (e.g. an inline "Copied" state). A user-cancelled share sheet is `cancelled`,
+ * not a failure.
  */
 export async function shareCard(cardId: string, hook: string): Promise<ShareResult> {
 	if (!browser) return 'failed';
